@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"bytes"
-	"runtime/pprof"
 
 	"github.com/elseano/rundown/segments"
 	"github.com/elseano/rundown/markdown"
@@ -272,16 +271,6 @@ func defaultComplete(c *cli.Context) {
 }
 
 func main() {
-	f, perr := os.Create("cpuprofile.prof")
-	if perr != nil {
-			log.Fatal("could not create CPU profile: ", perr)
-	}
-	defer f.Close() // error handling omitted for example
-	if perr := pprof.StartCPUProfile(f); perr != nil {
-			log.Fatal("could not start CPU profile: ", perr)
-	}
-	defer pprof.StopCPUProfile()
-
 	app := &cli.App{
 		Name:  "rundown",
 		Usage: "Display and execute markdown files.",
