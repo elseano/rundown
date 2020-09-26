@@ -13,7 +13,7 @@ Some of the usecases rundown suits are:
 
 As we use Rundown, we're finding plenty of other ways you can use it!
 
-## Feature Highlights & Examples
+## Feature Highlights
 
 Rundown will run markdown perfectly fine. As your rundown files get more complex, you'll want to start using the rundown extensions. Rundown's extensions are transparent additions to the markdown format which aren't rendered by standard markdown renderers (i.e. Github, etc), meaning a reader won't even notice the additions. 
 
@@ -29,10 +29,27 @@ Some of the additions Rundown brings are:
 * Visually appealing console markdown rendering
 * Shebang support, allowing you to make your markdown files executables (POSIX)
 * Rundown files can be designed to execute top to bottom, or present a menu to execute only a single part.
-* Fast - rundown is written in Go, and works on Linux, Windows and Mac.
+* Fast - rundown is written in Go, and works on Linux and Mac. Windows support via WSL probably works.
 
-[](label:show-code-blocks)
-## Fenced Code Block Examples
+## Rundown Examples <r label=examples/>
+
+At it's core, Rundown turns markdown's fenced code blocks into executable code. Indented code blocks are left as-is, as illustrated by this example.
+
+    # Simple Markdown File
+
+        This is a code block, it will be rendered to the console.
+    
+    ``` bash
+    echo "This is a fenced code block, it will be executed"
+    ```
+
+When running fenced code blocks, rundown by default will hide the output and display a spinner indicating that it's running.
+
+![](2020-09-26-19-56-49.png)
+
+It will update the spinner on completion of the process to either successful or failure. Failures terminate rundown unless you specify otherwise.
+
+
 
 By default, a fenced code block which doesn't specify a language will be rendered out.
 
@@ -54,45 +71,15 @@ However, if you specify the syntax, then rundown will execute that file, and sho
 sleep 1
 ```
 
-In Rundown, you can change how the code block executes by adding additional flag and parameters to the syntax line.
-
-    ``` bash stdout
-    echo "Output Line 1"
-    sleep 1
-    echo "Output line 2"
-    ```
-
-``` bash stdout
-echo "Output Line 1"
-sleep 1
-echo "Output line 2"
-```
-
-There are cases were the syntax doesn't match the executable, or you need to add flags to the executable. You can use the `with` flag on the code block. Here, we're also using the `named` flag, which assumes the first line is a comment which should be the title of the spinner.
-
-    ``` js with:"node --jitless" stdout named
-    // Hi from NodeJS
-    console.log("Hi from NodeJS")
-    ```
-
-``` js with:"node --jitless" stdout named
-// Hi from NodeJS
-console.log("Hi from NodeJS")
-```
-
 A full list of the modifiers and examples can be found in the [Modifiers Example](./examples/mods.md) markdown file.
 
-[](label:shortcodes)
-## Shortcodes
+## Shortcodes <r label=shortcodes>
 
 Headings can have "shortcodes" attached to them, which allows that heading (and all child headings) to be executed specifically. Specifying a shortcode can be done either before the heading, or inside the heading itself.
 
-    ## Shortcodes [](label:shortcodes)
-
-    or
-
-    [](label:shortcodes)
-    ## Shortcodes
+``` markdown reveal norun
+## Shortcodes <r label=shortcodes/>
+```
 
 That heading can then be run via `rundown README.md shortcodes`. Bash/Fish/ZSH completition is available for shortcodes, as well as a shortcode subcommand which lists available shortcodes within a document.
 
@@ -108,8 +95,7 @@ For example:
     export GO_ARCH=linux
     ```
 
-    [](label:compile)
-    ## Compile
+    ## Compile <r label=build/>
 
     ``` bash
     go build -o rundown

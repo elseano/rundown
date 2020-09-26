@@ -2,7 +2,6 @@ package util
 
 import (
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -138,10 +137,7 @@ func (p *Process) Start() (*io.PipeReader, error) {
 
 		p.waitGroup.Add(1)
 
-		_, err := io.Copy(stdoutW, p.pty)
-		if err != nil {
-			log.Printf("Error while copying pty to output pipe: %v\r\n", err)
-		}
+		_, _ = io.Copy(stdoutW, p.pty)
 
 		p.waitGroup.Done()
 	}()
@@ -150,10 +146,7 @@ func (p *Process) Start() (*io.PipeReader, error) {
 	go func() {
 		p.waitGroup.Add(1)
 
-		_, err = io.Copy(p.pty, stdinR)
-		if err != nil {
-			log.Printf("Error while copying input pipe to pty: %v\r\n", err)
-		}
+		_, _ = io.Copy(p.pty, stdinR)
 
 		p.waitGroup.Done()
 
