@@ -7,6 +7,7 @@ require (
 	github.com/alecthomas/chroma v0.7.2-0.20200305040604-4f3623dce67a
 	github.com/briandowns/spinner v1.11.1
 	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129 // indirect
+	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 	github.com/containerd/fifo v0.0.0-20200410184934-f15a3290365b
 	github.com/creack/pty v1.1.11
 	github.com/fatih/color v1.7.0
@@ -15,6 +16,7 @@ require (
 	github.com/hpcloud/tail v1.0.0
 	github.com/kyokomi/emoji v2.2.4+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible
+	github.com/manifoldco/promptui v0.7.0
 	github.com/papertrail/go-tail v0.0.0-20180509224916-973c153b0431
 	github.com/paulrademacher/climenu v0.0.0-20151110221007-a1afbb4e378b
 	github.com/pkg/term v1.0.0 // indirect

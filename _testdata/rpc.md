@@ -1,13 +1,16 @@
 
 # Rundown RPC functionality
 
-Rundown supports RPC functionality which enables your scripts to alter how rundown displays and handles process execution.
+Rundown supports RPC functionality.
+
+This enables your scripts to alter how rundown displays and handles process
+execution.
 
 ## Changing the spinner title
 
 Rundown RPC supports setting the spinner title via:
 
- ┃ echo "name: New spinner title" > $RUNDOWN
+    echo "name: New spinner title" > $RUNDOWN
 
 For example:
 
@@ -24,7 +27,8 @@ echo "name: Title changed again" > $RUNDOWN
 
 ## Passing environment variables
 
-Code blocks can set environment variables, and they'll be provided to subsequent environment variables.
+Code blocks can set environment variables, and they'll be provided to
+subsequent environment variables.
 
 ``` bash reveal
 echo "env: SOMEVAL=Test" > $RUNDOWN
@@ -36,10 +40,11 @@ Now we can reference that later.
 echo $SOMEVAL
 ```
 
-There's also a shorthand to capture **new** environment variables from a script, using the `env` modifier.
+There's also a shorthand to capture **exported** environment variables from a
+script, using the `env` modifier.
 
 ``` bash reveal env
-NEW_VAR=Something
+export NEW_VAR=Something
 ```
 
 And then reference again:
@@ -52,27 +57,46 @@ echo $NEW_VAR
 -----
 
 Rundown RPC functionality
-Rundown supports RPC functionality which enables your scripts to alter how rundown displays and handles process execution.
+Rundown supports RPC functionality.
+
+This enables your scripts to alter how rundown displays and handles process
+execution.
 
   Changing the spinner title
   Rundown RPC supports setting the spinner title via:
 
-  echo "S New spinner title" >> $RUNDOWN
+   ┃ echo "name: New spinner title" > $RUNDOWN
 
   For example:
 
   ✔ Title changed again (Complete)
 
   Passing environment variables
-  Code blocks can set environment variables, and they'll be provided to subsequent environment variables.
+  Code blocks can set environment variables, and they'll be provided to
+  subsequent environment variables.
 
-  echo "E SOMEVAL=Test" >> $RUNDOWN
+   ┃ echo "env: SOMEVAL=Test" > $RUNDOWN
 
   ✔ Running (Complete)
 
   Now we can reference that later.
 
-  echo $SOMEVAL
+   ┃ echo $SOMEVAL
 
   Output
   ‣ Test
+  
+  There's also a shorthand to capture exported environment variables from a
+  script, using the env modifier.
+
+   ┃ export NEW_VAR=Something
+
+  ✔ Running (Complete)
+
+  And then reference again:
+
+   ┃ echo $NEW_VAR
+
+  Output
+  ‣ Something
+  ✔ Running (Complete)

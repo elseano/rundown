@@ -1,16 +1,16 @@
 package main
 
 import (
-	"testing"
 	"bufio"
-	"strings"
-	"os"
 	"bytes"
+	"os"
+	"strings"
+	"testing"
 
-	"github.com/elseano/rundown/segments"
 	"github.com/elseano/rundown/markdown"
-	"github.com/elseano/rundown/util"
+	"github.com/elseano/rundown/segments"
 	"github.com/elseano/rundown/testutil"
+	"github.com/elseano/rundown/util"
 )
 
 func TestSimpleRundown(t *testing.T) {
@@ -48,7 +48,6 @@ func TestFailureRundown(t *testing.T) {
 	testutil.AssertLines(t, expected, actual)
 }
 
-
 func TestEmojiRundown(t *testing.T) {
 	source, expected := loadFile("_testdata/emoji.md")
 	actual := run(t, source)
@@ -70,6 +69,20 @@ func TestFormattingRundown(t *testing.T) {
 	testutil.AssertLines(t, expected, actual)
 }
 
+func TestStopOkRundown(t *testing.T) {
+	source, expected := loadFile("_testdata/stop.md")
+	actual := run(t, source)
+
+	testutil.AssertLines(t, expected, actual)
+}
+
+func TestStopFailRundown(t *testing.T) {
+	source, expected := loadFile("_testdata/stopfail.md")
+	actual := run(t, source)
+
+	testutil.AssertLines(t, expected, actual)
+}
+
 // Blah
 func run(t *testing.T, source string) string {
 	logger := testutil.NewTestLogger(t)
@@ -84,9 +97,12 @@ func run(t *testing.T, source string) string {
 
 	var buffer bytes.Buffer
 
-	ExecuteRundown(result, md.Renderer(), logger, &buffer)
+	context := segments.NewContext()
+	context.ConsoleWidth = 80
 
-	fixed :=  strings.TrimSpace(util.CollapseReturns(util.RemoveColors(buffer.String())))
+	segments.ExecuteRundown(context, result, md.Renderer(), logger, &buffer)
+
+	fixed := strings.TrimSpace(util.CollapseReturns(util.RemoveColors(buffer.String())))
 
 	for i, line := range strings.Split(fixed, "\n") {
 		t.Logf("%3d: %s\n", i, line)
@@ -94,7 +110,6 @@ func run(t *testing.T, source string) string {
 
 	return fixed
 }
-
 
 func loadFile(filename string) (source string, expected string) {
 	fp, err := os.Open(filename)

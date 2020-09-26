@@ -1,11 +1,13 @@
 package segments
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
+	"math"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -13,9 +15,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"math"
-	"bufio"
 
+	"github.com/elseano/rundown/markdown"
 	"github.com/elseano/rundown/util"
 	"golang.org/x/crypto/ssh/terminal"
 
@@ -27,8 +28,8 @@ import (
 type CodeSegment struct {
 	BaseSegment
 	code      string
-	Modifiers *Modifiers
 	language  string
+	modifiers *markdown.Modifiers
 }
 
 func rpcLoop(messages chan string, spinner util.Spinner, context *Context, logger *log.Logger, rpcDoneChan chan struct{}, rpcDoneCommand string) {
@@ -37,8 +38,8 @@ func rpcLoop(messages chan string, spinner util.Spinner, context *Context, logge
 		var splitLine = strings.SplitN(incoming, " ", 2)
 		var cmd = splitLine[0]
 		var args = ""
-		
-		if len(splitLine) > 1 { 
+
+		if len(splitLine) > 1 {
 			args = splitLine[1]
 		}
 
@@ -53,8 +54,8 @@ func rpcLoop(messages chan string, spinner util.Spinner, context *Context, logge
 			break
 		case "envdiff:":
 			logger.Printf("[RPC] Set all new environment variables\n")
-			var existing = map[string]bool{ "RUNDOWN": true }
-			
+			var existing = map[string]bool{"RUNDOWN": true}
+
 			for _, env := range os.Environ() {
 				splitEnv := strings.SplitN(env, "=", 2)
 				existing[splitEnv[0]] = true
@@ -64,15 +65,19 @@ func rpcLoop(messages chan string, spinner util.Spinner, context *Context, logge
 
 			for line := range messages {
 				logger.Printf("[RPC] Got env %s\n", line)
-				if line == ":done" { break }
+				if line == ":done" {
+					break
+				}
 				args := strings.SplitN(line, "=", 2)
 
-				if existing[args[0]] { continue } // Ignore existing environment variables
+				if existing[args[0]] {
+					continue
+				} // Ignore existing environment variables
 				if len(args) < 2 {
 					logger.Printf("[RPC] Garbage: %s\n", args[0])
 					continue
 				}
-				
+
 				logger.Printf("[RPC] Environments to set: %v\n", args)
 				context.SetEnv(args[0], args[1])
 			}
@@ -84,9 +89,8 @@ func rpcLoop(messages chan string, spinner util.Spinner, context *Context, logge
 
 		default:
 			logger.Printf("[RPC] Ignoring unknown %s", incoming)
-	
-		}
 
+		}
 
 	}
 }
@@ -98,8 +102,8 @@ func inputHandler(reader *os.File, writer *os.File, logger *log.Logger) {
 
 	for {
 		if n, err := reader.Read(buf); err == nil {
-			logger.Printf("Got input: %d %q\n", n, buf[0:n])				
-			newlines := bytes.Count(buf[0:n], []byte{ 13 })
+			logger.Printf("Got input: %d %q\n", n, buf[0:n])
+			newlines := bytes.Count(buf[0:n], []byte{13})
 			if newlines > 0 {
 				logger.Printf("Found newlines: %d", newlines)
 				writer.Write([]byte("\r\n"))
@@ -108,10 +112,9 @@ func inputHandler(reader *os.File, writer *os.File, logger *log.Logger) {
 	}
 }
 
-
 func (c *CodeSegment) Kind() string { return "CodeSegment" }
 
-func (s *CodeSegment) displayBlock(source []byte, context *Context, renderer renderer.Renderer, lastSegment *Segment, logger *log.Logger, out io.Writer) {
+func (s *CodeSegment) displayBlock(source []byte, context *Context, renderer renderer.Renderer, lastSegment Segment, logger *log.Logger, out io.Writer) {
 	// if lastSegment != nil {
 
 	// 	if lastCode, ok := CodeSegment(*lastSegment); ok {
@@ -123,12 +126,12 @@ func (s *CodeSegment) displayBlock(source []byte, context *Context, renderer ren
 
 	seg := &DisplaySegment{
 		BaseSegment{
-			Indent: s.Indent,
+			Level:  s.Level,
 			Nodes:  s.Nodes,
 			Source: &source,
 		},
 	}
-	
+
 	seg.Execute(context, renderer, lastSegment, logger, out)
 }
 
@@ -136,10 +139,10 @@ func (s *CodeSegment) String() string {
 	var buf bytes.Buffer
 
 	buf.WriteString("CodeSegment {\n")
-	buf.WriteString(fmt.Sprintf("  Mods: %s", s.Modifiers))
-	out := util.CaptureStdout(func() { 
+	buf.WriteString(fmt.Sprintf("  Mods: %s\n", s.GetModifiers()))
+	out := util.CaptureStdout(func() {
 		for _, n := range s.Nodes {
-			n.Dump(*s.Source, s.Indent)
+			n.Dump(*s.Source, s.Level)
 		}
 	})
 	buf.WriteString(out)
@@ -166,7 +169,7 @@ func (w SafeWriter) Write(p []byte) (n int, err error) {
 }
 
 func saveContentsToTemp(context *Context, contents string, filenamePreference string) string {
-	if tmpFile, err := ioutil.TempFile(context.TempDir, "saved-*-" + filenamePreference); err == nil {
+	if tmpFile, err := ioutil.TempFile(context.TempDir, "saved-*-"+filenamePreference); err == nil {
 		tmpFile.WriteString(contents)
 		tmpFile.Close()
 
@@ -175,6 +178,8 @@ func saveContentsToTemp(context *Context, contents string, filenamePreference st
 		panic(err)
 	}
 }
+
+func (s *CodeSegment) GetModifiers() *markdown.Modifiers { return s.modifiers }
 
 /**
 * Modifiers:
@@ -190,51 +195,47 @@ func saveContentsToTemp(context *Context, contents string, filenamePreference st
 *   abort - Implies named and stdout. Displays a named execution failure, and exits without showing the script.
  */
 
-func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, lastSegment *Segment, loggerInner *log.Logger, out io.Writer) ExecutionResult {
+func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, lastSegment Segment, loggerInner *log.Logger, out io.Writer) ExecutionResult {
 	var spinner util.Spinner = util.NewDummySpinner()
 	var spinnerName = "Running"
 	var rpcDoneCommand = "RD-DDDX"
 	var doneChannel = make(chan struct{})
+	var modifiers = s.modifiers
 
 	writer := SafeWriter{Writer: loggerInner.Writer(), spinner: spinner}
 
 	logger := log.New(writer, loggerInner.Prefix(), loggerInner.Flags())
 
-	indent := s.Indent
+	indent := s.Level
 
-	if context.ForcedIndentZero {
+	if context.ForcedLevelZero {
 		indent = 0
 	}
 
-	logger.Printf("Block mods: %s\n", s.Modifiers)
+	logger.Printf("Block mods: %s\n", modifiers)
 
 	if strings.TrimSpace(s.language) == "" {
-		s.Modifiers.Flags[NoRunFlag] = true
-		s.Modifiers.Flags[RevealFlag] = true
+		modifiers.Flags[NoRunFlag] = true
+		modifiers.Flags[RevealFlag] = true
 	}
 
-	if save, ok := s.Modifiers.Values[SaveParameter]; ok {
+	if save, ok := modifiers.Values[SaveParameter]; ok {
 		content := s.code
 
-		if s.Modifiers.Flags[EnvAwareFlag] == true {
-			for k,v := range context.Env {
-				content = strings.ReplaceAll(content, "$" + k, v)
+		if modifiers.Flags[EnvAwareFlag] == true {
+			for k, v := range context.Env {
+				content = strings.ReplaceAll(content, "$"+k, v)
 			}
 		}
 		path := saveContentsToTemp(context, content, save)
 		varName := strings.Split(save, ".")[0]
 		context.SetEnv(strings.ToUpper(varName), path)
-		s.Modifiers.Flags[NoRunFlag] = true
+		modifiers.Flags[NoRunFlag] = true
 	}
 
-	if s.Modifiers.Flags[AbortFlag] {
-		s.Modifiers.Flags[NamedFlag] = true
-		s.Modifiers.Flags[StdoutFlag] = true
-	}
-
-	if s.Modifiers.Flags[NoRunFlag] {
+	if modifiers.Flags[NoRunFlag] {
 		logger.Println("Block is NORUN")
-		if !s.Modifiers.Flags[RevealFlag] {
+		if !modifiers.Flags[RevealFlag] {
 			logger.Println("Block is noop")
 			return SuccessfulExecution
 		} else {
@@ -244,26 +245,32 @@ func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, last
 
 			content := outCap.String()
 
-			if s.Modifiers.Flags[EnvAwareFlag] == true {
+			if modifiers.Flags[EnvAwareFlag] == true {
 				logger.Println("Block is ENV_AWARE. Substituting environment")
 
-				envMatch := regexp.MustCompile("(\\$[A-Z0-9_]+)")
-
-				for k,v := range context.Env {
-					content = strings.ReplaceAll(content, "$" + k, v)
-				}
-
-				if match := envMatch.FindString(content); match != "" {
-					return ExecutionResult{ 
-						Message: match + " is not set",
-						Kind: "Error", 
-						Source: content, 
-						Output: "",
+				c, err := SubEnv(content, context)
+				if err != nil {
+					return ExecutionResult{
+						Message: err.Error(),
+						Kind:    "Error",
+						Source:  content,
+						Output:  "",
 						IsError: true,
 					}
 				}
+
+				content = c
+
+				envMatch := regexp.MustCompile("(\\$[A-Z0-9_]+)")
+
+				for k, v := range context.Env {
+					content = strings.ReplaceAll(content, "$"+k, v)
+				}
+
+				if match := envMatch.FindString(content); match != "" {
+				}
 			}
-			
+
 			out.Write([]byte(content))
 			// out.Write([]byte("\r\n")) // Add some space between code output and next block.
 
@@ -271,7 +278,7 @@ func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, last
 		}
 	}
 
-	if s.Modifiers.Flags[NamedFlag] && !s.Modifiers.Flags[NoSpinFlag] {
+	if modifiers.Flags[NamedFlag] && !modifiers.Flags[NoSpinFlag] {
 		logger.Println("Block is NAMED")
 		firstLine := strings.Split(strings.TrimSpace(s.code), "\n")[0]
 		matcher := regexp.MustCompile(`\s*.{1,2}\s+(.*)`)
@@ -285,7 +292,7 @@ func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, last
 		}
 	}
 
-	if s.Modifiers.Flags[NoSpinFlag] != true {
+	if modifiers.Flags[NoSpinFlag] != true {
 		logger.Printf("Block requires spinner at indent: %d, title: %s", int(math.Max(0, float64(indent-1))), spinnerName)
 		spinner = util.NewSpinner(int(math.Max(0, float64(indent-1))), spinnerName, out)
 		writer.spinner = spinner
@@ -294,8 +301,6 @@ func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, last
 	spinner.Start()
 
 	go rpcLoop(context.Messages, spinner, context, logger, doneChannel, rpcDoneCommand)
-
-	// fmt.Print("\033[s")
 
 	var tmpFile *os.File
 	var err interface{}
@@ -310,7 +315,7 @@ func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, last
 
 	executable := s.language
 
-	if prog, ok := s.Modifiers.Values[WithParameter]; ok {
+	if prog, ok := modifiers.Values[WithParameter]; ok {
 		executable = prog
 	}
 
@@ -321,7 +326,7 @@ func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, last
 	}
 
 	// Convert every comment into a RPC call to set heading.
-	if s.Modifiers.Flags[NamedAllFlag] {
+	if modifiers.Flags[NamedAllFlag] {
 		matcher := regexp.MustCompile(`^[\/\#]{1,2}\s+(.*)$`)
 		for _, line := range strings.Split(s.code, "\n") {
 			commentLine := matcher.ReplaceAllString(line, "echo \"Name: $1\" >> $$RUNDOWN")
@@ -331,13 +336,48 @@ func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, last
 		contents = contents + s.code
 	}
 
-	if s.Modifiers.Flags[CaptureEnvFlag] {
+	if modifiers.Flags[CaptureEnvFlag] {
 		contents = contents + "\necho \"envdiff:\" >> $RUNDOWN\nenv >> $RUNDOWN\necho \":done\" >> $RUNDOWN"
 	}
 
-
 	if _, err := tmpFile.Write([]byte(contents)); err != nil {
 		panic(err)
+	}
+
+	os.Chmod(filename, 0700)
+	tmpFile.Close()
+
+	if modifiers.Flags[BorgFlag] {
+		var tmpFileRepeat *os.File
+
+		if context.Repeat {
+			// Wrap the script in a script to relaunch rundown.
+
+			if tmpFileRepeat, err = ioutil.TempFile(context.TempDir, "rundown-repeat-*"); err != nil {
+				panic(err)
+			}
+			defer tmpFileRepeat.Close()
+
+			repeatContents := "#!/bin/sh\n" + filename + "\n" + context.Invocation + "\n"
+
+			logger.Printf("Repeat file: \n %s \n", repeatContents)
+
+			tmpFileRepeat.Write([]byte(repeatContents))
+
+			filename = tmpFileRepeat.Name()
+			os.Chmod(filename, 0700)
+		}
+
+		execErr := syscall.Exec(filename, []string{}, context.EnvStringList())
+		if execErr != nil {
+			return ExecutionResult{
+				Message: execErr.Error(),
+				Kind:    "Error",
+				Source:  contents,
+				Output:  "",
+				IsError: true,
+			}
+		}
 	}
 
 	cmd := exec.Command(filename)
@@ -349,21 +389,19 @@ func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, last
 
 	logger.Printf("Script:\r\n%s\r\nEnv:%v\r\n", contents, cmd.Env)
 
-	if s.Modifiers.Flags[RevealFlag] {
+	if modifiers.Flags[RevealFlag] {
 		spinner.HideAndExecute(func() {
 			s.displayBlock(*s.Source, context, renderer, lastSegment, logger, out)
-			// out.Write([]byte("\r\n")) // Add some space between code output and spinner.
+			out.Write([]byte("\r\n")) // Add some space between code output and spinner.
 		})
 	}
 
-	os.Chmod(filename, 0700)
-
-	if s.Modifiers.Flags[NoRunFlag] != true {
+	if modifiers.Flags[NoRunFlag] != true {
 
 		ptmx, err := pty.Start(cmd)
 		if err != nil {
 			spinner.Error("Error")
-			return ExecutionResult{ Message: fmt.Sprintf("%v", err), Kind: "Error", Source: contents, IsError: true }
+			return ExecutionResult{Message: fmt.Sprintf("%v", err), Kind: "Error", Source: contents, IsError: true}
 		}
 		defer func() { _ = ptmx.Close() }() // Best effort.
 
@@ -371,8 +409,7 @@ func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, last
 		endedWithoutNewline := false
 		var output io.Writer = nil
 
-
-		if s.Modifiers.Flags[StdoutFlag] {
+		if modifiers.Flags[StdoutFlag] {
 			output = os.Stdout
 
 			ch := make(chan os.Signal, 1)
@@ -390,20 +427,28 @@ func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, last
 			if err != nil {
 				// Don't care.
 			}
-			defer func() { if(oldState != nil) { terminal.Restore(int(os.Stdin.Fd()), oldState) } }() // Best effort.
+			defer func() {
+				if oldState != nil {
+					terminal.Restore(int(os.Stdin.Fd()), oldState)
+				}
+			}() // Best effort.
 
 			logger.Println("Setting up STDIN...")
 
 			// Copy stdin to our newline capturer for inserting blank lines when password input is requested.
 			piper, pipew, err := os.Pipe()
-			if err != nil { panic(err) }
+			if err != nil {
+				panic(err)
+			}
 			mw := io.MultiWriter(pipew, ptmx)
 			go func() { _, _ = io.Copy(mw, os.Stdin) }()
 			// go func() { _, _ = io.Copy(ptmx, mw) }()
 			go func() { inputHandler(piper, ptmx, logger) }()
 
 			outr, outw, err := os.Pipe()
-			if err != nil { panic(err) }
+			if err != nil {
+				panic(err)
+			}
 
 			logger.Println("Setting up STDOUT...")
 
@@ -412,10 +457,10 @@ func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, last
 			ptmxMulti := io.MultiWriter(outw, &captureBuffer)
 			go func() {
 				defer outw.Close()
-				_, _ = io.Copy(ptmxMulti, ptmx) 
+				_, _ = io.Copy(ptmxMulti, ptmx)
 			}()
 
-			logger.Println("Displaying process output\n\rIndent is ", indent, "\n\r")
+			logger.Println("Displaying process output\n\rLevel is ", indent, "\n\r")
 			output = out
 
 			logger.Println("Setting up output formatter...")
@@ -425,15 +470,22 @@ func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, last
 				outputHeading = "Output"
 			}
 
+			if modifiers.Flags[StdoutFlag] {
+				// If two consecutive CodeSegments, prefix a blank line to the output heading
+				// to format cleanly.
+				if lastSegment != nil && lastSegment.Kind() == "CodeSegment" {
+					if _, ok := lastSegment.GetModifiers().Flags[NoSpinFlag]; !ok {
+						outputHeading = "\n" + outputHeading
+					}
+				}
 
-			if s.Modifiers.Flags[StdoutFlag] {
 				endedWithoutNewline = util.ReadAndFormatOutput(outr, indent, aurora.Blue("‣ ").Bold().Faint().String(), spinner, bufio.NewWriter(output), logger, aurora.Faint(outputHeading).String())
 				logger.Printf("endedWithoutNewline? %v\r\n", endedWithoutNewline)
 			}
 		} else {
 			output = ioutil.Discard
 			go func() {
-				_, _ = io.Copy(&captureBuffer, ptmx) 
+				_, _ = io.Copy(&captureBuffer, ptmx)
 			}()
 		}
 
@@ -441,70 +493,76 @@ func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, last
 
 		waitErr := cmd.Wait()
 
-		time.Sleep(100 * time.Millisecond)	// 2x receiveLoop delay
+		time.Sleep(100 * time.Millisecond) // 2x receiveLoop delay
 
 		os.Chmod(filename, 0644)
 
 		// Wait for pending RPC commands.
 		context.Messages <- rpcDoneCommand
-		<- doneChannel
+		<-doneChannel
 
-		if s.Modifiers.Flags[AbortFlag] {
-			spinner.Error("Aborted")
+		if modifiers.Flags[StopOkFlag] {
+			spinner.Success("Complete")
+		} else if modifiers.Flags[StopFailFlag] {
+			spinner.Error("Failed")
 		} else {
 			if ex, ok := waitErr.(*exec.ExitError); ok {
-				logger.Printf("Error condition detected. Err: %v, SOF: %v, SOS: %v\n", ex, s.Modifiers.Flags[SkipOnFailureFlag], s.Modifiers.Flags[SkipOnSuccessFlag])
-				if s.Modifiers.Flags[SkipOnFailureFlag] {
+				logger.Printf("Error condition detected. Err: %v, SOF: %v, SOS: %v\n", ex, modifiers.Flags[SkipOnFailureFlag], modifiers.Flags[SkipOnSuccessFlag])
+				if modifiers.Flags[SkipOnFailureFlag] {
 					spinner.Skip("Passed")
-				} else if s.Modifiers.Flags[SkipOnSuccessFlag] {
+				} else if modifiers.Flags[SkipOnSuccessFlag] {
 					spinner.Success("Required")
-				} else if s.Modifiers.Flags[IgnoreFailureFlag] {
+				} else if modifiers.Flags[IgnoreFailureFlag] {
 					spinner.Error("Ignoring Failure")
 				} else {
 					spinner.Error("Failed")
 				}
 			} else {
-				if s.Modifiers.Flags[SkipOnSuccessFlag] {
+				if modifiers.Flags[SkipOnSuccessFlag] {
 					spinner.Skip("Passed")
-				} else if s.Modifiers.Flags[SkipOnFailureFlag] {
+				} else if modifiers.Flags[SkipOnFailureFlag] {
 					spinner.Success("Required")
 				} else {
 					spinner.Success("Complete")
 				}
 			}
 		}
-		
+
 		if !endedWithoutNewline {
 			logger.Println("Injecting newline")
-			fmt.Fprint(output, "\r\n")
+			// fmt.Fprint(output, "\r\n")
 		}
 
 		if we, ok := waitErr.(*exec.ExitError); ok {
-			if s.Modifiers.Flags[SkipOnFailureFlag] {
+			if modifiers.Flags[SkipOnFailureFlag] {
 				return SkipToNextHeading
-			} else if s.Modifiers.Flags[SkipOnSuccessFlag] || s.Modifiers.Flags[IgnoreFailureFlag] {
+			} else if modifiers.Flags[SkipOnSuccessFlag] || modifiers.Flags[IgnoreFailureFlag] {
 				return SuccessfulExecution
 			} else {
-				return ExecutionResult{ 
-					Message: we.String(), 
-					Kind: "Error", 
-					Source: contents, 
-					Output: strings.ReplaceAll(captureBuffer.String(), filename, "SCRIPT"),
+				return ExecutionResult{
+					Message: we.String(),
+					Kind:    "Error",
+					Source:  contents,
+					Output:  strings.ReplaceAll(captureBuffer.String(), filename, "SCRIPT"),
 					IsError: true,
 				}
 			}
 		} else {
-			if s.Modifiers.Flags[SkipOnSuccessFlag] {
+			if modifiers.Flags[SkipOnSuccessFlag] {
 				return SkipToNextHeading
 			}
-			
-			if s.Modifiers.Flags[AbortFlag] {
-				return AbortedExecution
+
+			if modifiers.Flags[StopOkFlag] {
+				return StopOkResult
 			}
-			
+
+			if modifiers.Flags[StopFailFlag] {
+				return StopFailResult
+			}
+
 			return SuccessfulExecution
 		}
 	}
 
-	return SuccessfulExecution  // NORUN = true
+	return SuccessfulExecution // NORUN = true
 }

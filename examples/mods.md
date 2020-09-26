@@ -2,35 +2,47 @@
 
 Modifiers come in two flavours: Flags, and Values. Flag modifiers are single `words`, which simply imply they're activated. Values are a `key:value` format, and the value can optionally be quoted with either single or double quotes if it contains spaces.
 
-Modifiers can be specified using one of three possible formats. Markdown renderers tend to vary, and in order to keep a document readable, you should choose the right format.
+Modifiers can be specified using one of three possible formats. Markdown renderers tend to vary, and in order to keep a document readable, you should choose the right format for your rendering situation.
 
-## Fenced code block format
+## Tag Format
 
-Modifiers on fenced code blocks are generally the preferred way of altering execution. This format works well with GitHub rendering.
+The most compatible way of specifying modifiers is using the `rundown` tag. It comes in two flavours:
+
+* Short, which is just `<r flag key=value>`
+* Long, which is `<rundown flag key=value>`
+
+    <rundown nospin blah=something />
+
+Browsers will ignore this tag, but Rundown will process it. If you want to do some funky stuff with the tag in the browser, you can use the Custom Elements API.
+
+The rundown tag can appear before block level elements (paragraphs, headings, code blocks) and will alter them.
+
+    <r nospin/>
+    ``` bash
+    # No spinner will be shown
+    ```
+
+You can also use the rundown tag to alter how text renders.
+
+    Your user ID is <r sub-env>`$USER`</r>.
+
+## Fenced code block shortcut
+
+This is a alternative to the Tag Format specifically for fenced code blocks, and has limited support in markdown renderers.
+
+* **GitHub** :tick:
+* **GitLab** :cross: Breaks syntax highlighting.
+* **VS Code** :tick:
 
     ``` bash nospin
     sleep 1
     ```
 
-However, there's situations where you need to modify something which isn't a fenced code block, or your render breaks when having multiple words on the syntax line.
-
-## Invisible Link format
-
-This format is a markdown inline element, which means you can place it inside block elements (headings, paragraphs, etc). It will render HTML, however HTML links with no text aren't rendered by browsers, so these will be invisible to readers.
-
-    [](nospin)
-    ``` bash
-      sleep 1
-    ```
-
-[](nospin)
-``` bash
-  sleep 1
-```
+Because using the fenced code format is quite easy, but suffers from compatibility issues, rundown comes with a `retag` command which converts this format into tag format.
 
 ## Comment format
 
-Finally there's the comment format. This will render to HTML as well, but as it's a comment, browsers won't display it. Some client-side Javascript markdown renderers do still display this.
+Finally there's the comment format. This will render to HTML as well, but as it's a comment, browsers won't display it. Some client-side markdown renderers do still display this.
 
     <!--~ nospin -->
     ``` bash
@@ -46,11 +58,11 @@ Take care to ensure your comment formats remain as a single line entity, and inc
 
 Multiple line comments with the tilde (`~`) are Invisible Blocks, which serve a different purpose in Rundown. You can find out more about them at the [Invisible Blocks](./invisible.md) page.
 
-# Testing Modifiers
+# Code Modifiers
 
 Modifiers allow you to change how the code executes.
 
-## Blank
+## Blank <r label=blank/>
 
 Default execution
 
@@ -58,17 +70,17 @@ Default execution
 sleep 1
 ```
 
-## nospin
+## No Spinner <r label=nospin />
 
-This prevents the spinner from showing
+The `nospin` flag prevents the spinner from showing at all. Generally you'd combine this with the `stdout` flag below. Reach for this if scripts ask for input on a _blank_ line, which can cause the spinner to over-write any user input.
 
 ``` bash nospin
 sleep 1
 ```
 
-## named
+## Named - CHanging the spinner title <r label=named/>
 
-The first line of the script is treated as a comment, and that comment body is the title of the spinner.
+The `named` flag treats the first line of the script as a comment, and that comment body is the title of the spinner.
 
 ``` bash named
 # Waiting...
@@ -76,7 +88,16 @@ The first line of the script is treated as a comment, and that comment body is t
 sleep 1
 ```
 
-## Stdout
+Any number of applications can be running your script, so the comment line ignores anything that isn't a letter or number at the start of the line.
+
+Take this Go script for example:
+
+``` go named norun reveal
+// This is the spinner title
+printf("Oh hai")
+```
+
+## Stdout <r label=stdout/>
 
 This shows STDOUT in the output.
 
@@ -88,7 +109,7 @@ echo "You won't see this"
 echo "You should see this"
 ```
 
-## norun
+## No Run <r label=norun/>
 
 This ignores the code block, don't run it, and don't display it.
 
@@ -96,9 +117,9 @@ This ignores the code block, don't run it, and don't display it.
 echo "This will be displayed and not run"
 ```
 
-## reveal
+## Reveal <r label=reveal/>
 
-This will display the code block **AND** run it.
+This will display the code block as part of Rundown's output, **AND** run it immediately afterwards.
 
 ``` bash reveal
 sleep 1
@@ -112,27 +133,27 @@ A common approach to rendering syntax highlighted code in the console is to use 
     end
     ```
 
-## Skip on Success
+## Skip on Success <r label=skip-on-success/>
 
 Skips to the next heading (any level) if the block executed successfully
 
-``` bash skip_on_success
+``` bash skip-on-success
 true
 ```
 
 You will never see this message.
 
-## Skip on Failure
+## Skip on Failure <r label=skip-on-failure/>
 
 Skips to the next heading (any level) if the block didn't execute successfully
 
-``` bash skip_on_failure
+``` bash skip-on-failure
 nonexistant_program
 ```
 
 You will never see this message.
 
-## Capture Environment
+## Capture Environment <r label=env/>
 
 The `env` flag will capture any exported variables and make then available to subsequent scripts.
 
@@ -146,19 +167,39 @@ Then later:
     echo $BLAH
     ```
 
-## With
+## With <r label=with/>
 
 Allows you to customise what program executes the script.
 
-    ``` json with:'kubectl apply -f'
+    ``` json with='kubectl apply -f'
     { "one": "value" }
     ```
 
-## Save
+Alternatively
+
+    <r with="kubectl apply -f"/>
+    ``` json
+    { "one": "value" }
+    ```
+
+## Borg <r label=borg/>
+
+The code block process replaces the current rundown process. 
+
+This is handy if your script is going to log the user into an SSH session or something, or you want
+to return the status code of the script.
+
+    Now logging you into `someserver`.
+
+    ``` bash borg
+    ssh user@someserver
+    ```
+
+## Save <r label=save/>
 
 Used when you want to demonstrate a file's contents, while also saving it for later use.
 
-    ``` yaml save:config.yml
+    ``` yaml save="config.yml"
     apiVersion: v1
     kind: Service
       metadata:
@@ -171,9 +212,9 @@ Later on, you can use the `basename` as an environment variable to use in script
     echo "YAML was saved into $CONFIG"
     ```
 
-### Environment Substitution
+### Environment Substitution <r label=sub-env/>
 
-When using `save`, you can also apply the `env_aware` flag. This will perform a substitution of any environment variable with it's value. Be careful though, if you refer to a missing environment variable, the block will fail.
+When using `save`, you can also apply the `sub_env` flag. This will perform a substitution of any environment variable with it's value. Be careful though, if you refer to a missing environment variable, the block will fail.
 
     ``` yaml save:config.yml env_aware
     apiVersion: v1
@@ -181,3 +222,39 @@ When using `save`, you can also apply the `env_aware` flag. This will perform a 
       metadata:
         name: "$USER-service"
     ```
+
+# Content Modifiers
+
+Content modifiers allow you to change how regular markdown content is renderered.
+
+## Environment Substitution <r label=sub-env-content/>
+
+Only works with the `<rundown/>` tag format.
+
+When using the `sub-env` flag, all enclosed content will have environment substitution activated.
+
+    ``` bash env
+    export BLAH=Hello
+    ```
+
+    Why, <r sub-env>$BLAH</r> there!
+
+``` bash env
+export BLAH=Hello
+```
+
+Why, <r sub-env>$BLAH</r> there! But $BLAH isn't substituted this time.
+
+## Early termination
+
+The `end` flag allows you to control where the script ends. This can be useful when combined with `skip_on_success` flags, where you might want to continue the flow under an error state to display some helpful messages.
+
+    ``` bash skip_on_success named
+    # Is Homebrew installed?
+    brew --version
+    ```
+
+    You need to install homebrew. Please go to http://brew.sh.
+
+    <!--~ end -->
+

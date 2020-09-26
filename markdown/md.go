@@ -9,11 +9,12 @@ import (
 func PrepareMarkdown() goldmark.Markdown {
 	md := goldmark.New(
 		goldmark.WithExtensions(
+			ConsoleRenderer,
 			extension.GFM,
 			CodeModifiers,
 			InvisibleBlocks,
-			ConsoleRenderer,
 			extension.Strikethrough,
+			RundownElements,
 			Emoji,
 			// CodeExecute,
 		),

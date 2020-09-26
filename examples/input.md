@@ -6,6 +6,10 @@ Scripts can ask for input and display their output.
 read -p "Hi " output
 ```
 
+You can also run more complex commands which ask a series of inputs.
+
+**TODO** - This seems broken.
+
 ``` bash stdout
-mwinit
+aws configure
 ```

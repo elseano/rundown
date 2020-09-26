@@ -22,16 +22,16 @@ printf "World"
 STDOUT is also smart enough to hide the spinner when waiting for input on the same line:
 
 ``` bash stdout
-read -t 1 -p "Enter something: " something
-true
+read -t 1 -p "Enter something: " something || true
 ```
 
-However, STDOUT will reveal the spinner if your input prompt is a blank line. To overcome that, use the `nospin` modifier.
+However, STDOUT will reveal the spinner if your input prompt is a blank line.
+
+To overcome that, use the `nospin` modifier.
 
 ``` bash stdout nospin
 read -t 1 -p "Some prompt
-" something
-true
+" something || true
 ```
 
 If you're running a `named` code segment, the output heading will be the name.
@@ -62,13 +62,16 @@ Output
 ‣ World
 ✔ Running (Complete)
 
-STDOUT is also smart enough to hide the spinner when waiting for input on the same line:
+STDOUT is also smart enough to hide the spinner when waiting for input on the
+same line:
 
 Output
 ‣ Enter something: 
 ✔ Running (Complete)
 
-However, STDOUT will reveal the spinner if your input prompt is a blank line. To overcome that, use the nospin modifier.
+However, STDOUT will reveal the spinner if your input prompt is a blank line.
+
+To overcome that, use the nospin modifier.
 
 Output
 ‣ Some prompt

@@ -1,23 +1,23 @@
-package main
+package segments
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
-	"fmt"
+
 	// "bufio"
 	// "time"
 	"bytes"
 	// "context"
-	"syscall"
 	"bufio"
+	"syscall"
+
 	// "strings"
 
-	"github.com/elseano/rundown/segments"
-
-	"github.com/yuin/goldmark/renderer"
 	"github.com/logrusorgru/aurora"
+	"github.com/yuin/goldmark/renderer"
 )
 
 func dropCR(data []byte) []byte {
@@ -26,7 +26,6 @@ func dropCR(data []byte) []byte {
 	}
 	return data
 }
-
 
 func ScanFullLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 {
@@ -41,7 +40,6 @@ func ScanFullLines(data []byte, atEOF bool) (advance int, token []byte, err erro
 	return 0, nil, nil
 }
 
-
 func receiveLoop(filename string, messages chan<- string, logger *log.Logger) {
 	logger.Printf("Setting up receive loop\r\n")
 
@@ -53,7 +51,7 @@ func receiveLoop(filename string, messages chan<- string, logger *log.Logger) {
 	}
 
 	// RDWR so it doesn't block on opening.
-	file, err := os.OpenFile(filename, os.O_CREATE | os.O_RDWR, os.ModeNamedPipe)
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, os.ModeNamedPipe)
 	if err != nil {
 		logger.Printf("Error openeing receive loop %v\n", err)
 		return
@@ -74,7 +72,7 @@ func receiveLoop(filename string, messages chan<- string, logger *log.Logger) {
 	}
 }
 
-func ExecuteRundown(rundown []segments.Segment, renderer renderer.Renderer, logger *log.Logger, out io.Writer) segments.ExecutionResult {
+func ExecuteRundown(context *Context, rundown []Segment, renderer renderer.Renderer, logger *log.Logger, out io.Writer) ExecutionResult {
 	// Using a buffered channel allows us to capture all messages correctly. Unsure how to test that reliably though.
 	messages := make(chan string, 200)
 
@@ -92,44 +90,40 @@ func ExecuteRundown(rundown []segments.Segment, renderer renderer.Renderer, logg
 
 	logger.Printf("Created rundown RPC file at %s", tmpFile.Name())
 
-	context := &segments.Context{
-		Env: map[string]string{
-			"RUNDOWN": tmpFile.Name(),
-		},
-		Messages: messages,
-		TempDir:  tmpDir,
-		ForcedIndentZero: false,
-	}
+	context.Messages = messages
+	context.TempDir = tmpDir
+	context.ForcedLevelZero = false
+	context.Env["RUNDOWN"] = tmpFile.Name()
 
 	go receiveLoop(tmpFile.Name(), messages, logger)
 
 	// defer os.Remove(tmpFile.Name())
 
 	var skipToHeading = false
-	var lastSegment *segments.Segment
+	var lastSegment Segment
 
 	for _, segment := range rundown {
 		if skipToHeading {
-			if _, ok := segment.(*segments.HeadingMarker); !ok {
+			if _, ok := segment.(*HeadingMarker); !ok {
 				continue
-			} 
-			
+			}
+
 			out.Write([]byte("\r\n")) // Add spacing between skipping code block and next heading.
 			skipToHeading = false
 		}
 
-		var result segments.ExecutionResult
+		var result ExecutionResult
 
 		// Ensure all rerequisites have been run, when running via shortcodes.
 		if segment.Kind() == "HeadingMarker" {
-			headingMarker := segment.(*segments.HeadingMarker)
+			headingMarker := segment.(*HeadingMarker)
 			if headingMarker.ParentHeading != nil {
 				// Only run the parent pre-reqs, as the ones at the current level will be run
 				// as part of the current loop.
 				var count = 0
-				context.ForcedIndentZero = true
+				context.ForcedLevelZero = true
 				result, count = headingMarker.ParentHeading.RunSetups(context, renderer, lastSegment, logger, out)
-				context.ForcedIndentZero = false
+				context.ForcedLevelZero = false
 
 				if count > 0 {
 					fmt.Fprintf(out, "\r\n") // Blank line between setups and the we're running heading.
@@ -141,15 +135,15 @@ func ExecuteRundown(rundown []segments.Segment, renderer renderer.Renderer, logg
 			result = segment.Execute(context, renderer, lastSegment, logger, out)
 		}
 
-		lastSegment = &segment
+		lastSegment = segment
 
-		if result == segments.SkipToNextHeading {
+		if result == SkipToNextHeading {
 			logger.Printf("Block returned SkipToNextHeading")
 			skipToHeading = true
-		} else if result == segments.SuccessfulExecution {
+		} else if result == SuccessfulExecution {
 			logger.Printf("Block returned SuccessfulExecution")
-		} else if result == segments.AbortedExecution {
-			// os.RemoveAll(tmpDir)
+		} else if result == StopOkResult || result == StopFailResult {
+			os.RemoveAll(tmpDir)
 			return result
 		} else { // Error
 			logger.Printf("Block returned FailedExecution")
@@ -161,5 +155,5 @@ func ExecuteRundown(rundown []segments.Segment, renderer renderer.Renderer, logg
 	}
 
 	os.RemoveAll(tmpDir)
-	return segments.SuccessfulExecution
+	return SuccessfulExecution
 }

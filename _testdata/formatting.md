@@ -63,6 +63,9 @@ We also support ~~strikethrough~~!
 * Bullets 
 * should be 
 * indented correctly
+* Really long bullet points will be wrapped, and they will be wrapped at the indentation level of the start of the bullet point text so it looks nice.
+  * Indented, and the wrapping should also observe that we're indented on wrap an extra two spaces because this is a sub-bullet.
+* And back to normal should work as expected as well given we just deintented the line again.
 
 1. So should
 2. Numbered
@@ -88,8 +91,8 @@ This text should be code.
 
 This text:
 
- • Should be
- • Bullet points
+• Should be
+• Bullet points
 
 And this text
 
@@ -112,6 +115,7 @@ Sequential runs should be placed together:
 Sequential runs with a middle reveal should be spaced.
 
 ✔ Running (Complete)
+
  ┃ echo "Hi"
 
 ✔ Running (Complete)
@@ -122,13 +126,19 @@ Sequential runs with a middle reveal should be spaced.
 
   We also support strikethrough!
 
-   • Bullets
-   • should be
-   • indented correctly
+  • Bullets
+  • should be
+  • indented correctly
+  • Really long bullet points will be wrapped, and they will be wrapped at the
+    indentation level of the start of the bullet point text so it looks nice.
+    • Indented, and the wrapping should also observe that we're indented on
+      wrap an extra two spaces because this is a sub-bullet.
+  • And back to normal should work as expected as well given we just
+    deintented the line again.
 
-   1 So should
-   2 Numbered
-   3 Lists
+  1 So should
+  2 Numbered
+  3 Lists
 
     Indenting
     Goes quite deep.

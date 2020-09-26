@@ -9,6 +9,7 @@ Some of the usecases rundown suits are:
 * Tutorials
 * Code building scripts
 * Simple programs
+* Operational support scripts
 
 As we use Rundown, we're finding plenty of other ways you can use it!
 

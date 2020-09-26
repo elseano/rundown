@@ -1,22 +1,22 @@
 package util
 
 import (
-	"io"
 	"bytes"
+	"io"
 	"regexp"
 )
 
 type WordWrapWriter struct {
 	io.Writer
-	AfterWrap func(writer io.Writer) int
+	AfterWrap      func(writer io.Writer) int
 	CurrentLinePos int
-	Columns int
-	lastAfterWrap int
+	Columns        int
+	lastAfterWrap  int
 }
 
 func NewWordWrapWriter(out io.Writer, columns int) *WordWrapWriter {
 	return &WordWrapWriter{
-		Writer: out,
+		Writer:  out,
 		Columns: columns,
 	}
 }
@@ -52,10 +52,10 @@ func (w *WordWrapWriter) Write(b []byte) (n int, err error) {
 					w.lastAfterWrap = w.AfterWrap(w.Writer)
 					w.CurrentLinePos = w.lastAfterWrap
 				} else {
-					w.lastAfterWrap, w.CurrentLinePos = 0,0
+					w.lastAfterWrap, w.CurrentLinePos = 0, 0
 				}
 				spaceBytes = []byte{}
-			} else if trueLength + w.CurrentLinePos + len(spaceBytes) > w.Columns {
+			} else if trueLength+w.CurrentLinePos+len(spaceBytes) > w.Columns {
 				// Wrap if the word will spill over
 				w.Writer.Write([]byte("\n"))
 				w.CurrentLinePos = 0
@@ -63,7 +63,7 @@ func (w *WordWrapWriter) Write(b []byte) (n int, err error) {
 					w.lastAfterWrap = w.AfterWrap(w.Writer)
 					w.CurrentLinePos = w.lastAfterWrap
 				} else {
-					w.lastAfterWrap, w.CurrentLinePos = 0,0
+					w.lastAfterWrap, w.CurrentLinePos = 0, 0
 				}
 				spaceBytes = []byte{}
 			}
@@ -93,6 +93,5 @@ func (w *WordWrapWriter) Write(b []byte) (n int, err error) {
 		}
 	}
 
-	return n, nil
+	return len(b), nil
 }
-

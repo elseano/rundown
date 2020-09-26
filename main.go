@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -8,16 +9,14 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"bytes"
 
-	"github.com/elseano/rundown/segments"
+	rdcli "github.com/elseano/rundown/cli"
 	"github.com/elseano/rundown/markdown"
+	"github.com/elseano/rundown/segments"
 
-	"github.com/urfave/cli/v2"
-	"github.com/paulrademacher/climenu"
 	"github.com/logrusorgru/aurora"
+	"github.com/urfave/cli/v2"
 	"golang.org/x/tools/godoc/util"
-
 )
 
 func buildLogger(debugging bool) *log.Logger {
@@ -85,39 +84,43 @@ func displayShortCodes(filename string, logger *log.Logger) {
 	for _, segment := range loadedSegments {
 		if heading, ok := segment.(*segments.HeadingMarker); ok && heading.ShortCode != "" {
 			sections = append(sections, heading)
-			if longestHeading < len(heading.ShortCode) { longestHeading = len(heading.ShortCode) }
+			if longestHeading < len(heading.ShortCode) {
+				longestHeading = len(heading.ShortCode)
+			}
 		}
 	}
 
-	fmtStr := "  %-" + strconv.Itoa(longestHeading+2) + "s    %s\n"
+	fmtStr := "  %-" + strconv.Itoa(longestHeading+2) + "s    %s %s\n"
 
 	fmt.Printf("This file supports jumping to specific sections.\n")
 	fmt.Printf("\nUsage:\n")
 	fmt.Printf("    rundown %s [SHORTCODE]\n", filename)
 	fmt.Printf("\nWith the following short codes availables:\n")
 
-
 	for _, heading := range sections {
-		fmt.Printf(fmtStr, heading.ShortCode, heading.Title)
+		var desc = ""
+
+		if heading.Description != "" {
+			desc = "- " + heading.Description
+		}
+		fmt.Printf(fmtStr, heading.ShortCode, heading.Title, desc)
 	}
 
 	os.Exit(0)
 }
 
-
-func runShortCode(filename string, requestedShortCodes []string, logger *log.Logger) {
+func runShortCode(context *segments.Context, filename string, requestedShortCodes []string, logger *log.Logger) {
 	loadedSegments := fileToSegments(filename, logger)
 
 	runAt := -1
 	toRun := []segments.Segment{}
 
-
 	for _, requestedShortCode := range requestedShortCodes {
 
 		for i := 0; i < len(loadedSegments); i = i + 1 {
 			if heading, ok := loadedSegments[i].(*segments.HeadingMarker); ok && heading.ShortCode == requestedShortCode {
-				runAt = i;
-				break;
+				runAt = i
+				break
 			}
 		}
 
@@ -126,13 +129,13 @@ func runShortCode(filename string, requestedShortCodes []string, logger *log.Log
 			os.Exit(1)
 		}
 
-		baseLevel := loadedSegments[runAt].GetIndent() - 1
+		baseLevel := loadedSegments[runAt].GetLevel() - 1
 
-		loadedSegments[runAt].DeIndent(baseLevel)
+		loadedSegments[runAt].DeLevel(baseLevel)
 
 		toRun = append(toRun, loadedSegments[runAt])
-		for i := runAt + 1; i < len(loadedSegments) && !(loadedSegments[i].Kind() == "HeadingMarker" && loadedSegments[i].GetIndent() - 1 <= baseLevel); i = i + 1 {
-			loadedSegments[i].DeIndent(baseLevel)
+		for i := runAt + 1; i < len(loadedSegments) && !(loadedSegments[i].Kind() == "HeadingMarker" && loadedSegments[i].GetLevel()-1 <= baseLevel); i = i + 1 {
+			loadedSegments[i].DeLevel(baseLevel)
 			toRun = append(toRun, loadedSegments[i])
 		}
 
@@ -141,61 +144,38 @@ func runShortCode(filename string, requestedShortCodes []string, logger *log.Log
 
 	fmt.Printf(aurora.Faint("Rundown running %s shortcodes: %s\n\n").String(), filename, strings.Join(requestedShortCodes, ", "))
 
-	result := ExecuteRundown(toRun, md.Renderer(), logger, os.Stdout)
+	result := segments.ExecuteRundown(segments.NewContext(), toRun, md.Renderer(), logger, os.Stdout)
 	if result.IsError {
 		os.Exit(1)
 	}
 
 }
 
-
-func runHeading(filename string, logger *log.Logger) {
+func runHeading(context *segments.Context, filename string, logger *log.Logger) {
 	loadedSegments := fileToSegments(filename, logger)
 
 	fmt.Printf(aurora.Faint("Rundown running %s\n\n").String(), filename)
 
-	menu := climenu.NewButtonMenu(aurora.Bold("Rundown").String(), "Choose section to run")
-	for i, segment := range loadedSegments {
-		if heading, ok := segment.(*segments.HeadingMarker); ok {
-			title := heading.Title
-			if heading.ShortCode != "" {
-				title = title + aurora.Faint(" (" + heading.ShortCode + ")").String()
-			}
-			menu.AddMenuItem(strings.Repeat(" ", heading.Indent) + title, strconv.Itoa(i))
-		}
+	shortCode := rdcli.ShortcodeMenu(loadedSegments)
+
+	fmt.Println()
+
+	if shortCode == "" {
+		os.Exit(0)
 	}
 
-	action, escaped := menu.Run()
+	runShortCode(context, filename, []string{shortCode}, logger)
 
-	if escaped {
-		os.Exit(1)
-	}
-
-	runAt, _ := strconv.Atoi(action)
-	baseLevel := loadedSegments[runAt].GetIndent() - 1
-	loadedSegments[runAt].DeIndent(baseLevel)
-
-	toRun := []segments.Segment{loadedSegments[runAt]}
-	for i := runAt + 1; i < len(loadedSegments) && !(loadedSegments[i].Kind() == "HeadingMarker" && loadedSegments[i].GetIndent() - 1 <= baseLevel); i = i + 1 {
-		loadedSegments[i].DeIndent(baseLevel)
-		toRun = append(toRun, loadedSegments[i])
-	}
-
-	result := ExecuteRundown(toRun, md.Renderer(), logger, os.Stdout)
-	if result.IsError {
-		os.Exit(1)
-	}
+	fmt.Println()
 }
 
 func executeFile(filename string, logger *log.Logger) {
 	loadedSegments := fileToSegments(filename, logger)
-	result := ExecuteRundown(loadedSegments, md.Renderer(), logger, os.Stdout)
+	result := segments.ExecuteRundown(segments.NewContext(), loadedSegments, md.Renderer(), logger, os.Stdout)
 	if result.IsError {
 		os.Exit(1)
 	}
 }
-
-
 
 func inspectRundown(c *cli.Context) {
 	logger := buildLogger(c.Bool("debug"))
@@ -208,9 +188,6 @@ func inspectRundown(c *cli.Context) {
 	}
 
 }
-
-
-
 
 func defaultRun(c *cli.Context) error {
 	logger := buildLogger(c.Bool("debug"))
@@ -226,10 +203,18 @@ func defaultRun(c *cli.Context) error {
 	}
 
 	if len(shortCode) > 0 {
-		runShortCode(filename, shortCode, logger)
+		runShortCode(segments.NewContext(), filename, shortCode, logger)
 	} else {
 		if c.Bool("ask") {
-			runHeading(filename, logger)
+			runHeading(segments.NewContext(), filename, logger)
+		} else if c.Bool("ask-repeat") {
+			context := segments.NewContext()
+			context.Repeat = true
+			context.Invocation = strings.Join(os.Args, " ")
+
+			for {
+				runHeading(context, filename, logger)
+			}
 		} else {
 			executeFile(filename, logger)
 		}
@@ -248,7 +233,7 @@ func defaultComplete(c *cli.Context) {
 	} else {
 		files, err := ioutil.ReadDir(".")
 		if err != nil {
-				log.Fatal(err)
+			log.Fatal(err)
 		}
 
 		for _, file := range files {
@@ -262,19 +247,19 @@ func defaultComplete(c *cli.Context) {
 						fmt.Fprintf(c.App.Writer, "%s\n", file.Name())
 					}
 				}
-				
+
 			}
-		}				
+		}
 	}
 
-	return 
+	return
 }
 
 func main() {
 	app := &cli.App{
-		Name:  "rundown",
-		Usage: "Display and execute markdown files.",
-		UsageText: "rundown [-d] [command] FILENAME shortcode(optional) ...", 
+		Name:                   "rundown",
+		Usage:                  "Display and execute markdown files.",
+		UsageText:              "rundown [-d] [command] FILENAME shortcode(optional) ...",
 		UseShortOptionHandling: true,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
@@ -286,29 +271,33 @@ func main() {
 				Usage: "The default shortcode to run if none provided (used with shebang scripts)",
 			},
 			&cli.BoolFlag{
-				Name: "ask",
+				Name:  "ask",
 				Usage: "If no shortcode is provided, ask which section to run (used with shebang scripts)",
+			},
+			&cli.BoolFlag{
+				Name:  "ask-repeat",
+				Usage: "If no shortcode is provided, enter an ask and run loop (used with shebang scripts)",
 			},
 		},
 		EnableBashCompletion: true,
 		Commands: []*cli.Command{
 			&cli.Command{
-				Name: "inspect",
-				Aliases: []string{"i"},
-				Usage: "Shows the rundown AST of the markdown file",
+				Name:      "inspect",
+				Aliases:   []string{"i"},
+				Usage:     "Shows the rundown AST of the markdown file",
 				ArgsUsage: "FILENAME",
-			
+
 				Action: func(c *cli.Context) error {
 					inspectRundown(c)
 					return nil
 				},
 			},
 			&cli.Command{
-				Name: "run",
-				Aliases: []string{"r"},
-				Usage: "Runs the markdown file from start to end, or only a specific heading if a shortcode is supplied",
+				Name:      "run",
+				Aliases:   []string{"r"},
+				Usage:     "Runs the markdown file from start to end, or only a specific heading if a shortcode is supplied",
 				ArgsUsage: "FILENAME [shortcode] ...",
-			
+
 				Action: func(c *cli.Context) error {
 					return defaultRun(c)
 				},
@@ -317,25 +306,25 @@ func main() {
 				},
 			},
 			&cli.Command{
-				Name: "select",
-				Aliases: []string{"s"},
-				Usage: "Displays a menu allowing selection of which section (and child sections) to run",
+				Name:      "select",
+				Aliases:   []string{"s"},
+				Usage:     "Displays a menu allowing selection of which section (and child sections) to run",
 				ArgsUsage: "FILENAME",
-			
+
 				Action: func(c *cli.Context) error {
 					logger := buildLogger(c.Bool("debug"))
-					runHeading(c.Args().Get(0), logger)
+					runHeading(segments.NewContext(), c.Args().Get(0), logger)
 					fmt.Printf("\n")
 
 					return nil
 				},
 			},
 			&cli.Command{
-				Name: "show-codes",
-				Aliases: []string{"c"},
-				Usage: "Displays available shortcodes in the markdown file",
+				Name:      "show-codes",
+				Aliases:   []string{"c"},
+				Usage:     "Displays available shortcodes in the markdown file",
 				ArgsUsage: "FILENAME",
-			
+
 				Action: func(c *cli.Context) error {
 					logger := buildLogger(c.Bool("debug"))
 					displayShortCodes(c.Args().Get(0), logger)
@@ -351,7 +340,6 @@ func main() {
 		BashComplete: func(c *cli.Context) {
 			defaultComplete(c)
 		},
-
 	}
 
 	err := app.Run(os.Args)

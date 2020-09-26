@@ -1,7 +1,9 @@
 package markdown
 
 import (
+	"bufio"
 	"bytes"
+	"fmt"
 	"io/ioutil"
 
 	// "fmt"
@@ -37,10 +39,107 @@ func (e *consoleRendererExt) Extend(m goldmark.Markdown) {
 
 // A Config struct has configurations for the HTML based renderers.
 type Config struct {
-	TempDir string
+	TempDir        string
+	RundownHandler RundownHandler
+	Level          int
+	ConsoleWidth   int
+	LevelChange    func(level int)
 }
 
 const optTempDir renderer.OptionName = "TempDir"
+const optRundownHandler renderer.OptionName = "RundownHandler"
+const optLevelLevel renderer.OptionName = "LevelLevel"
+const optConsoleWidth renderer.OptionName = "ConsoleWidth"
+const optLevelChange renderer.OptionName = "LevelChange"
+
+type RundownHandler interface {
+	Mutate([]byte, ast.Node) ([]byte, error)
+	OnRundownNode(node ast.Node) error
+}
+
+type withRundownHandler struct {
+	handler RundownHandler
+}
+
+func (o *withRundownHandler) SetConfig(c *renderer.Config) {
+	c.Options[optRundownHandler] = o.handler
+}
+
+func (o *withRundownHandler) SetConsoleOption(c *Config) {
+	c.RundownHandler = o.handler
+}
+
+// The mutator is responsible for changing the inside of a RundownInline block before
+// it's written to the output, but after it's been rendered.
+func WithRundownHandler(handler RundownHandler) interface {
+	renderer.Option
+	Option
+} {
+	return &withRundownHandler{handler: handler}
+}
+
+type withLevel struct {
+	level int
+}
+
+func (o *withLevel) SetConfig(c *renderer.Config) {
+	c.Options[optLevelLevel] = o.level
+}
+
+func (o *withLevel) SetConsoleOption(c *Config) {
+	c.Level = o.level
+}
+
+// The mutator is responsible for changing the inside of a RundownInline block before
+// it's written to the output, but after it's been rendered.
+func WithLevel(level int) interface {
+	renderer.Option
+	Option
+} {
+	return &withLevel{level: level}
+}
+
+type withLevelChange struct {
+	changer func(level int)
+}
+
+func (o *withLevelChange) SetConfig(c *renderer.Config) {
+	c.Options[optLevelChange] = o.changer
+}
+
+func (o *withLevelChange) SetConsoleOption(c *Config) {
+	c.LevelChange = o.changer
+}
+
+// The mutator is responsible for changing the inside of a RundownInline block before
+// it's written to the output, but after it's been rendered.
+func WithLevelChange(changer func(level int)) interface {
+	renderer.Option
+	Option
+} {
+	return &withLevelChange{changer: changer}
+}
+
+type withConsoleWidth struct {
+	width int
+}
+
+func (o *withConsoleWidth) SetConfig(c *renderer.Config) {
+	c.Options[optConsoleWidth] = o.width
+}
+
+func (o *withConsoleWidth) SetConsoleOption(c *Config) {
+	c.ConsoleWidth = o.width
+}
+
+// The mutator is responsible for changing the inside of a RundownInline block before
+// it's written to the output, but after it's been rendered.
+func WithConsoleWidth(width int) interface {
+	renderer.Option
+	Option
+} {
+	return &withConsoleWidth{width: width}
+}
 
 // NewConfig returns a new Config with defaults.
 func NewConfig() Config {
@@ -51,7 +150,8 @@ func NewConfig() Config {
 	}
 
 	return Config{
-		TempDir: tmpDir,
+		TempDir:      tmpDir,
+		ConsoleWidth: 80,
 	}
 }
 
@@ -60,6 +160,14 @@ func (c *Config) SetOption(name renderer.OptionName, value interface{}) {
 	switch name {
 	case optTempDir:
 		c.TempDir = value.(string)
+	case optRundownHandler:
+		c.RundownHandler = value.(RundownHandler)
+	case optLevelLevel:
+		c.Level = value.(int)
+	case optConsoleWidth:
+		c.ConsoleWidth = value.(int)
+	case optLevelChange:
+		c.LevelChange = value.(func(level int))
 		// case optXHTML:
 		// 	c.XHTML = value.(bool)
 		// case optUnsafe:
@@ -93,6 +201,11 @@ func NewRenderer(opts ...Option) renderer.NodeRenderer {
 	for _, opt := range opts {
 		opt.SetConsoleOption(&r.Config)
 	}
+
+	r.SetLevel(r.Config.Level)
+
+	// r.currentLevel = r.Config.LevelLevel
+
 	return r
 }
 
@@ -134,6 +247,22 @@ func (r *Renderer) peekStyle() Style {
 	return resetStyle
 }
 
+func (r *Renderer) CurrentLevel() int {
+	return r.currentLevel
+}
+
+func (r *Renderer) SetLevel(level int) {
+	// Make No Heading & First Heading at the same level.
+	if level < 1 {
+		level = 1
+	}
+	r.currentLevel = level
+
+	if r.Config.LevelChange != nil {
+		r.Config.LevelChange(level)
+	}
+}
+
 func (r *Renderer) popStyle() Style {
 	if r.currentStyle.Len() > 0 {
 		ele := r.currentStyle.Front()
@@ -156,17 +285,17 @@ func (r *Renderer) nodeLinesToString(source []byte, n ast.Node) string {
 	return buffer.String()
 }
 
-func (r *Renderer) indentLines(lines string, b util.BufWriter) {
+func (r *Renderer) levelLines(lines string, b util.BufWriter) {
 	splitlines := strings.Split(lines, "\n")
 	for _, v := range splitlines {
-		r.writeString(b, paddingForIndent(r.currentLevel)+v+"\n")
+		r.writeString(b, paddingForLevel(r.currentLevel)+v+"\n")
 	}
 }
 
-func (r *Renderer) indentLinesWithPrefix(prefix string, lines string, b util.BufWriter) {
+func (r *Renderer) levelLinesWithPrefix(prefix string, lines string, b util.BufWriter) {
 	splitlines := strings.Split(lines, "\n")
 	for _, v := range splitlines {
-		r.writeString(b, paddingForIndent(r.currentLevel)+prefix+v+"\n")
+		r.writeString(b, paddingForLevel(r.currentLevel)+prefix+v+"\n")
 	}
 }
 
@@ -185,6 +314,7 @@ func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(ast.KindParagraph, r.renderParagraph)
 	reg.Register(ast.KindTextBlock, r.renderTextBlock)
 	reg.Register(ast.KindThematicBreak, r.renderThematicBreak)
+	reg.Register(KindRundownBlock, r.renderRundownBlock)
 
 	// inlines
 
@@ -197,7 +327,7 @@ func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(ast.KindRawHTML, r.renderNothing)
 	reg.Register(ast.KindText, r.renderText)
 	reg.Register(ast.KindString, r.renderString)
-
+	reg.Register(KindRundownInline, r.renderRundownInline)
 	reg.Register(KindCodeModifierBlock, r.renderNothing)
 }
 
@@ -232,6 +362,8 @@ var GlobalAttributeFilter = util.NewBytesFilter(
 )
 
 func (r *Renderer) renderDocument(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	r.SetLevel(r.Config.Level)
+
 	return ast.WalkContinue, nil
 }
 
@@ -240,11 +372,62 @@ func (r *Renderer) renderNothing(w util.BufWriter, source []byte, node ast.Node,
 	return ast.WalkContinue, nil
 }
 
+func (r *Renderer) renderRundownBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if r.Config.RundownHandler != nil {
+		err := r.Config.RundownHandler.OnRundownNode(node)
+		if err != nil {
+			return ast.WalkStop, err
+		}
+	}
+
+	return ast.WalkContinue, nil
+}
+
+func (r *Renderer) renderRundownInline(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	var buf bytes.Buffer
+	var w2 = bufio.NewWriter(&buf)
+
+	if !node.HasChildren() {
+		return ast.WalkSkipChildren, nil
+	}
+
+	if entering {
+		renderer := renderer.NewRenderer(renderer.WithNodeRenderers(util.Prioritized(r, 1)))
+
+		for child := node.FirstChild(); child != nil; child = child.NextSibling() {
+			renderer.Render(w2, source, child)
+		}
+
+		if r.Config.RundownHandler != nil {
+			err := r.Config.RundownHandler.OnRundownNode(node)
+			if err != nil {
+				return ast.WalkStop, err
+			}
+
+			s := string(buf.Bytes())
+			result, err := r.Config.RundownHandler.Mutate([]byte(s), node)
+			if err != nil {
+				return ast.WalkStop, err
+			}
+			w.Write(result)
+		} else {
+			w.Write(buf.Bytes())
+		}
+	}
+
+	return ast.WalkSkipChildren, nil
+}
+
 // HeadingAttributeFilter defines attribute names which heading elements can have
 var HeadingAttributeFilter = GlobalAttributeFilter
 
-func paddingForIndent(indent int) string {
-	return strings.Repeat("  ", indent-1)
+func paddingForLevel(level int) string {
+	level--
+	if level < 0 {
+		level = 0
+	}
+
+	return strings.Repeat("  ", level)
 }
 
 func (r *Renderer) writeString(w util.BufWriter, s string) {
@@ -258,7 +441,7 @@ func (r *Renderer) renderHeading(w util.BufWriter, source []byte, node ast.Node,
 			// r.writeString(w, "\n")
 		}
 
-		r.writeString(w, paddingForIndent(n.Level))
+		r.writeString(w, paddingForLevel(n.Level))
 
 		switch n.Level {
 		case 1:
@@ -271,15 +454,27 @@ func (r *Renderer) renderHeading(w util.BufWriter, source []byte, node ast.Node,
 			r.pushStyle(Color(aurora.BoldFm))
 		}
 
-		r.currentLevel = n.Level
+		r.SetLevel(n.Level)
 	} else {
 		r.popStyle()
-		// TODO - Move label into a child tag, maybe an inline AnnotationNode
-		// if mod, ok := node.PreviousSibling().(*CodeModifierBlock); ok {
-		// 	if label, ok := mod.Values["label"]; ok {
-		// 		r.writeString(w, aurora.Faint(" (" + label + ")").String())
-		// 	}
-		// }
+
+		mods := NewModifiers()
+
+		if r, ok := node.PreviousSibling().(*RundownBlock); ok {
+			mods.Ingest(r.Modifiers)
+		}
+
+		for c := node.FirstChild(); c != nil; c = c.NextSibling() {
+			if r, ok := c.(*RundownInline); ok {
+				mods.Ingest(r.Modifiers)
+			}
+		}
+
+		if label, ok := mods.Values[Parameter("label")]; ok {
+			r.writeString(w, "\033[0m")
+			r.writeString(w, aurora.Faint(" ("+label+")").String())
+		}
+
 		r.writeString(w, "\n")
 	}
 	return ast.WalkContinue, nil
@@ -292,8 +487,8 @@ var BlockquoteAttributeFilter = GlobalAttributeFilter.Extend(
 
 func (r *Renderer) renderBlockquote(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
-		r.pushStyle(NewBulletSequence(aurora.Blue(" >").String(), paddingForIndent(r.currentLevel)))
-		} else {
+		r.pushStyle(NewBulletSequence(aurora.Blue(" >").String(), paddingForLevel(r.currentLevel)))
+	} else {
 		r.popStyle()
 	}
 	return ast.WalkContinue, nil
@@ -322,17 +517,12 @@ func (r *Renderer) syntaxHighlightText(w util.BufWriter, language string, source
 	trailing := []string{}
 	lines := strings.SplitAfter(buf.String(), "\n")
 	for i := len(lines) - 1; i >= 0 && strings.TrimSpace(rdutil.RemoveColors(lines[i])) == ""; {
-		// fmt.Printf("Trimming line %d, len = %d\n", i, len(lines))
 		trailing = append(trailing, strings.TrimSpace(lines[i]))
 		lines = lines[0:i]
 		i = i - 1
-		// fmt.Printf("Lines length %d, i = %d\n", len(lines), i)
-		// fmt.Printf("%q\n", strings.TrimSpace(rdutil.RemoveColors(lines[i])))
 	}
 
-	// fmt.Printf("Lines: %d, Trimmed: %d\n", len(lines), len(trailing))
-
-	r.indentLinesWithPrefix(aurora.Black(" ┃ ").Faint().String(), strings.TrimSpace(strings.Join(lines, "")), w)
+	r.levelLinesWithPrefix(aurora.Black(" ┃ ").Faint().String(), strings.TrimSpace(strings.Join(lines, "")), w)
 	for i := len(trailing) - 1; i >= 0; i = i - 1 {
 		w.WriteString(trailing[i])
 	}
@@ -341,7 +531,7 @@ func (r *Renderer) syntaxHighlightText(w util.BufWriter, language string, source
 
 func (r *Renderer) renderCodeBlock(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
-		r.indentLinesWithPrefix(aurora.Black(" ┃ ").Faint().String(), strings.TrimSpace(r.nodeLinesToString(source, n)), w)
+		r.levelLinesWithPrefix(aurora.Black(" ┃ ").Faint().String(), strings.TrimSpace(r.nodeLinesToString(source, n)), w)
 	} else {
 		_, _ = w.WriteString("\r\n") // Block level element, add blank line.
 	}
@@ -360,7 +550,7 @@ func (r *Renderer) renderFencedCodeBlock(w util.BufWriter, source []byte, node a
 			r.syntaxHighlightText(w, string(language), source, node)
 		}
 	} else {
-		r.writeString(w, "\r\n") // Block level element, add blank line.
+		// r.writeString(w, "\r\n") // Block level element, add blank line.
 	}
 
 	return ast.WalkContinue, nil
@@ -378,17 +568,17 @@ var ListAttributeFilter = GlobalAttributeFilter.Extend(
 )
 
 type IntegerSequenceStyle struct {
-	seq int
-	indent string
+	seq   int
+	level string
 }
 
-func NewIntegerSequence(start int, indent string) *IntegerSequenceStyle {
-	return &IntegerSequenceStyle{seq: start - 1, indent: indent}
+func NewIntegerSequence(start int, level string) *IntegerSequenceStyle {
+	return &IntegerSequenceStyle{seq: start - 1, level: level}
 }
 
 func (s *IntegerSequenceStyle) Begin() string {
 	s.seq++
-	return s.indent + aurora.Blue(" " + strconv.Itoa(s.seq) + " ").Bold().String()
+	return s.level + aurora.Blue(strconv.Itoa(s.seq)+" ").Bold().String()
 }
 
 func (s *IntegerSequenceStyle) End() string {
@@ -403,8 +593,8 @@ type BulletSequenceStyle struct {
 	marker string
 }
 
-func NewBulletSequence(marker string, indent string) BulletSequenceStyle {
-	return BulletSequenceStyle{marker: indent + marker}
+func NewBulletSequence(marker string, level string) BulletSequenceStyle {
+	return BulletSequenceStyle{marker: level + marker}
 }
 
 func (s BulletSequenceStyle) Begin() string {
@@ -424,13 +614,17 @@ func (r *Renderer) renderList(w util.BufWriter, source []byte, node ast.Node, en
 
 	if entering {
 		if n.IsOrdered() {
-			r.pushStyle(NewIntegerSequence(n.Start, paddingForIndent(r.currentLevel)))
+			r.pushStyle(NewIntegerSequence(n.Start, paddingForLevel(r.currentLevel)))
 		} else {
-			r.pushStyle(NewBulletSequence(" •", paddingForIndent(r.currentLevel)))
+			r.pushStyle(NewBulletSequence("•", paddingForLevel(r.currentLevel)))
 		}
+		r.SetLevel(r.currentLevel + 1)
 	} else {
-		_, _ = w.WriteString("\n")
+		if _, ok := node.Parent().(*ast.ListItem); !ok {
+			_, _ = w.WriteString("\n")
+		}
 		r.popStyle()
+		r.SetLevel(r.currentLevel - 1)
 	}
 	return ast.WalkContinue, nil
 }
@@ -466,7 +660,7 @@ func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, n ast.Node, 
 			return ast.WalkSkipChildren, nil
 		}
 
-		r.writeString(w, paddingForIndent(r.currentLevel))
+		r.writeString(w, paddingForLevel(r.currentLevel))
 
 		// if n.Attributes() != nil {
 		// 	_, _ = w.WriteString("<p")
@@ -484,7 +678,10 @@ func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, n ast.Node, 
 
 func (r *Renderer) renderTextBlock(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if !entering {
-		if _, ok := n.NextSibling().(ast.Node); ok && n.FirstChild() != nil {
+		_, ok := n.NextSibling().(ast.Node)
+		_, ok2 := n.Parent().(*ast.ListItem)
+
+		if ok && !ok2 {
 			_ = w.WriteByte('\n')
 		}
 	}
@@ -504,11 +701,11 @@ func (r *Renderer) renderThematicBreak(w util.BufWriter, source []byte, n ast.No
 	if !entering {
 		return ast.WalkContinue, nil
 	}
-	_, _ = w.WriteString("<hr")
-	if n.Attributes() != nil {
-		RenderAttributes(w, n, ThematicAttributeFilter)
-	}
-	_, _ = w.WriteString(">\n")
+
+	line := strings.Repeat("-", r.Config.ConsoleWidth-4)
+
+	_, _ = w.WriteString(fmt.Sprintf("  %s  \r\n\r\n", aurora.Faint(line).String()))
+
 	return ast.WalkContinue, nil
 }
 
@@ -681,16 +878,26 @@ func (r *Renderer) renderText(w util.BufWriter, source []byte, node ast.Node, en
 		r.writeString(w, r.peekStyle().Begin())
 	}
 
+	value := segment.Value(source)
+
+	// If the next node is a rundown marker indicating a label, trim
+	// any trailing space to present the label properly.
+	if rundown, ok := node.NextSibling().(*RundownInline); ok {
+		if _, ok := rundown.Modifiers.Values["label"]; ok {
+			value = bytes.TrimRight(value, " ")
+		}
+	}
+
 	if n.IsRaw() {
-		_, _ = w.Write(segment.Value(source))
+		_, _ = w.Write(value)
 	} else {
-		_, _ = w.Write(segment.Value(source))
+		_, _ = w.Write(value)
 		if n.HardLineBreak() || (n.SoftLineBreak() && true) {
 			_, _ = w.WriteString("\n")
-			r.writeString(w, paddingForIndent(r.currentLevel))
+			r.writeString(w, paddingForLevel(r.currentLevel))
 		} else if n.SoftLineBreak() {
 			_ = w.WriteByte('\n')
-			r.writeString(w, paddingForIndent(r.currentLevel))
+			r.writeString(w, paddingForLevel(r.currentLevel))
 		}
 	}
 
