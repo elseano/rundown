@@ -222,13 +222,6 @@ func PrepareSegments(source []byte, doc ast.Node, logger *log.Logger, indent int
 
 			currentContentSegment = nil
 
-		} else if node.Kind() == markdown.KindInvisibleBlock {
-			invisible := node.(*markdown.InvisibleBlock)
-			subDoc := captureLines(node, source)
-			for _, subSegment := range doBuildSegments(subDoc, invisible.Markdown, logger, currentLevel) {
-				segments = append(segments, subSegment)
-			}
-			currentContentSegment = nil
 		} else if node.Kind() == markdown.KindRundownBlock && node.NextSibling() != nil {
 			rundownBlocks = append(rundownBlocks, node)
 		} else {

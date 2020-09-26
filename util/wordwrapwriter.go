@@ -45,7 +45,8 @@ func (w *WordWrapWriter) Write(b []byte) (n int, err error) {
 			trueLength := w.trueLength(wordBytes)
 
 			// We are returning to the start of the line? Reset positions and treat as a wrap.
-			if bytes.Equal(spaceBytes, []byte("\r")) {
+			// Except if it's CRLF.
+			if bytes.Equal(spaceBytes, []byte("\r")) && !bytes.Equal(wordBytes, []byte("\n")) {
 				w.Writer.Write([]byte("\r"))
 				w.CurrentLinePos = 0
 				if w.AfterWrap != nil {

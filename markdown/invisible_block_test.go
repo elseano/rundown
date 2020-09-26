@@ -11,18 +11,18 @@ import (
 )
 
 func TestInvisibleBlock1(t *testing.T) {
-	contents := []byte("Normal markdown text\n\n<!--~\nHidden markdown text, only for rundown\n-->\nMore text")
-	verifyParsedAsKinds(contents, t, []ast.NodeKind{ast.KindParagraph, KindInvisibleBlock, ast.KindParagraph})
+	contents := []byte("Normal markdown text\n\n<!--~\nHidden markdown text, only for rundown\n-->\n\nMore text")
+	verifyParsedAsKinds(contents, t, []ast.NodeKind{ast.KindParagraph, ast.KindParagraph, ast.KindParagraph})
 }
 
 func TestInvisibleBlock2(t *testing.T) {
 	contents := []byte("Normal markdown text\n\n<!--~\nHidden markdown text, only for rundown\n\n    Indented code block\n\n```\nSomeCode\n\n```\n-->\nHere's more normal text")
-	verifyParsedAsKinds(contents, t, []ast.NodeKind{ast.KindParagraph, KindInvisibleBlock, ast.KindParagraph})
+	verifyParsedAsKinds(contents, t, []ast.NodeKind{ast.KindParagraph, ast.KindParagraph, ast.KindCodeBlock, ast.KindFencedCodeBlock, ast.KindParagraph})
 }
 
 func TestInvisibleBlock3(t *testing.T) {
 	contents := []byte("Normal markdown text\n\n<!--~\nHidden markdown text, only for rundown\n-->")
-	verifyParsedAsKinds(contents, t, []ast.NodeKind{ast.KindParagraph, KindInvisibleBlock})
+	verifyParsedAsKinds(contents, t, []ast.NodeKind{ast.KindParagraph, ast.KindParagraph})
 }
 
 func TestInvisibleBlock4(t *testing.T) {

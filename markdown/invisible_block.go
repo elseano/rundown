@@ -4,6 +4,7 @@ package markdown
 
 import (
 	"bytes"
+	"fmt"
 	"regexp"
 
 	"github.com/yuin/goldmark"
@@ -26,55 +27,26 @@ func (e *invisibleBlocks) Extend(m goldmark.Markdown) {
 		parser.WithBlockParsers(
 			util.Prioritized(NewInvisibleBlockParser(m), 1),
 		),
-		// parser.WithASTTransformers(
-		// 	util.Prioritized(NewInvisibleASTTransformer(), 999),
-		// ),
-
+		parser.WithASTTransformers(
+			util.Prioritized(NewInvisibleBlockASTTransformer(), 1),
+		),
 	)
 }
 
-/** BLOCK **/
+/** HOLDING BLOCK **/
 
-type Invisible struct {
-}
-
-func NewInvisible() *Invisible {
-	return &Invisible{}
-}
-
-type InvisibleBlock struct {
+type invisibleBlockMarker struct {
 	ast.BaseBlock
-
-	// ClosureLine is a line that closes this html block.
-	ClosureLine text.Segment
-
-	Markdown goldmark.Markdown
 }
 
-// KindHTMLBlock is a NodeKind of the HTMLBlock node.
-var KindInvisibleBlock = ast.NewNodeKind("InvisibleBlock")
-
-// Kind implements Node.Kind.
-func (n *InvisibleBlock) Kind() ast.NodeKind {
-	return KindInvisibleBlock
+func (b *invisibleBlockMarker) Dump(source []byte, level int) {
+	ast.DumpHelper(b, source, level, nil, nil)
 }
 
-func NewInvisibleBlock(markdown goldmark.Markdown) *InvisibleBlock {
-	return &InvisibleBlock{
-		BaseBlock:   ast.BaseBlock{},
-		ClosureLine: text.NewSegment(-1, -1),
-		Markdown: markdown,
-	}
-}
+var kindInvisibleBlockMarker = ast.NewNodeKind("InvisibleBlockMarker")
 
-func (n *InvisibleBlock) IsRaw() bool { return true }
-
-func (n *InvisibleBlock) HasClosure() bool {
-	return true
-}
-
-func (n *InvisibleBlock) Dump(source []byte, level int) {
-	ast.DumpHelper(n, source, level, nil, nil)
+func (b *invisibleBlockMarker) Kind() ast.NodeKind {
+	return kindInvisibleBlockMarker
 }
 
 /** PARSER **/
@@ -99,65 +71,56 @@ func NewInvisibleBlockParser(m goldmark.Markdown) parser.BlockParser {
 var invisibleBlockInfoKey = parser.NewContextKey()
 
 func (b *invisibleBlockParser) Trigger() []byte {
-	return []byte{'<'}
+	return []byte{'<', '-'}
 }
 
 func (b *invisibleBlockParser) Open(parent ast.Node, reader text.Reader, pc parser.Context) (ast.Node, parser.State) {
-	line, segment := reader.PeekLine()
-	if pos := pc.BlockOffset(); pos < 0 || line[pos] != '<' {
+	line, _ := reader.PeekLine()
+	if pos := pc.BlockOffset(); pos < 0 || (line[pos] != '<' && line[pos] != '-') {
 		return nil, parser.NoChildren
 	}
 
-	if htmlBlockType2OpenRegexp.Match(line) && !bytes.Contains(line, htmlBlockType2Close) {
-		node := NewInvisibleBlock(b.markdown)
-		reader.Advance(segment.Len() - 1)
-		return node, parser.NoChildren
+	text := string(line)
+	fmt.Sprintln(text)
+
+	// Invisible Blocks are truely invisible in the AST. We just skip the opening and closing.
+
+	if start := htmlBlockType2OpenRegexp.FindIndex(line); start != nil && !bytes.Contains(line, htmlBlockType2Close) {
+		// reader.AdvanceLine()
+		pc.Set(invisibleBlockInfoKey, true)
+		return &invisibleBlockMarker{}, parser.Close
+	}
+
+	if bytes.Contains(line, htmlBlockType2Close) && pc.Get(invisibleBlockInfoKey) == true {
+		// reader.AdvanceLine()
+
+		line, _ := reader.PeekLine()
+		text := string(line)
+		fmt.Sprintln(text)
+
+		// // Skip past any trailing blank lines, as these will break the block parser loop.
+		// for {
+		// 	_, segment := reader.PeekLine()
+		// 	segment2 := segment.TrimLeftSpace(reader.Source())
+		// 	if segment2.IsEmpty() {
+		// 		reader.Advance(segment.Len())
+		// 	} else {
+		// 		break
+		// 	}
+		// }
+
+		pc.Set(invisibleBlockInfoKey, nil)
+		return &invisibleBlockMarker{}, parser.Close
 	}
 
 	return nil, parser.NoChildren
 }
 
 func (b *invisibleBlockParser) Continue(node ast.Node, reader text.Reader, pc parser.Context) parser.State {
-	htmlBlock := node.(*InvisibleBlock)
-	lines := htmlBlock.Lines()
-	line, segment := reader.PeekLine()
-
-	if lines.Len() == 1 {
-		firstLine := lines.At(0)
-		if bytes.Contains(firstLine.Value(reader.Source()), htmlBlockType2Close) {
-			return parser.Close
-		}
-	}
-	if bytes.Contains(line, htmlBlockType2Close) {
-		htmlBlock.ClosureLine = segment
-		reader.Advance(segment.Len())
-		return parser.Close
-	}
-
-	node.Lines().Append(segment)
-	reader.Advance(segment.Len() - 1)
-
-	return parser.Continue | parser.NoChildren
+	return parser.Close
 }
 
 func (b *invisibleBlockParser) Close(node ast.Node, reader text.Reader, pc parser.Context) {
-	// var buf bytes.Buffer
-
-	// for i := 0; i < node.Lines().Len(); i++ {
-	// 	line := node.Lines().At(i)
-	// 	buf.Write(line.Value(reader.Source()))
-	// }
-
-	// contentReader := text.NewReader(buf.Bytes())
-	// parser := b.markdown.Parser()
-
-	// contentDoc := parser.Parse(contentReader)
-	// contentDoc.Dump(buf.Bytes(), 0)
-
-	// for child := contentDoc.FirstChild(); child != nil; child = child.NextSibling() {
-	// 	node.InsertAfter(node, node, child)
-	// }
-
 }
 
 func (b *invisibleBlockParser) CanInterruptParagraph() bool {
@@ -168,48 +131,35 @@ func (b *invisibleBlockParser) CanAcceptIndentedLine() bool {
 	return false
 }
 
-/** AST TRansformer **
+/*
+ *
+ * FencedCodeBlock + Rundown AST Transformer
+ *
+ */
 
-type invisibleASTTransformer struct {
+type invisibleBlockASTTransformer struct {
 }
 
-var defaultInvisibleASTTransformer = &invisibleASTTransformer{}
+var defaultInvisibleBlockASTTransformer = &invisibleBlockASTTransformer{}
 
-// NewInvisibleASTTransformer returns a new parser.ASTTransformer that
-// insert a invisible list to the last of the document.
-func NewInvisibleASTTransformer() parser.ASTTransformer {
-	return defaultInvisibleASTTransformer
+// NewFootnoteASTTransformer returns a new parser.ASTTransformer that
+// insert a footnote list to the last of the document.
+func NewInvisibleBlockASTTransformer() parser.ASTTransformer {
+	return defaultInvisibleBlockASTTransformer
 }
 
-func (a *invisibleASTTransformer) Transform(node *ast.Document, reader text.Reader, pc parser.Context) {
-	for child := node.FirstChild(); child != nil;  {
-		if invisible, ok := child.(*InvisibleBlock); ok {
-			fmt.Printf("Found invisible block %v\n", child.Kind())
+func (a *invisibleBlockASTTransformer) Transform(doc *ast.Document, reader text.Reader, pc parser.Context) {
+	// Finds InvisibleBlocks and removes them.
 
-			subLines := captureLines(invisible, reader.Source())
+	for child := doc.FirstChild(); child != nil; {
 
-			fmt.Println(subLines)
-
-			subReader := text.NewReader([]byte(subLines))
-			subDoc := invisible.Parse(subReader)
-
-			subDoc.Dump(subReader.Source(), 1)
-
-
-			parent := child.Parent()
-			
-			for subNode := subDoc.FirstChild(); subNode != nil; {
-				fmt.Printf("Inserting child node %v\n", subNode.Kind())
-
-				nextSubNode := subNode.NextSibling()
-				parent.InsertAfter(parent, child, subNode)
-				subNode = nextSubNode
-			}
-
-			parent.RemoveChild(parent, child)
-		}
+		ib, ok := child.(*invisibleBlockMarker)
 
 		child = child.NextSibling()
+
+		if ok {
+			doc.RemoveChild(doc, ib)
+		}
 	}
+
 }
-**/

@@ -10,18 +10,16 @@ import (
 	"math"
 	"os"
 	"os/exec"
-	"os/signal"
 	"regexp"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/elseano/rundown/markdown"
 	"github.com/elseano/rundown/util"
-	"golang.org/x/crypto/ssh/terminal"
-
-	"github.com/creack/pty"
 	"github.com/logrusorgru/aurora"
+
 	"github.com/yuin/goldmark/renderer"
 )
 
@@ -95,22 +93,28 @@ func rpcLoop(messages chan string, spinner util.Spinner, context *Context, logge
 	}
 }
 
-// Takes carriage returns from the input, and passes them through to the output.
-// Needed for formatting issues with accepting input from STDIN while showing STDOUT.
-func inputHandler(reader *os.File, writer *os.File, logger *log.Logger) {
-	var buf = make([]byte, 216)
+// // Takes carriage returns from the input, and passes them through to the output.
+// // Needed for formatting issues with accepting input from STDIN while showing STDOUT.
+// func inputHandler(reader *os.File, writer *os.File, logger *log.Logger) {
+// 	var buf = make([]byte, 216)
 
-	for {
-		if n, err := reader.Read(buf); err == nil {
-			logger.Printf("Got input: %d %q\n", n, buf[0:n])
-			newlines := bytes.Count(buf[0:n], []byte{13})
-			if newlines > 0 {
-				logger.Printf("Found newlines: %d", newlines)
-				writer.Write([]byte("\r\n"))
-			}
-		}
-	}
-}
+// 	for {
+// 		if n, err := reader.Read(buf); err == nil {
+// 			logger.Printf("Got input: %d %q\n", n, buf[0:n])
+// 			// n2, err2 := writer.Write(buf[0:n])
+// 			err2 := writer.Sync()
+
+// 			if err2 != nil {
+// 				fmt.Printf("Err writing to PTMX %d %#v - %s\n", 0, err2, err2.(*os.PathError).Err.Error())
+// 			}
+// 			// newlines := bytes.Count(buf[0:n], []byte{13})
+// 			// if newlines > 0 {
+// 			// 	logger.Printf("Found newlines: %d", newlines)
+// 			// 	writer.Write([]byte("\r\n"))
+// 			// }
+// 		}
+// 	}
+// }
 
 func (c *CodeSegment) Kind() string { return "CodeSegment" }
 
@@ -397,67 +401,31 @@ func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, last
 	}
 
 	if modifiers.Flags[NoRunFlag] != true {
+		process := util.NewProcess(cmd)
 
-		ptmx, err := pty.Start(cmd)
+		stdout, err := process.Start()
 		if err != nil {
 			spinner.Error("Error")
 			return ExecutionResult{Message: fmt.Sprintf("%v", err), Kind: "Error", Source: contents, IsError: true}
 		}
-		defer func() { _ = ptmx.Close() }() // Best effort.
 
 		var captureBuffer bytes.Buffer
 		endedWithoutNewline := false
 		var output io.Writer = nil
+		var waiter sync.WaitGroup
 
 		if modifiers.Flags[StdoutFlag] {
-			output = os.Stdout
+			stdoutReader, stdoutWriter, err := os.Pipe()
+			if err != nil {
+				spinner.Error("Error")
+				return ExecutionResult{Message: fmt.Sprintf("%v", err), Kind: "Error", Source: contents, IsError: true}
+			}
 
-			ch := make(chan os.Signal, 1)
-			signal.Notify(ch, syscall.SIGWINCH)
+			stdoutDist := io.MultiWriter(stdoutWriter, &captureBuffer)
+
 			go func() {
-				for range ch {
-					if err := pty.InheritSize(os.Stdin, ptmx); err != nil {
-						// log.Printf("error resizing pty: %s", err) // Don't care.
-					}
-				}
-			}()
-			ch <- syscall.SIGWINCH // Initial resize.
-
-			oldState, err := terminal.MakeRaw(int(os.Stdin.Fd()))
-			if err != nil {
-				// Don't care.
-			}
-			defer func() {
-				if oldState != nil {
-					terminal.Restore(int(os.Stdin.Fd()), oldState)
-				}
-			}() // Best effort.
-
-			logger.Println("Setting up STDIN...")
-
-			// Copy stdin to our newline capturer for inserting blank lines when password input is requested.
-			piper, pipew, err := os.Pipe()
-			if err != nil {
-				panic(err)
-			}
-			mw := io.MultiWriter(pipew, ptmx)
-			go func() { _, _ = io.Copy(mw, os.Stdin) }()
-			// go func() { _, _ = io.Copy(ptmx, mw) }()
-			go func() { inputHandler(piper, ptmx, logger) }()
-
-			outr, outw, err := os.Pipe()
-			if err != nil {
-				panic(err)
-			}
-
-			logger.Println("Setting up STDOUT...")
-
-			// Setup a distribution of STDOUT/STDERR into outw (which will be used to display output) and captureBuffer
-			// which is used for error reporting.
-			ptmxMulti := io.MultiWriter(outw, &captureBuffer)
-			go func() {
-				defer outw.Close()
-				_, _ = io.Copy(ptmxMulti, ptmx)
+				defer stdoutWriter.Close()
+				_, _ = io.Copy(stdoutDist, stdout)
 			}()
 
 			logger.Println("Displaying process output\n\rLevel is ", indent, "\n\r")
@@ -470,28 +438,34 @@ func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, last
 				outputHeading = "Output"
 			}
 
-			if modifiers.Flags[StdoutFlag] {
-				// If two consecutive CodeSegments, prefix a blank line to the output heading
-				// to format cleanly.
-				if lastSegment != nil && lastSegment.Kind() == "CodeSegment" {
-					if _, ok := lastSegment.GetModifiers().Flags[NoSpinFlag]; !ok {
-						outputHeading = "\n" + outputHeading
-					}
+			// If two consecutive CodeSegments, prefix a blank line to the output heading
+			// to format cleanly.
+			if lastSegment != nil && lastSegment.Kind() == "CodeSegment" {
+				if _, ok := lastSegment.GetModifiers().Flags[NoSpinFlag]; !ok {
+					outputHeading = "\n" + outputHeading
 				}
-
-				endedWithoutNewline = util.ReadAndFormatOutput(outr, indent, aurora.Blue("‣ ").Bold().Faint().String(), spinner, bufio.NewWriter(output), logger, aurora.Faint(outputHeading).String())
-				logger.Printf("endedWithoutNewline? %v\r\n", endedWithoutNewline)
 			}
+
+			go func() {
+				waiter.Add(1)
+				endedWithoutNewline = util.ReadAndFormatOutput(stdoutReader, indent, aurora.Blue("‣ ").Bold().Faint().String(), spinner, bufio.NewWriter(output), logger, aurora.Faint(outputHeading).String())
+				logger.Printf("endedWithoutNewline? %v\r\n", endedWithoutNewline)
+				waiter.Done()
+			}()
 		} else {
 			output = ioutil.Discard
 			go func() {
-				_, _ = io.Copy(&captureBuffer, ptmx)
+				waiter.Add(1)
+				_, _ = io.Copy(&captureBuffer, stdout)
+				waiter.Done()
 			}()
 		}
 
 		logger.Println("Waiting for command completion")
 
-		waitErr := cmd.Wait()
+		waitErr := process.Wait()
+
+		waiter.Wait()
 
 		time.Sleep(100 * time.Millisecond) // 2x receiveLoop delay
 

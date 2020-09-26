@@ -3,13 +3,18 @@
 Scripts can ask for input and display their output.
 
 ``` bash stdout
-read -p "Hi " output
+echo "Hi"
 ```
 
 You can also run more complex commands which ask a series of inputs.
 
-**TODO** - This seems broken.
+``` bash stdout env
+read -p "Hi " OUTPUT
+```
 
-``` bash stdout
-aws configure
+Again:
+
+``` bash stdout env
+echo "Last input was $OUTPUT"
+read -p "Hi " OUTPUT
 ```

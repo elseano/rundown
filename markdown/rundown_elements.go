@@ -31,7 +31,7 @@ func (e *rundownElements) Extend(m goldmark.Markdown) {
 			util.Prioritized(NewRundownInlineParser(), 2),
 		),
 		parser.WithBlockParsers(
-			util.Prioritized(NewRundownBlockParser(), 1),
+			util.Prioritized(NewRundownBlockParser(), 2),
 		),
 		parser.WithASTTransformers(
 			util.Prioritized(NewRundownASTTransformer(), 1),

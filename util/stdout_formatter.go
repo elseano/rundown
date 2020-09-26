@@ -1,24 +1,22 @@
 package util
 
 import (
+	"bufio"
+	"fmt"
 	"io"
 	"log"
-	"regexp"
-	"strings"
-	"fmt"
 	"math"
+	"regexp"
 	"strconv"
-	"bufio"
-
+	"strings"
 	// "github.com/logrusorgru/aurora"
-
 )
 
 type Line struct {
-	LastColumn int
-	FormattingStash string
+	LastColumn        int
+	FormattingStash   string
 	CurrentlyIndented bool
-	Dirty bool
+	Dirty             bool
 }
 
 func (l *Line) MoveCursor(col int) {
@@ -34,6 +32,7 @@ func (l *Line) MoveCursor(col int) {
 }
 
 type TokenResult int
+
 const (
 	TokenCursor TokenResult = iota + 1
 	TokenColour
@@ -44,7 +43,6 @@ const (
 
 var formattingMatch = regexp.MustCompile("(\x1b\\[[0-9\\;]*m)|(\x1b\\[[0-9]*[A-Za-ln-z]|[\r\n]+)|(\\s+)")
 
-
 func NextToken(input string) (token TokenResult, data string, rest string) {
 	if input == "" {
 		return TokenEmpty, "", ""
@@ -53,7 +51,7 @@ func NextToken(input string) (token TokenResult, data string, rest string) {
 	i := 0
 
 	match := formattingMatch.FindStringSubmatchIndex(input)
-	
+
 	if len(match) > 0 {
 		if match[0] > 0 { // Text at the start
 			nextMatch := formattingMatch.FindStringSubmatchIndex(input[i:])
@@ -69,7 +67,7 @@ func NextToken(input string) (token TokenResult, data string, rest string) {
 			return TokenCursor, input[match[0]:match[1]], input[match[1]:]
 		} else if match[2] == 0 { // Colour
 			return TokenColour, input[match[0]:match[1]], input[match[1]:]
-		} else if match[6] == 0 { // Whitespace 
+		} else if match[6] == 0 { // Whitespace
 			return TokenWhitespace, input[match[0]:match[1]], input[match[1]:]
 		}
 	}
@@ -80,6 +78,7 @@ func NextToken(input string) (token TokenResult, data string, rest string) {
 const StartOfLine = -999
 
 var movementCode = regexp.MustCompile("\x1b\\[([0-9]*)([A-Za-z])")
+
 func DecodeCursor(cursor string) (lineDelta, columnDelta int) {
 	switch cursor {
 	case "\r":
@@ -101,10 +100,10 @@ func DecodeCursor(cursor string) (lineDelta, columnDelta int) {
 		case "B": //Down
 			return amount, 0
 		case "C": // Forward
-		return 0, amount
+			return 0, amount
 		case "D": // Backward
-		return 0, amount * -1
-	}
+			return 0, amount * -1
+		}
 	}
 
 	return 0, 0
@@ -121,8 +120,8 @@ func moveCursor(out io.Writer, offset int) {
 		Debugf("Moving cursor down: %d\n", offset)
 		fmt.Fprintf(out, "\x1b[%dB", offset)
 	} else if offset < 0 {
-		Debugf("Moving cursor up: %d\n", offset * -1)
-		fmt.Fprintf(out, "\x1b[%dA", offset * -1)
+		Debugf("Moving cursor up: %d\n", offset*-1)
+		fmt.Fprintf(out, "\x1b[%dA", offset*-1)
 	}
 }
 
@@ -131,18 +130,17 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 	var indentStr = indentSpaces + prefix
 	var buf = make([]byte, 216)
 	var hasShownSomething = false
-	var lineTracking = map[int]*Line{ 0: &Line{} }
+	var lineTracking = map[int]*Line{0: &Line{}}
 	var currentLine = 0
 	var maxLine = 0
 	var lastToken TokenResult
 	var spinnerLineOffset = 0
 	var cursorLine = 0
-	var oldCurrentLine = 0 
+	var oldCurrentLine = 0
 
 	// r := regexp.MustCompile("([^\r\n]*)([\r\n]{0,2})")
 
 	logger.Printf("Reading and formatting output with spinner %#v\n", spinner)
-
 
 	for {
 		if n, err := reader.Read(buf); err == nil {
@@ -154,7 +152,7 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 			stringBuf := string(buf[0:n])
 			segmentContainedText := false
 			oldCurrentLine = currentLine
-			
+
 			for token, data, rest := NextToken(stringBuf); token != TokenEmpty; token, data, rest = NextToken(rest) {
 
 				logger.Printf("Token: %#v, %#v, %#v\n", token, data, rest)
@@ -169,53 +167,53 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 
 				switch token {
 
-					case TokenCursor:
-						lineDelta, columnDelta := DecodeCursor(data)
-						Debugf("Cursor movement: %d, %d\n", lineDelta, columnDelta)
+				case TokenCursor:
+					lineDelta, columnDelta := DecodeCursor(data)
+					Debugf("Cursor movement: %d, %d\n", lineDelta, columnDelta)
 
-						// Moving multiple new lines downwards, indent the blank line.
-						if lineDelta > 0 && lastToken == TokenCursor && !lineData.CurrentlyIndented {
-							// fmt.Fprint(&toWrite, indentStr + lineData.FormattingStash)
-							// lineData.FormattingStash = ""
-							// lineData.CurrentlyIndented = true
-						}
+					// Moving multiple new lines downwards, indent the blank line.
+					if lineDelta > 0 && lastToken == TokenCursor && !lineData.CurrentlyIndented {
+						// fmt.Fprint(&toWrite, indentStr + lineData.FormattingStash)
+						// lineData.FormattingStash = ""
+						// lineData.CurrentlyIndented = true
+					}
 
-						currentLine = currentLine + lineDelta
-						if lineTracking[currentLine] == nil {
-							lineTracking[currentLine] = &Line{}
-						}
+					currentLine = currentLine + lineDelta
+					if lineTracking[currentLine] == nil {
+						lineTracking[currentLine] = &Line{}
+					}
 
-						lineTracking[currentLine].MoveCursor(columnDelta)
+					lineTracking[currentLine].MoveCursor(columnDelta)
 
-						fmt.Fprint(&toWrite, data)
+					fmt.Fprint(&toWrite, data)
 
-						break
-					case TokenColour:
-						fallthrough
-					case TokenWhitespace:
-						if lineData.CurrentlyIndented {
-							fmt.Fprint(&toWrite, lineData.FormattingStash + data)
-							lineData.FormattingStash = ""
-						} else {
-							lineData.FormattingStash = lineData.FormattingStash + data
-						}
+					break
+				case TokenColour:
+					fallthrough
+				case TokenWhitespace:
+					if lineData.CurrentlyIndented {
+						fmt.Fprint(&toWrite, lineData.FormattingStash+data)
+						lineData.FormattingStash = ""
+					} else {
+						lineData.FormattingStash = lineData.FormattingStash + data
+					}
 
-						break
-					case TokenDisplayStream:
-						if !lineData.CurrentlyIndented {
-							Debugf("Line %d not indented, indenting line with %q and formatting %q\n", currentLine, indentStr, lineData.FormattingStash)
-							fmt.Fprintf(&toWrite, "%s%s", indentStr, lineData.FormattingStash)
+					break
+				case TokenDisplayStream:
+					if !lineData.CurrentlyIndented {
+						Debugf("Line %d not indented, indenting line with %q and formatting %q\n", currentLine, indentStr, lineData.FormattingStash)
+						fmt.Fprintf(&toWrite, "%s%s", indentStr, lineData.FormattingStash)
 
-							lineData.LastColumn = lineData.LastColumn + len(indentStr)
-							lineData.FormattingStash = ""
-							lineData.CurrentlyIndented = true
-						}
+						lineData.LastColumn = lineData.LastColumn + len(indentStr)
+						lineData.FormattingStash = ""
+						lineData.CurrentlyIndented = true
+					}
 
-						Debugf("Writing: %#v\n", data)
-						fmt.Fprint(&toWrite, data)
-						lineData.LastColumn = lineData.LastColumn + len(data)
-						lineData.Dirty = true
-						segmentContainedText = true
+					Debugf("Writing: %#v\n", data)
+					fmt.Fprint(&toWrite, data)
+					lineData.LastColumn = lineData.LastColumn + len(data)
+					lineData.Dirty = true
+					segmentContainedText = true
 				}
 
 				lastToken = token
@@ -261,7 +259,7 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 			if lineTracking[currentLine].LastColumn == 0 && anythingToWrite {
 				if lineTracking[currentLine].Dirty {
 					movement := maxLine - currentLine + spinnerLineOffset
-				// If ML = 5 and CL = 4 and SO = 1, then we need to move from 6 to 4, so ML - CL + SO = 2
+					// If ML = 5 and CL = 4 and SO = 1, then we need to move from 6 to 4, so ML - CL + SO = 2
 					moveCursor(out, movement)
 					cursorLine = cursorLine + movement
 				}
@@ -272,7 +270,7 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 
 			out.Flush()
 
-				// fmt.Printf("End of segment: %+v", lineTracking)
+			// fmt.Printf("End of segment: %+v", lineTracking)
 		} else {
 			if err == io.EOF {
 				logger.Println("GOT EOF")
@@ -288,7 +286,7 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 				out.Flush()
 
 				return !lineTracking[currentLine].CurrentlyIndented
-	
+
 			}
 
 			fmt.Println("ERR", err)

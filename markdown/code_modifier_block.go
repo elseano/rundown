@@ -23,7 +23,7 @@ var CodeModifiers = &codeModifiers{}
 
 func (e *codeModifiers) Extend(m goldmark.Markdown) {
 	m.Parser().AddOptions(parser.WithBlockParsers(
-		util.Prioritized(NewCodeModifierBlockParser(), 1),
+		util.Prioritized(NewCodeModifierBlockParser(), 2),
 	))
 	// m.Renderer().AddOptions(renderer.WithNodeRenderers(
 	// 	util.Prioritized(NewStrikethroughHTMLRenderer(), 500),
@@ -123,13 +123,11 @@ func getCodeModifier(reader text.Reader, pc parser.Context) ([]byte, CodeModifie
 
 	text := line[pos:]
 
-
 	if match := xmlCodeModifiers.FindSubmatch(text); match != nil {
 		return match[1], XmlBlockType
 	} else if match := linkCodeModifiers.FindSubmatch(text); match != nil {
 		return match[1], HiddenLinkBlockType
 	}
-
 
 	return nil, NoCodeBlockType
 }

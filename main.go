@@ -13,6 +13,7 @@ import (
 	rdcli "github.com/elseano/rundown/cli"
 	"github.com/elseano/rundown/markdown"
 	"github.com/elseano/rundown/segments"
+	"github.com/yuin/goldmark/text"
 
 	"github.com/logrusorgru/aurora"
 	"github.com/urfave/cli/v2"
@@ -189,6 +190,20 @@ func inspectRundown(c *cli.Context) {
 
 }
 
+func inspectMarkdown(c *cli.Context) {
+	filename := c.Args().Get(0)
+
+	md := markdown.PrepareMarkdown()
+
+	b, _ := ioutil.ReadFile(filename)
+
+	reader := text.NewReader(b)
+
+	doc := md.Parser().Parse(reader)
+
+	doc.Dump(b, 0)
+}
+
 func defaultRun(c *cli.Context) error {
 	logger := buildLogger(c.Bool("debug"))
 	shortCode := []string{}
@@ -289,6 +304,16 @@ func main() {
 
 				Action: func(c *cli.Context) error {
 					inspectRundown(c)
+					return nil
+				},
+			},
+			&cli.Command{
+				Name:      "ast",
+				Usage:     "Shows the markdown AST of the markdown file",
+				ArgsUsage: "FILENAME",
+
+				Action: func(c *cli.Context) error {
+					inspectMarkdown(c)
 					return nil
 				},
 			},

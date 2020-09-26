@@ -80,6 +80,12 @@ Goes quite deep.
 
 At 4 levels we don't do much.
 
+However, thematic breaks ignore heading levels.
+
+----
+
+This should still be indented at level 4.
+
 -----
 
 This is a heading
