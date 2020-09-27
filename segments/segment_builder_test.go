@@ -1,20 +1,19 @@
 package segments
 
 import (
-	"testing"
 	"log"
 	"os"
-	"strings"
 	"regexp"
+	"strings"
+	"testing"
 
 	"github.com/elseano/rundown/markdown"
-	"github.com/elseano/rundown/util"
 	"github.com/elseano/rundown/testutil"
+	"github.com/elseano/rundown/util"
 
 	"github.com/yuin/goldmark"
 
 	"github.com/stretchr/testify/assert"
-
 )
 
 func TestPrepareSegments(t *testing.T) {
@@ -32,12 +31,7 @@ func TestPrepareSegments(t *testing.T) {
 	assert.Equal(t, "DisplaySegment", segments[0].Kind())
 
 	result = renderSeg(segments[0], markdown, contents, logger)
-	assert.Equal(t, "Normal markdown text", result)
-
-	assert.Equal(t, "DisplaySegment", segments[1].Kind())
-
-	result = renderSeg(segments[1], markdown, contents, logger)
-	assert.Equal(t, "Hidden markdown text, only for rundown", result)
+	assert.Equal(t, "Normal markdown text\n\nHidden markdown text, only for rundown\n\nMore text", result)
 
 }
 
@@ -57,14 +51,14 @@ func TestPrepareSegmentsSpacing(t *testing.T) {
 	assert.Equal(t, "DisplaySegment", segments[3].Kind())
 }
 
-
 func renderSeg(seg Segment, md goldmark.Markdown, contents []byte, logger *log.Logger) string {
 	context := &Context{
 		Env: map[string]string{
 			"RUNDOWN": "",
 		},
-		Messages: make(chan string),
-		TempDir:  "",
+		Messages:     make(chan string),
+		TempDir:      "",
+		ConsoleWidth: 80,
 	}
 
 	rx := regexp.MustCompile("\033\\[[0-9\\;]+m")

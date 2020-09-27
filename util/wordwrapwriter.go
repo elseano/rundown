@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"regexp"
+	"strings"
 )
 
 type WordWrapWriter struct {
@@ -31,7 +32,8 @@ func (w *WordWrapWriter) SetAfterWrap(wrapper func(writer io.Writer) int) {
 }
 
 func (w *WordWrapWriter) trueLength(b []byte) int {
-	return len(RemoveColors(string(b)))
+	noc := RemoveColors(string(b))
+	return len(strings.TrimSuffix(noc, "\n"))
 }
 
 var wordSplitter = regexp.MustCompile("([\r ])?([^\r ]*)")

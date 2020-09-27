@@ -1,13 +1,12 @@
 package util
 
 import (
-	"testing"
 	"bytes"
 	"io"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
-
 
 func TestWrapBasic(t *testing.T) {
 	var buf bytes.Buffer
@@ -40,11 +39,11 @@ func TestWrapCallback(t *testing.T) {
 	var buf bytes.Buffer
 
 	w := NewWordWrapWriter(&buf, 10)
-	w.SetAfterWrap(func (out io.Writer) int {
+	w.SetAfterWrap(func(out io.Writer) int {
 		n, _ := out.Write([]byte(" "))
 		return n
 	})
 	w.Write([]byte("This is some text which has a really long line\nHere's\ranother line.\r"))
 
-	assert.Equal(t, "This is\n some text\n which has\n a really\n long\n line\nHere's\r another\n line.\r ", buf.String())
+	assert.Equal(t, "This is\n some text\n which has\n a really\n long line\nHere's\r another\n line.\r ", buf.String())
 }

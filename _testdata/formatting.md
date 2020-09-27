@@ -151,3 +151,10 @@ Sequential runs with a middle reveal should be spaced.
 
       But
       At 4 levels we don't do much.
+
+      However, thematic breaks ignore heading levels.
+
+  ----------------------------------------------------------------------------  
+      
+
+      This should still be indented at level 4.

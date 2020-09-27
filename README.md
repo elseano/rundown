@@ -49,7 +49,7 @@ When running fenced code blocks, rundown by default will hide the output and dis
 
 It will update the spinner on completion of the process to either successful or failure. Failures terminate rundown unless you specify otherwise.
 
-
+![](2020-09-26-19-58-14.png)
 
 By default, a fenced code block which doesn't specify a language will be rendered out.
 

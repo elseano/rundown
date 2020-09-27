@@ -541,16 +541,11 @@ func (r *Renderer) renderCodeBlock(w util.BufWriter, source []byte, n ast.Node, 
 func (r *Renderer) renderFencedCodeBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	n := node.(*ast.FencedCodeBlock)
 	if entering {
-		if !n.HasBlankPreviousLines() {
-			r.writeString(w, "\n")
-		}
-		// r.writeString(w, "\n")
 		language := n.Language(source)
 		if language != nil {
 			r.syntaxHighlightText(w, string(language), source, node)
 		}
 	} else {
-		// r.writeString(w, "\r\n") // Block level element, add blank line.
 	}
 
 	return ast.WalkContinue, nil

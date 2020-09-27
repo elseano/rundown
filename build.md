@@ -96,3 +96,39 @@ Debugging `rundown`'s handling of the file `debug.md`:
 ``` bash borg reveal
 ~/go/bin/dlv exec --api-version 2 --headless --listen 127.0.0.1:49491 ./rundown -- debug.md
 ```
+
+<r stop-ok />
+
+## Delve Run Test <r label=delve:test/>
+
+Same as **Delve** above, but runs the specified test.
+
+``` bash borg reveal
+~/go/bin/dlv test --api-version 2 --headless --listen 127.0.0.1:49491 github.com/elseano/rundown -- -run TestHidden
+```
+
+# Testing Rundown
+
+## Testing locally <r label=test/>
+
+Simply run:
+
+``` bash
+go test ./...
+```
+
+## Testing other platforms <r label=test:all/>
+
+<r desc>Rundown was built on OSX, and testing on Linux is done through a docker container.</r>
+
+``` bash named
+# Building docker container
+docker build -t rdlinux -f build/Dockerfile.ubuntu .
+```
+
+Now that the container is ready, run the tests.
+
+``` bash named stdout
+# Running test inside Docker
+docker run rdlinux
+```
