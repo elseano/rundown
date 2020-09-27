@@ -8,8 +8,8 @@ Modifiers can be specified using one of three possible formats. Markdown rendere
 
 The most compatible way of specifying modifiers is using the `rundown` tag. It comes in two flavours:
 
-* Short, which is just `<r flag key=value>`
-* Long, which is `<rundown flag key=value>`
+* Short, which is just `<r flag key=value/>`
+* Long, which is `<rundown flag key=value/>`
 
     <rundown nospin blah=something />
 
@@ -175,6 +175,13 @@ to return the status code of the script.
     ssh user@someserver
     ```
 
+## Shortcodes <r label=shortcodes/>
+
+* Define a shortcode: `<r label=tag/>`
+* Add a shortcode description: `<r desc="blah"/>` or `<r desc>Blah</r>`
+
+See [Full shortcode documentation](./shortcodes.md).
+
 ## Save <r label=save/>
 
 Used when you want to demonstrate a file's contents, while also saving it for later use.
@@ -227,14 +234,18 @@ Why, <r sub-env>$BLAH</r> there! But $BLAH isn't substituted this time.
 
 ## Early termination
 
-The `end` flag allows you to control where the script ends. This can be useful when combined with `skip_on_success` flags, where you might want to continue the flow under an error state to display some helpful messages.
+The `stop-ok` and `stop-fail` flags allow you to control early termination points for your script. 
 
-    ``` bash skip_on_success named
+This can be useful when combined with `skip-on-success` flags, where you might want to continue the flow under an error state to display some helpful messages.
+
+Or when using **shortcodes**, where you don't want to fall through to a child heading.
+
+    ``` bash skip-on-success named
     # Is Homebrew installed?
     brew --version
     ```
 
     You need to install homebrew. Please go to http://brew.sh.
 
-    <!--~ end -->
+    <r stop-fail/>
 

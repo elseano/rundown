@@ -1,6 +1,8 @@
-# Hidden Blocks
+> Tip - Run this file in Rundown, there's hidden blocks to see.
 
-In Rundown, hidden blocks are a great way to hide execution detail from readers, but add enhancements when running the markdown file using rundown.
+# Hidden Blocks and how they work
+
+In Rundown, you can add hidden blocks are a great way to hide execution detail from readers, but add enhancements when running the markdown file using rundown.
 
     <!--~
     I'll only be rendered inside Rundown.
@@ -22,12 +24,13 @@ echo "I'm running from inside a rundown hidden block."
 ```
 -->
 
-Limitations:
+This includes headings with shortcodes, or code setup blocks. Unless your Markdown renderer reveals comments, these blocks wont be visible, but Rundown will see them.
 
-Due to the current way rundown parses markdown, the following limitations apply:
+<!--~
+## Hidden heading <r label=hidden>
 
-* Headings within a hidden block aren't included in `skip-on-success` and `skip-on-failure` flags.
-* Code blocks denoted as `setup` are not obeyed.
+This is a hidden heading. You won't see it in markdown.
+-->
 
 ## Uses for Hidden Blocks
 
@@ -46,4 +49,17 @@ Hidden blocks are a great way to provide "progressive enhancement" to your Rundo
     ``` bash stdout
     aws ec2 describe-instances
     ```
+
+Hidden headings are good when you want to `skip-on-failure` or `skip-on-success` without actually creating a new heading:
+
+    ``` bash skip-on-failure
+    ifail
+    ```
+
+    <!--~
+    ## Error
+    -->
+
+    Will skip to here.
+
 
