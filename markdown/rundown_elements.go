@@ -374,12 +374,52 @@ func NewRundownASTTransformer() parser.ASTTransformer {
 	return defaultRundownASTTransformer
 }
 
+func getRawText(n ast.Node, source []byte) string {
+	result := ""
+	for i := 0; i < n.Lines().Len(); i++ {
+		s := n.Lines().At(i)
+		result = result + string(source[s.Start:s.Stop])
+	}
+	return result
+}
+
+var isRundownOpening = regexp.MustCompile(`<(?:r|rundown)\s+(.*?)\s*(?:/>|>)`)
+var isRundownClosing = regexp.MustCompile(`</(?:r|rundown)>`)
+
 func (a *rundownASTTransformer) Transform(doc *ast.Document, reader text.Reader, pc parser.Context) {
 	// Finds FencedCodeBlocks, and transforms their syntax line additions into RundownBlock elements
-	// which provides consistency later
+	// which provides consistency later.
+
+	// Also finds HTMLBlocks which are rundown start and end tags, and everything inbetween into
+	// a RundownBlock tag.
+
+	var startBlock *ast.HTMLBlock
+	var mods *Modifiers
 
 	ast.Walk(doc, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
-		if fcb, ok := node.(*ast.FencedCodeBlock); ok && !entering {
+		if html, ok := node.(*ast.HTMLBlock); ok && startBlock == nil {
+			contents := getRawText(html, reader.Source())
+			if match := isRundownOpening.FindStringSubmatch(contents); match != nil {
+				mods = ParseModifiers(string(match[1]), "=")
+				startBlock = html
+			}
+		} else if html, ok := node.(*ast.HTMLBlock); ok && startBlock != nil && isRundownClosing.MatchString(getRawText(html, reader.Source())) {
+			rundown := NewRundownBlock(mods)
+			doc.InsertBefore(doc, startBlock, rundown)
+
+			for content := startBlock.NextSibling(); content != nil && content != html; {
+				thisContent := content
+				content = content.NextSibling()
+
+				rundown.AppendChild(rundown, thisContent)
+			}
+
+			doc.RemoveChild(doc, startBlock)
+			doc.RemoveChild(doc, html)
+
+			startBlock = nil
+			mods = nil
+		} else if fcb, ok := node.(*ast.FencedCodeBlock); ok && !entering {
 			var infoText string = ""
 
 			info := node.(*ast.FencedCodeBlock).Info

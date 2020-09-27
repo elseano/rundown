@@ -10,7 +10,7 @@ go build -o rundown
 
 # Build release <r label=release/>
 
-This script builds the rundown release into `dist/`
+<r desc>This script builds the rundown release into `dist/`</r>
 
 The `.current-version` file is used as the basis of the generated version number, the build script increments the build number segment of it.
 
@@ -20,8 +20,8 @@ export VERSION=`cat .current-version`
 echo "This build version will be $VERSION"
 ```
 
-``` bash named_all
-# Building
+``` bash named-all
+# Preparing to build
 
 if [ -d dist ]; then
   rm -rf dist
@@ -30,17 +30,22 @@ fi
 mkdir -p dist/darwin-amd64/
 mkdir -p dist/linux-amd64/
 
+GIT_COMMIT=$(git rev-list -1 HEAD)
+
+FLAGS="-X main.GitCommit=$GIT_COMMIT -X main.Version=$VERSION"
+
 # Building MacOS
-GOOS=darwin go build -o dist/darwin-amd64/rundown
+GOOS=darwin go build -ldflags="$FLAGS" -o dist/darwin-amd64/rundown
 # Building Linux
-GOOS=linux go build -o dist/linux-amd64/rundown
+GOOS=linux go build -ldflags="$FLAGS" -o dist/linux-amd64/rundown
 
 # Preparing release
-cp LICENSE bash_autocomplete README.md dist/darwin-amd64/
-cp LICENSE bash_autocomplete README.md dist/linux-amd64/
+cp LICENSE build/bash_autocomplete README.md dist/darwin-amd64/
+cp LICENSE build/bash_autocomplete README.md dist/linux-amd64/
 
-tar -zcf dist/rundown-$VERSION-darwin-amd64.tgz dist/darwin-amd64
-tar -zcf dist/rundown-$VERSION-linux-amd64.tgz dist/linux-amd64
+# Creating platform archives...
+cd dist/darwin-amd64 && tar -zcf ../rundown-$VERSION-darwin-amd64.tgz . && cd ../..
+cd dist/linux-amd64 && tar -zcf ../rundown-$VERSION-linux-amd64.tgz . && cd ../..
 ```
 
 Rundown built and available at `dist/rundown`.

@@ -1,6 +1,15 @@
-# Hidden Blocks and how they work
+# Hidden Content
 
-In Rundown, you can add hidden blocks are a great way to hide execution detail from readers, but add enhancements when running the markdown file using rundown.
+There's two types of hidden content in Rundown.
+
+1. Content thats hidden from markdown, but visible to rundown
+2. Content hidden from rundown, but visible to markdown.
+
+Each method employs a different technique due to the nature of markdown.
+
+# Hiding content from markdown
+
+In Rundown hidden blocks are a great way to hide execution detail from readers of markdown, but make them visible to rundown.
 
     <!--~
     I'll only be rendered inside Rundown.
@@ -60,12 +69,39 @@ Hidden headings are good when you want to `skip-on-failure` or `skip-on-success`
 
     Will skip to here.
 
+# Hiding content from Rundown
+
+There are times when you'll want to hide content from being executed or displayed in Rundown, while making it visible in Markdown.
+
+To achieve this, use the `<rundown>` or `<r>` tag, with the `ignore` attribute.
+
+    <r ignore>Content</r>
+
+You can hide just a few words in a paragraph, or ignore multiple paragraphs and code blocks.
+
+If you're ignoring multiple paragraphs (or block level elements), make sure your `<rundown>` tags are on **their own lines**, separated with blank lines:
+
+    <r ignore>
+
+    > This is a blockquote
+
+    </r>
+
+
 
 -----
 
-Hidden Blocks and how they work
-In Rundown, you can add hidden blocks are a great way to hide execution detail
-from readers, but add enhancements when running the markdown file using rundown.
+Hidden Content
+There's two types of hidden content in Rundown.
+
+1 Content thats hidden from markdown, but visible to rundown
+2 Content hidden from rundown, but visible to markdown.
+
+Each method employs a different technique due to the nature of markdown.
+
+Hiding content from markdown
+In Rundown hidden blocks are a great way to hide execution detail from readers
+of markdown, but make them visible to rundown.
 
  ┃ <!--~
  ┃ I'll only be rendered inside Rundown.
@@ -124,3 +160,23 @@ I'll only be rendered inside Rundown.
    ┃ -->
    ┃ 
    ┃ Will skip to here.
+
+Hiding content from Rundown
+There are times when you'll want to hide content from being executed or
+displayed in Rundown, while making it visible in Markdown.
+
+To achieve this, use the <rundown> or <r> tag, with the ignore attribute.
+
+ ┃ <r ignore>Content</r>
+
+You can hide just a few words in a paragraph, or ignore multiple paragraphs and
+code blocks.
+
+If you're ignoring multiple paragraphs (or block level elements), make sure your
+<rundown> tags are on their own lines, separated with blank lines:
+
+ ┃ <r ignore>
+ ┃ 
+ ┃ > This is a blockquote
+ ┃ 
+ ┃ </r>

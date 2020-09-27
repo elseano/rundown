@@ -373,10 +373,18 @@ func (r *Renderer) renderNothing(w util.BufWriter, source []byte, node ast.Node,
 }
 
 func (r *Renderer) renderRundownBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
-	if r.Config.RundownHandler != nil {
-		err := r.Config.RundownHandler.OnRundownNode(node)
-		if err != nil {
-			return ast.WalkStop, err
+	if entering {
+		rundown := node.(*RundownBlock)
+
+		if rundown.Modifiers.Flags[Flag("ignore")] == true {
+			return ast.WalkSkipChildren, nil
+		}
+
+		if r.Config.RundownHandler != nil {
+			err := r.Config.RundownHandler.OnRundownNode(node)
+			if err != nil {
+				return ast.WalkStop, err
+			}
 		}
 	}
 
@@ -392,7 +400,15 @@ func (r *Renderer) renderRundownInline(w util.BufWriter, source []byte, node ast
 	}
 
 	if entering {
-		renderer := renderer.NewRenderer(renderer.WithNodeRenderers(util.Prioritized(r, 1)))
+
+		renderer := PrepareMarkdown().Renderer()
+		// TODO - Copy all config and apply it to the renderer.
+
+		rundown := node.(*RundownInline)
+
+		if rundown.Modifiers.Flags[Flag("ignore")] == true {
+			return ast.WalkSkipChildren, nil
+		}
 
 		for child := node.FirstChild(); child != nil; child = child.NextSibling() {
 			renderer.Render(w2, source, child)

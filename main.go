@@ -20,6 +20,9 @@ import (
 	"golang.org/x/tools/godoc/util"
 )
 
+var GitCommit string
+var Version string
+
 func buildLogger(debugging bool) *log.Logger {
 	var debug io.Writer
 
@@ -274,6 +277,7 @@ func main() {
 	app := &cli.App{
 		Name:                   "rundown",
 		Usage:                  "Display and execute markdown files.",
+		Version:                Version,
 		UsageText:              "rundown [-d] [command] FILENAME shortcode(optional) ...",
 		UseShortOptionHandling: true,
 		Flags: []cli.Flag{
