@@ -1,7 +1,14 @@
 # Emoji Support
 
-Supports GitHub Emojis
+Supports emoji rendering via `:name:`. For example:
 
-Beer :beer:, smile :smile:, and of course :rocket:.
+* Beer `:beer:` - :beer:.
+* Smile `:smile:` - :smile:.
+* Rocket `:rocket:` - :rocket:.
+* Zany face `:zany_face:` - :zany_face:.
 
 But not :notemoji: because it's invalid.
+
+Full list of Emojis can be see in the Unicode spec:
+
+http://www.unicode.org/emoji/charts/emoji-list.html

@@ -38,26 +38,6 @@ This is a alternative to the Tag Format specifically for fenced code blocks, and
     sleep 1
     ```
 
-Because using the fenced code format is quite easy, but suffers from compatibility issues, rundown comes with a `retag` command which converts this format into tag format.
-
-## Comment format
-
-Finally there's the comment format. This will render to HTML as well, but as it's a comment, browsers won't display it. Some client-side markdown renderers do still display this.
-
-    <!--~ nospin -->
-    ``` bash
-    sleep 1
-    ```
-
-<!--~ nospin -->
-``` bash
-sleep 1
-```
-
-Take care to ensure your comment formats remain as a single line entity, and include the tilde `~` after the comment starting marker. 
-
-Multiple line comments with the tilde (`~`) are Invisible Blocks, which serve a different purpose in Rundown. You can find out more about them at the [Invisible Blocks](./invisible.md) page.
-
 # Code Modifiers
 
 Modifiers allow you to change how the code executes.
@@ -66,64 +46,64 @@ Modifiers allow you to change how the code executes.
 
 Default execution
 
-``` bash
-sleep 1
-```
+    ``` bash
+    sleep 1
+    ```
 
 ## No Spinner <r label=nospin />
 
 The `nospin` flag prevents the spinner from showing at all. Generally you'd combine this with the `stdout` flag below. Reach for this if scripts ask for input on a _blank_ line, which can cause the spinner to over-write any user input.
 
-``` bash nospin
-sleep 1
-```
+    ``` bash nospin
+    sleep 1
+    ```
 
 ## Named - CHanging the spinner title <r label=named/>
 
 The `named` flag treats the first line of the script as a comment, and that comment body is the title of the spinner.
 
-``` bash named
-# Waiting...
+    ``` bash named
+    # Waiting...
 
-sleep 1
-```
+    sleep 1
+    ```
 
 Any number of applications can be running your script, so the comment line ignores anything that isn't a letter or number at the start of the line.
 
 Take this Go script for example:
 
-``` go named norun reveal
-// This is the spinner title
-printf("Oh hai")
-```
+    ``` go named norun reveal
+    // This is the spinner title
+    printf("Oh hai")
+    ```
 
 ## Stdout <r label=stdout/>
 
 This shows STDOUT in the output.
 
-``` bash
-echo "You won't see this"
-```
+    ``` bash
+    echo "You won't see this"
+    ```
 
-``` bash stdout
-echo "You should see this"
-```
+    ``` bash stdout
+    echo "You should see this"
+    ```
 
 ## No Run <r label=norun/>
 
 This ignores the code block, don't run it, and don't display it.
 
-``` bash norun
-echo "This will be displayed and not run"
-```
+    ``` bash norun
+    echo "This will be displayed and not run"
+    ```
 
 ## Reveal <r label=reveal/>
 
 This will display the code block as part of Rundown's output, **AND** run it immediately afterwards.
 
-``` bash reveal
-sleep 1
-```
+    ``` bash reveal
+    sleep 1
+    ```
 
 A common approach to rendering syntax highlighted code in the console is to use `norun` with `reveal`:
 
@@ -137,9 +117,9 @@ A common approach to rendering syntax highlighted code in the console is to use 
 
 Skips to the next heading (any level) if the block executed successfully
 
-``` bash skip-on-success
-true
-```
+    ``` bash skip-on-success
+    true
+    ```
 
 You will never see this message.
 
@@ -147,9 +127,9 @@ You will never see this message.
 
 Skips to the next heading (any level) if the block didn't execute successfully
 
-``` bash skip-on-failure
-nonexistant_program
-```
+    ``` bash skip-on-failure
+    nonexistant_program
+    ```
 
 You will never see this message.
 
@@ -214,9 +194,9 @@ Later on, you can use the `basename` as an environment variable to use in script
 
 ### Environment Substitution <r label=sub-env/>
 
-When using `save`, you can also apply the `sub_env` flag. This will perform a substitution of any environment variable with it's value. Be careful though, if you refer to a missing environment variable, the block will fail.
+When using `save`, you can also apply the `sub-env` flag. This will perform a substitution of any environment variable with it's value. Be careful though, if you refer to a missing environment variable, the block will fail.
 
-    ``` yaml save:config.yml env_aware
+    ``` yaml save:config.yml sub-env
     apiVersion: v1
     kind: Service
       metadata:
