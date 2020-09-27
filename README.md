@@ -71,6 +71,8 @@ However, if you specify the syntax, then rundown will execute that file, and sho
 sleep 1
 ```
 
+Rundown's own build file is a good example of what you can accomplish with Rundown. Take a look at [build.md](./build.md).
+
 A full list of the modifiers and examples can be found in the [Modifiers Example](./examples/mods.md) markdown file.
 
 ## Shortcodes <r label=shortcodes>
