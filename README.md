@@ -13,6 +13,8 @@ Some of the usecases rundown suits are:
 
 As we use Rundown, we're finding plenty of other ways you can use it!
 
+![Rundown Demo](./_images/demo.gif)
+
 ## Feature Highlights
 
 Rundown will run markdown perfectly fine. As your rundown files get more complex, you'll want to start using the rundown extensions. Rundown's extensions are transparent additions to the markdown format which aren't rendered by standard markdown renderers (i.e. Github, etc), meaning a reader won't even notice the additions. 
@@ -21,13 +23,13 @@ This file is a rundown file for example!
 
 Some of the additions Rundown brings are:
 
-* Shortcodes, which allow you to only run portions of a markdown file.
-* Fenced code block execution and progress indicator manipulation.
+* [Shortcodes](./examples/shortcodes.md), which allow you to only run portions of a markdown file.
+* Fenced code block execution and progress indicator [manipulation](./examples/spinner.md).
 * Optional failure handling, script skipping, and STDOUT presentation.
-* First-class emoji support either via UTF characters, or :rocket: (`:rocket:`) syntax.
-* Invisible blocks, which are only rendered inside markdown and ignored by web based renderers.
+* First-class [emoji](./examples/emoji.md) support either via UTF characters, or :rocket: (`:rocket:`) syntax.
+* [Invisible blocks](./examples/hidden.md), which are only rendered inside markdown and ignored by web based renderers.
 * Visually appealing console markdown rendering
-* Shebang support, allowing you to make your markdown files executables (POSIX)
+* [Shebang support](./examples/shebang-repeat.md), allowing you to make your markdown files executables (POSIX)
 * Rundown files can be designed to execute top to bottom, or present a menu to execute only a single part.
 * Fast - rundown is written in Go, and works on Linux and Mac. Windows support via WSL probably works.
 
@@ -43,15 +45,11 @@ At it's core, Rundown turns markdown's fenced code blocks into executable code. 
     echo "This is a fenced code block, it will be executed"
     ```
 
-When running fenced code blocks, rundown by default will hide the output and display a spinner indicating that it's running.
+When running fenced code blocks, rundown by default will hide the output and display a spinner indicating that it's running. It will update the spinner on completion of the process to either successful or failure. Failures terminate rundown unless you specify otherwise.
 
-![](2020-09-26-19-56-49.png)
+![](./_images/spinner.png)
 
-It will update the spinner on completion of the process to either successful or failure. Failures terminate rundown unless you specify otherwise.
-
-![](2020-09-26-19-58-14.png)
-
-By default, a fenced code block which doesn't specify a language will be rendered out.
+By default, a fenced code block which doesn't specify a language will be rendered out instead of executed.
 
     ```
     This is a simple fenced code block, it won't be executed.
@@ -61,7 +59,7 @@ By default, a fenced code block which doesn't specify a language will be rendere
 This is a simple fenced code block, it won't be executed.
 ```
 
-However, if you specify the syntax, then rundown will execute that file, and show a spinner as the execution progresses.
+However, if you specify the syntax, then rundown will execute that file, and show a spinner as the execution progresses. [Modifiers Example](./examples/mods.md) allow you to change this behaviour.
 
     ``` bash
     sleep 1

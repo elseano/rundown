@@ -132,3 +132,22 @@ Now that the container is ready, run the tests.
 # Running test inside Docker
 docker run rdlinux
 ```
+
+# Building a video
+
+<r desc>Builds an animated gif video from a quicktime file.</r>
+
+<!--~
+``` bash stdout nospin
+if [ -z "{$FILE:-}" ]; then
+  echo "Specify a FILE env to run this"
+  exit 1
+fi
+```
+-->
+
+``` bash named
+# Generating video file
+ffmpeg -ss 00:00:12.000 -i /Users/elseano/Desktop/Screen\ Recording\ 2020-09-27\ at\ 10.50.17\ am.mov  -pix_fmt rgb8 -r 10 screen.gif
+convert -layers Optimize $FILENAME opt_$FILENAME.gif
+```
