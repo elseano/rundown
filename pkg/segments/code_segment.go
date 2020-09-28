@@ -16,8 +16,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/elseano/rundown/markdown"
-	"github.com/elseano/rundown/util"
+	rdexec "github.com/elseano/rundown/pkg/exec"
+	"github.com/elseano/rundown/pkg/markdown"
+	"github.com/elseano/rundown/pkg/util"
 	"github.com/logrusorgru/aurora"
 
 	"github.com/yuin/goldmark/renderer"
@@ -401,7 +402,7 @@ func (s *CodeSegment) Execute(context *Context, renderer renderer.Renderer, last
 	}
 
 	if modifiers.Flags[NoRunFlag] != true {
-		process := util.NewProcess(cmd)
+		process := rdexec.NewProcess(cmd)
 
 		stdout, err := process.Start()
 		if err != nil {

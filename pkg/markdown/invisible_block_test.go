@@ -3,7 +3,7 @@ package markdown
 import (
 	"testing"
 
-	"github.com/elseano/rundown/util"
+	"github.com/elseano/rundown/pkg/util"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"

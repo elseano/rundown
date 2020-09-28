@@ -6,8 +6,8 @@ import (
 	"io"
 	"log"
 
-	"github.com/elseano/rundown/markdown"
-	"github.com/elseano/rundown/util"
+	"github.com/elseano/rundown/pkg/markdown"
+	"github.com/elseano/rundown/pkg/util"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/renderer"
 )

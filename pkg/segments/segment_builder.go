@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-errors/errors"
 
-	"github.com/elseano/rundown/markdown"
+	"github.com/elseano/rundown/pkg/markdown"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"

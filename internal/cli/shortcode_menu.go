@@ -3,7 +3,7 @@ package cli
 import (
 	"strings"
 
-	"github.com/elseano/rundown/segments"
+	"github.com/elseano/rundown/pkg/segments"
 	"github.com/manifoldco/promptui"
 )
 

@@ -8,6 +8,13 @@ Just a simple build of `rundown`:
 go build -o rundown
 ```
 
+# Build Examples <r label=docs/>
+
+<r desc>Takes the `_testdata/` markdown test files and copies the markdown section into the `docs/` folder.</r> This keeps documentation in sync with the tests.
+
+``` ruby
+```
+
 # Build release <r label=release/>
 
 <r desc>This script builds the rundown release into `dist/`</r>

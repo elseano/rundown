@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elseano/rundown/markdown"
+	"github.com/elseano/rundown/pkg/markdown"
+	"github.com/elseano/rundown/pkg/util"
 	"github.com/elseano/rundown/testutil"
-	"github.com/elseano/rundown/util"
 
 	"github.com/yuin/goldmark"
 

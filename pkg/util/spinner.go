@@ -1,13 +1,13 @@
 package util
 
 import (
+	"io"
 	"strings"
 	"time"
-	"io"
 
 	// spx "github.com/tj/go-spin"
 	// spx "github.com/briandowns/spinner"
-	"github.com/elseano/rundown/spinner"
+	"github.com/elseano/rundown/pkg/spinner"
 	"github.com/logrusorgru/aurora"
 )
 
@@ -87,9 +87,8 @@ type DummySpinner struct {
 	active bool
 }
 
-
 func NewDummySpinner() Spinner {
-	return &DummySpinner{ active: false }
+	return &DummySpinner{active: false}
 }
 
 func (s *DummySpinner) Active() bool {

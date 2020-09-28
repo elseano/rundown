@@ -24,7 +24,7 @@ import (
 
 	"github.com/logrusorgru/aurora"
 
-	rdutil "github.com/elseano/rundown/util"
+	rdutil "github.com/elseano/rundown/pkg/util"
 )
 
 type consoleRendererExt struct {

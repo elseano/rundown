@@ -3,7 +3,7 @@ package segments
 import (
 	"errors"
 
-	"github.com/elseano/rundown/markdown"
+	"github.com/elseano/rundown/pkg/markdown"
 )
 
 const (
