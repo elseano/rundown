@@ -4,9 +4,16 @@
 
 Just a simple build of `rundown`:
 
-``` bash reveal setup
-go build -o rundown cmd/rundown/main.go
+``` bash reveal setup env
+export VERSION=`cat .current-version`
+export GIT_COMMIT=$(git rev-list -1 HEAD)
+
+FLAGS="-X cmd.GitCommit=$GIT_COMMIT -X cmd.Version=$VERSION"
+
+go build -ldflags="$FLAGS" -o rundown cmd/rundown/main.go
 ```
+
+Build version <r sub-env>**$VERSION**</r>.
 
 # Build Examples <r label=docs/>
 
@@ -39,7 +46,7 @@ mkdir -p dist/linux-amd64/
 
 GIT_COMMIT=$(git rev-list -1 HEAD)
 
-FLAGS="-X main.GitCommit=$GIT_COMMIT -X main.Version=$VERSION"
+FLAGS="-X cmd.GitCommit=$GIT_COMMIT -X cmd.Version=$VERSION"
 
 # Building MacOS
 GOOS=darwin go build -ldflags="$FLAGS" -o dist/darwin-amd64/rundown cmd/rundown/main.go

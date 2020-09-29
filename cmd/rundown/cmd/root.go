@@ -12,10 +12,9 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:     "rundown [filename] [shortcodes]...",
-	Version: Version + " " + GitCommit,
-	Short:   "Execute a markdown file",
-	Long:    `Rundown turns Markdown files into applications`,
+	Use:   "rundown [filename] [shortcodes]...",
+	Short: "Execute a markdown file",
+	Long:  `Rundown turns Markdown files into applications`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return errors.New("Must specify at least the filename")
@@ -41,6 +40,8 @@ func Execute() error {
 }
 
 func init() {
+	rootCmd.Version = Version + " (" + GitCommit + ")"
+
 	rootCmd.Flags().BoolVarP(&flagCodes, "codes", "c", false, "Displays available shortcodes for the given file")
 	rootCmd.Flags().BoolVar(&flagDebug, "debug", false, "Write debugging into to debug.log")
 	rootCmd.Flags().BoolVarP(&flagAsk, "ask", "a", false, "Ask which shortcode to run")

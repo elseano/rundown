@@ -273,12 +273,13 @@ func padSegments(segments *SegmentList) []Segment {
 		segment := element.Value.(Segment)
 
 		lastCode, lastIsCode := lastSegment.(*CodeSegment)
+		lastSetup, lastIsSetup := lastSegment.(*SetupSegment)
 		// lastDisplay, lastIsDisplay := lastSegment.(*DisplaySegment)
 		currentHeading, currentIsHeading := segment.(*HeadingMarker)
 		currentDisplay, currentIsDisplay := segment.(*DisplaySegment)
 		currentCode, currentIsCode := segment.(*CodeSegment)
 
-		if lastIsCode && currentIsHeading {
+		if (lastIsCode || lastIsSetup) && currentIsHeading {
 			result = append(result, NewSeparator(currentHeading.Level))
 		}
 
@@ -288,7 +289,13 @@ func padSegments(segments *SegmentList) []Segment {
 			}
 		}
 
-		if lastIsCode && currentIsDisplay {
+		if lastIsSetup && currentIsCode {
+			if currentCode.modifiers.Flags[RevealFlag] && !lastSetup.Segment.modifiers.Flags[RevealFlag] {
+				result = append(result, NewSeparator(currentCode.Level))
+			}
+		}
+
+		if (lastIsCode || lastIsSetup) && currentIsDisplay {
 			result = append(result, NewSeparator(currentDisplay.Level))
 		}
 
