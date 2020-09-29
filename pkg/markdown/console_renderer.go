@@ -232,7 +232,7 @@ func (s *StyleStack) Pop() Style {
 
 	style := s.Styles[len(s.Styles)-1]
 	if len(s.Styles) > 1 {
-		s.Styles = s.Styles[0 : len(s.Styles)-2]
+		s.Styles = s.Styles[0 : len(s.Styles)-1]
 	} else {
 		s.Styles = []Style{}
 	}
@@ -610,7 +610,7 @@ func (s *IntegerSequenceStyle) Begin() string {
 }
 
 func (s *IntegerSequenceStyle) End() string {
-	return "\n"
+	return ""
 }
 
 func (s *IntegerSequenceStyle) Wrap(str string) string {
@@ -630,7 +630,7 @@ func (s BulletSequenceStyle) Begin() string {
 }
 
 func (s BulletSequenceStyle) End() string {
-	return "\n"
+	return ""
 }
 
 func (s BulletSequenceStyle) Wrap(str string) string {
@@ -674,7 +674,13 @@ func (r *Renderer) renderListItem(w util.BufWriter, source []byte, n ast.Node, e
 		_, _ = w.WriteString(r.blockStyles.Peek().Begin())
 
 	} else {
-		_, _ = w.WriteString(r.blockStyles.Peek().End())
+		bs := r.blockStyles.Peek()
+		if bs == nil {
+			fmt.Print("ERROR NO STYLE\n")
+			n.Dump(source, 1)
+		} else {
+			_, _ = w.WriteString(r.blockStyles.Peek().End())
+		}
 	}
 	return ast.WalkContinue, nil
 }
@@ -709,12 +715,12 @@ func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, n ast.Node, 
 
 func (r *Renderer) renderTextBlock(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if !entering {
-		_, ok := n.NextSibling().(ast.Node)
-		_, ok2 := n.Parent().(*ast.ListItem)
+		// _, ok := n.NextSibling().(ast.Node)
+		// _, ok2 := n.Parent().(*ast.ListItem)
 
-		if ok && !ok2 {
-			_ = w.WriteByte('\n')
-		}
+		// if ok && !ok2 {
+		_ = w.WriteByte('\n')
+		// }
 	}
 	return ast.WalkContinue, nil
 }

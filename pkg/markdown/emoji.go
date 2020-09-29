@@ -74,18 +74,15 @@ var emojiMatch = regexp.MustCompile("\\:([a-z_0-9]+)\\:")
 
 func (s *emojiParser) Parse(parent gast.Node, block text.Reader, pc parser.Context) gast.Node {
 	line, _ := block.PeekLine()
-	pos := pc.BlockOffset()
 
-	if pos >= 0 && pos < len(line) {
-		text := string(line[pos:])
+	text := string(line)
 
-		matches := emojiMatch.FindStringSubmatchIndex(text)
-		if matches != nil {
-			contents := string(text[matches[2]:matches[3]])
-			node := NewEmojiInline(contents)
-			block.Advance(len(contents) + 2)
-			return node
-		}
+	matches := emojiMatch.FindStringSubmatchIndex(text)
+	if matches != nil {
+		contents := string(text[matches[2]:matches[3]])
+		node := NewEmojiInline(contents)
+		block.Advance(len(contents) + 2)
+		return node
 	}
 
 	return nil

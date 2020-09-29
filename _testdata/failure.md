@@ -67,7 +67,7 @@ For example:
 somemissingapp
 ```
 
-<r on-failure>:sad: There was a failure.</r>
+<r on-failure>:dazed: There was a failure.</r>
 <r on-failure="not found">You need to install acme</r>
 ~~~
 
@@ -136,7 +136,7 @@ Rundown has a few different ways it handles and interprets errors.
    ┃ somemissingapp
    ┃ ```
    ┃ 
-   ┃ <r on-failure>:sadface: There was a failure.</r>
+   ┃ <r on-failure>:dazed: There was a failure.</r>
    ┃ <r on-failure="not found">You need to install acme</r>
 
   This will render both tags, as somemissingapp will result in a Command not

@@ -143,8 +143,12 @@ func (s *HeadingMarker) String() string {
 	for _, h := range s.Handlers {
 		handlers += h.String() + "\n"
 	}
+	setups := ""
+	for _, h := range s.Setup {
+		setups += h.String() + "\n"
+	}
 
-	return s.Stringify("HeadingMarker", fmt.Sprintf("Handlers: %s", handlers))
+	return s.Stringify("HeadingMarker", fmt.Sprintf("Handlers: {%s\n}\nSetups: {%s\n}", handlers, setups))
 }
 
 func (s *HeadingMarker) AppendHandler(node ast.Node) {

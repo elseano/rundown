@@ -115,7 +115,7 @@ func ExecuteRundown(context *Context, rundown []Segment, renderer renderer.Rende
 
 		var result ExecutionResult
 
-		// Ensure all rerequisites have been run, when running via shortcodes.
+		// Ensure all prerequisites have been run, when running via shortcodes.
 		if segment.Kind() == "HeadingMarker" {
 			headingMarker := segment.(*HeadingMarker)
 			currentHeading = headingMarker

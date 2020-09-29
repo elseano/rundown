@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strings"
 
 	"github.com/elseano/rundown/pkg/markdown"
 	"github.com/elseano/rundown/pkg/util"
@@ -183,7 +184,9 @@ func (s *BaseSegment) Stringify(name string, extra string) string {
 
 	buf.WriteString(name + " {\n")
 	if extra != "" {
-		buf.WriteString(extra + "\n")
+		for _, line := range strings.Split(extra, "\n") {
+			buf.WriteString("    " + line + "\n")
+		}
 	}
 
 	buf.WriteString(fmt.Sprintf("Level: %d\n", s.Level))

@@ -434,7 +434,7 @@ func (a *rundownASTTransformer) Transform(doc *ast.Document, reader text.Reader,
 
 				var rundown *RundownBlock = nil
 
-				if strings.Count(infoText, " ") > 2 {
+				if len(splitInfo) > 0 {
 					// Then assume modifiers are attached to fenced code block and move them
 					// to a preceding rundown block.
 					rundown = NewRundownBlock(fencedMods)

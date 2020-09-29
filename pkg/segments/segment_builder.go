@@ -37,7 +37,13 @@ func (s *SegmentList) List() *list.List {
 }
 
 func (s *SegmentList) LastSegment() Segment {
-	if s, ok := s.list.Back().Value.(Segment); ok {
+	back := s.list.Back()
+
+	if back == nil {
+		return nil
+	}
+
+	if s, ok := back.Value.(Segment); ok {
 		return s
 	}
 
@@ -157,6 +163,8 @@ func (s *SegmentList) NewHeadingMarker(node *ast.Heading) *HeadingMarker {
 	marker.ShortCode = shortcode
 	s.AppendSegment(marker)
 
+	s.currentHeadingTree[node.Level] = marker
+
 	return marker
 }
 
@@ -265,7 +273,9 @@ func padSegments(segments *SegmentList) []Segment {
 		segment := element.Value.(Segment)
 
 		lastCode, lastIsCode := lastSegment.(*CodeSegment)
+		// lastDisplay, lastIsDisplay := lastSegment.(*DisplaySegment)
 		currentHeading, currentIsHeading := segment.(*HeadingMarker)
+		currentDisplay, currentIsDisplay := segment.(*DisplaySegment)
 		currentCode, currentIsCode := segment.(*CodeSegment)
 
 		if lastIsCode && currentIsHeading {
@@ -274,8 +284,12 @@ func padSegments(segments *SegmentList) []Segment {
 
 		if lastIsCode && currentIsCode {
 			if currentCode.modifiers.Flags[RevealFlag] && !lastCode.modifiers.Flags[RevealFlag] {
-				result = append(result, NewSeparator(currentHeading.Level))
+				result = append(result, NewSeparator(currentCode.Level))
 			}
+		}
+
+		if lastIsCode && currentIsDisplay {
+			result = append(result, NewSeparator(currentDisplay.Level))
 		}
 
 		result = append(result, segment)

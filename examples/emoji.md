@@ -2,10 +2,13 @@
 
 Supports emoji rendering via `:name:`. For example:
 
-* Beer `:beer:` - :beer:.
-* Smile `:smile:` - :smile:.
-* Rocket `:rocket:` - :rocket:.
-* Zany face `:zany_face:` - :zany_face:.
+* Beer `:beer:` - :beer:
+* Smile `:smile:` - :smile:
+* Rocket `:rocket:` - :rocket:
+* Zany face `:zany_face:` - :zany_face:
+* Sad `:disappointed_face:` - :disappointed_face:
+* Dazed `:flushed_face:` - :flushed_face:
+* Dazed `:dog_face:` - :dog_face:
 
 But not :notemoji: because it's invalid.
 
