@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 
 	// "fmt"
-	"container/list"
+
 	"strconv"
 	"strings"
 
@@ -54,7 +54,7 @@ const optLevelChange renderer.OptionName = "LevelChange"
 
 type RundownHandler interface {
 	Mutate([]byte, ast.Node) ([]byte, error)
-	OnRundownNode(node ast.Node) error
+	OnRundownNode(node ast.Node, entering bool) error
 }
 
 type withRundownHandler struct {
@@ -186,7 +186,8 @@ type Option interface {
 // nodes as Console strings
 type Renderer struct {
 	Config
-	currentStyle *list.List
+	blockStyles  *StyleStack
+	inlineStyles *StyleStack
 	currentLevel int
 }
 
@@ -194,7 +195,8 @@ type Renderer struct {
 func NewRenderer(opts ...Option) renderer.NodeRenderer {
 	r := &Renderer{
 		Config:       NewConfig(),
-		currentStyle: list.New(),
+		blockStyles:  NewStyleStack(),
+		inlineStyles: NewStyleStack(),
 		currentLevel: 1,
 	}
 
@@ -207,6 +209,43 @@ func NewRenderer(opts ...Option) renderer.NodeRenderer {
 	// r.currentLevel = r.Config.LevelLevel
 
 	return r
+}
+
+func NewStyleStack() *StyleStack {
+	return &StyleStack{
+		Styles: []Style{},
+	}
+}
+
+type StyleStack struct {
+	Styles []Style
+}
+
+func (s *StyleStack) Push(style Style) {
+	s.Styles = append(s.Styles, style)
+}
+
+func (s *StyleStack) Pop() Style {
+	if len(s.Styles) == 0 {
+		return nil
+	}
+
+	style := s.Styles[len(s.Styles)-1]
+	if len(s.Styles) > 1 {
+		s.Styles = s.Styles[0 : len(s.Styles)-2]
+	} else {
+		s.Styles = []Style{}
+	}
+
+	return style
+}
+
+func (s *StyleStack) Peek() Style {
+	if len(s.Styles) == 0 {
+		return nil
+	}
+
+	return s.Styles[len(s.Styles)-1]
 }
 
 type Style interface {
@@ -233,20 +272,6 @@ func (c Color) Wrap(str string) string {
 	return c.Begin() + str + c.End()
 }
 
-func (r *Renderer) pushStyle(style Style) {
-	r.currentStyle.PushFront(style)
-}
-
-func (r *Renderer) peekStyle() Style {
-	if r.currentStyle.Len() > 0 {
-		if val, ok := r.currentStyle.Front().Value.(Style); ok {
-			return val
-		}
-	}
-
-	return resetStyle
-}
-
 func (r *Renderer) CurrentLevel() int {
 	return r.currentLevel
 }
@@ -261,17 +286,6 @@ func (r *Renderer) SetLevel(level int) {
 	if r.Config.LevelChange != nil {
 		r.Config.LevelChange(level)
 	}
-}
-
-func (r *Renderer) popStyle() Style {
-	if r.currentStyle.Len() > 0 {
-		ele := r.currentStyle.Front()
-		r.currentStyle.Remove(ele)
-		if val, ok := ele.Value.(Style); ok {
-			return val
-		}
-	}
-	return resetStyle
 }
 
 func (r *Renderer) nodeLinesToString(source []byte, n ast.Node) string {
@@ -373,18 +387,16 @@ func (r *Renderer) renderNothing(w util.BufWriter, source []byte, node ast.Node,
 }
 
 func (r *Renderer) renderRundownBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
-	if entering {
-		rundown := node.(*RundownBlock)
+	rundown := node.(*RundownBlock)
 
-		if rundown.Modifiers.Flags[Flag("ignore")] == true {
-			return ast.WalkSkipChildren, nil
-		}
+	if rundown.Modifiers.Flags[Flag("ignore")] == true {
+		return ast.WalkSkipChildren, nil
+	}
 
-		if r.Config.RundownHandler != nil {
-			err := r.Config.RundownHandler.OnRundownNode(node)
-			if err != nil {
-				return ast.WalkStop, err
-			}
+	if r.Config.RundownHandler != nil {
+		err := r.Config.RundownHandler.OnRundownNode(node, entering)
+		if err != nil {
+			return ast.WalkStop, err
 		}
 	}
 
@@ -415,7 +427,7 @@ func (r *Renderer) renderRundownInline(w util.BufWriter, source []byte, node ast
 		}
 
 		if r.Config.RundownHandler != nil {
-			err := r.Config.RundownHandler.OnRundownNode(node)
+			err := r.Config.RundownHandler.OnRundownNode(node, entering)
 			if err != nil {
 				return ast.WalkStop, err
 			}
@@ -428,6 +440,11 @@ func (r *Renderer) renderRundownInline(w util.BufWriter, source []byte, node ast
 			w.Write(result)
 		} else {
 			w.Write(buf.Bytes())
+		}
+	} else {
+		err := r.Config.RundownHandler.OnRundownNode(node, entering)
+		if err != nil {
+			return ast.WalkStop, err
 		}
 	}
 
@@ -461,18 +478,18 @@ func (r *Renderer) renderHeading(w util.BufWriter, source []byte, node ast.Node,
 
 		switch n.Level {
 		case 1:
-			r.pushStyle(Color(aurora.CyanFg | aurora.BoldFm | aurora.UnderlineFm))
+			r.inlineStyles.Push(Color(aurora.CyanFg | aurora.BoldFm | aurora.UnderlineFm))
 		case 2:
-			r.pushStyle(Color(aurora.CyanFg | aurora.BoldFm))
+			r.inlineStyles.Push(Color(aurora.CyanFg | aurora.BoldFm))
 		case 3:
-			r.pushStyle(Color(aurora.CyanFg))
+			r.inlineStyles.Push(Color(aurora.CyanFg))
 		default:
-			r.pushStyle(Color(aurora.BoldFm))
+			r.inlineStyles.Push(Color(aurora.BoldFm))
 		}
 
 		r.SetLevel(n.Level)
 	} else {
-		r.popStyle()
+		r.inlineStyles.Pop()
 
 		mods := NewModifiers()
 
@@ -503,9 +520,9 @@ var BlockquoteAttributeFilter = GlobalAttributeFilter.Extend(
 
 func (r *Renderer) renderBlockquote(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
-		r.pushStyle(NewBulletSequence(aurora.Blue(" >").String(), paddingForLevel(r.currentLevel)))
+		r.blockStyles.Push(NewBulletSequence(aurora.Blue(" >").String(), paddingForLevel(r.currentLevel)))
 	} else {
-		r.popStyle()
+		r.blockStyles.Pop()
 	}
 	return ast.WalkContinue, nil
 }
@@ -625,16 +642,16 @@ func (r *Renderer) renderList(w util.BufWriter, source []byte, node ast.Node, en
 
 	if entering {
 		if n.IsOrdered() {
-			r.pushStyle(NewIntegerSequence(n.Start, paddingForLevel(r.currentLevel)))
+			r.blockStyles.Push(NewIntegerSequence(n.Start, paddingForLevel(r.currentLevel)))
 		} else {
-			r.pushStyle(NewBulletSequence("•", paddingForLevel(r.currentLevel)))
+			r.blockStyles.Push(NewBulletSequence("•", paddingForLevel(r.currentLevel)))
 		}
 		r.SetLevel(r.currentLevel + 1)
 	} else {
 		if _, ok := node.Parent().(*ast.ListItem); !ok {
 			_, _ = w.WriteString("\n")
 		}
-		r.popStyle()
+		r.blockStyles.Pop()
 		r.SetLevel(r.currentLevel - 1)
 	}
 	return ast.WalkContinue, nil
@@ -653,8 +670,11 @@ func (r *Renderer) renderListItem(w util.BufWriter, source []byte, n ast.Node, e
 				_ = w.WriteByte('\n')
 			}
 		}
-	} else {
 
+		_, _ = w.WriteString(r.blockStyles.Peek().Begin())
+
+	} else {
+		_, _ = w.WriteString(r.blockStyles.Peek().End())
 	}
 	return ast.WalkContinue, nil
 }
@@ -788,9 +808,9 @@ func (r *Renderer) renderCodeSpan(w util.BufWriter, source []byte, n ast.Node, e
 
 func (r *Renderer) renderStrikethrough(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
-		r.pushStyle(Color(aurora.StrikeThroughFm | aurora.BlackFg))
+		r.inlineStyles.Push(Color(aurora.StrikeThroughFm | aurora.BlackFg))
 	} else {
-		r.popStyle()
+		r.inlineStyles.Pop()
 	}
 
 	return ast.WalkContinue, nil
@@ -804,12 +824,12 @@ func (r *Renderer) renderEmphasis(w util.BufWriter, source []byte, node ast.Node
 
 	if entering {
 		if n.Level == 2 {
-			r.pushStyle(Color(aurora.BoldFm))
+			r.inlineStyles.Push(Color(aurora.BoldFm))
 		} else {
-			r.pushStyle(Color(aurora.ItalicFm))
+			r.inlineStyles.Push(Color(aurora.ItalicFm))
 		}
 	} else {
-		r.popStyle()
+		r.inlineStyles.Pop()
 	}
 	return ast.WalkContinue, nil
 }
@@ -885,8 +905,8 @@ func (r *Renderer) renderText(w util.BufWriter, source []byte, node ast.Node, en
 	n := node.(*ast.Text)
 	segment := n.Segment
 
-	if n.PreviousSibling() == nil {
-		r.writeString(w, r.peekStyle().Begin())
+	if style := r.inlineStyles.Peek(); style != nil {
+		r.writeString(w, style.Begin())
 	}
 
 	value := segment.Value(source)
@@ -912,8 +932,8 @@ func (r *Renderer) renderText(w util.BufWriter, source []byte, node ast.Node, en
 		}
 	}
 
-	if n.NextSibling() == nil {
-		r.writeString(w, r.peekStyle().End())
+	if style := r.inlineStyles.Peek(); style != nil {
+		r.writeString(w, style.End())
 	}
 
 	return ast.WalkContinue, nil

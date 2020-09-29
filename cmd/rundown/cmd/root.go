@@ -48,7 +48,7 @@ func init() {
 	rootCmd.Flags().StringVar(&flagDefault, "default", "", "Default shortcode to run if none specified")
 
 	rootCmd.AddCommand(astCmd)
-	// rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(inspectCmd)
 }
 
 func run(cmd *cobra.Command, args []string) {

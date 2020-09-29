@@ -25,6 +25,7 @@ const (
 	SetupFlag                       = "setup"
 	BorgFlag                        = "borg"
 	DescriptionFlag                 = "desc"
+	OnFailureFlag                   = "on-failure"
 )
 
 var validFlags = map[markdown.Flag]bool{
@@ -46,6 +47,7 @@ var validFlags = map[markdown.Flag]bool{
 	SetupFlag:         true,
 	BorgFlag:          true,
 	DescriptionFlag:   true,
+	OnFailureFlag:     true,
 }
 
 const (
@@ -53,6 +55,7 @@ const (
 	WithParameter                           = "with"
 	LabelParameter                          = "label"
 	DescriptionParameter                    = "desc"
+	OnFailureParameter                      = "on-failure"
 )
 
 var validParameters = map[markdown.Parameter]bool{
@@ -60,6 +63,7 @@ var validParameters = map[markdown.Parameter]bool{
 	WithParameter:        true,
 	LabelParameter:       true,
 	DescriptionParameter: true,
+	OnFailureParameter:   true,
 }
 
 func ValidateModifiers(subject *markdown.Modifiers) []error {

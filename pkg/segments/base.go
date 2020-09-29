@@ -68,14 +68,16 @@ func (v *RundownHandler) Mutate(input []byte, node ast.Node) ([]byte, error) {
 	return input, nil
 }
 
-func (v *RundownHandler) OnRundownNode(node ast.Node) error {
-	if rundown, ok := node.(*markdown.RundownBlock); ok {
-		if rundown.GetModifiers().Flags[StopOkFlag] {
-			return &StopError{Result: StopOkResult}
-		}
+func (v *RundownHandler) OnRundownNode(node ast.Node, entering bool) error {
+	if !entering {
+		if rundown, ok := node.(*markdown.RundownBlock); ok {
+			if rundown.GetModifiers().Flags[StopOkFlag] {
+				return &StopError{Result: StopOkResult}
+			}
 
-		if rundown.GetModifiers().Flags[StopFailFlag] {
-			return &StopError{Result: StopFailResult}
+			if rundown.GetModifiers().Flags[StopFailFlag] {
+				return &StopError{Result: StopFailResult}
+			}
 		}
 	}
 

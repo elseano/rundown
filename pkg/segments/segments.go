@@ -1,9 +1,14 @@
 package segments
 
 import (
+	"fmt"
 	"io"
 	"log"
+	"regexp"
+	"strings"
 
+	"github.com/elseano/rundown/pkg/markdown"
+	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/renderer"
 )
 
@@ -57,6 +62,30 @@ func (c *SetupSegment) Execute(ctx *Context, renderer renderer.Renderer, lastSeg
 	}
 }
 
+type Handler struct {
+	BaseSegment
+	Mods *markdown.Modifiers
+}
+
+func (s *Handler) String() string {
+	return s.Stringify("Handler", "")
+}
+
+func (c *Handler) Kind() string { return "HeadingMarker" }
+
+func NewHandler(node ast.Node, source []byte, level int) *Handler {
+	rundown := node.(markdown.RundownNode)
+
+	return &Handler{
+		BaseSegment: BaseSegment{
+			Nodes:  []ast.Node{node},
+			Level:  level,
+			Source: &source,
+		},
+		Mods: rundown.GetModifiers(),
+	}
+}
+
 type HeadingMarker struct {
 	BaseSegment
 	Title         string
@@ -64,10 +93,66 @@ type HeadingMarker struct {
 	Description   string
 	Setup         []*SetupSegment
 	ParentHeading *HeadingMarker
+	Handlers      []*Handler
+}
+
+func NewHeadingMarker(node ast.Node, source []byte, parent *HeadingMarker) *HeadingMarker {
+	headingNode := node.(*ast.Heading)
+	currentLevel := headingNode.Level
+
+	var shortcode string = ""
+
+	// Is the first child a rundown block? Might be a label.
+	if rundown, ok := node.NextSibling().(*markdown.RundownBlock); ok {
+		if label, ok := rundown.Modifiers.Values[LabelParameter]; ok {
+			shortcode = label
+		}
+	}
+
+	// Otherwise, is there a rundown label specified in the heading?
+	if rundown, label := findRundownChildWithParameter(node, LabelParameter); rundown != nil {
+		shortcode = label
+	}
+
+	currentHeading := &HeadingMarker{
+		BaseSegment: BaseSegment{
+			Nodes:  []ast.Node{node},
+			Level:  currentLevel,
+			Source: &source,
+		},
+		Title:         strings.TrimSpace(string(headingNode.Text(source))),
+		ShortCode:     shortcode,
+		Setup:         []*SetupSegment{},
+		ParentHeading: parent,
+		Handlers:      []*Handler{},
+	}
+
+	if desc, ok := node.NextSibling().(*ast.Paragraph); ok {
+		if rundown := findRundownChildWithFlag(desc, DescriptionFlag); rundown != nil {
+			currentHeading.Description = string(rundown.Text(source))
+		}
+	} else if rundown, desc := findRundownParameter(node.NextSibling(), DescriptionParameter); rundown != nil {
+		currentHeading.Description = desc
+	}
+
+	return currentHeading
 }
 
 func (s *HeadingMarker) String() string {
-	return s.Stringify("HeadingMarker", "")
+	handlers := ""
+	for _, h := range s.Handlers {
+		handlers += h.String() + "\n"
+	}
+
+	return s.Stringify("HeadingMarker", fmt.Sprintf("Handlers: %s", handlers))
+}
+
+func (s *HeadingMarker) AppendHandler(node ast.Node) {
+	s.Handlers = append(s.Handlers, NewHandler(node, *s.Source, s.Level))
+}
+
+func (s *HeadingMarker) AppendSetup(setup *SetupSegment) {
+	s.Setup = append(s.Setup, setup)
 }
 
 func (c *HeadingMarker) Kind() string { return "HeadingMarker" }
@@ -95,6 +180,23 @@ func (c *HeadingMarker) RunSetups(ctx *Context, renderer renderer.Renderer, last
 	}
 
 	return SuccessfulExecution, count
+}
+
+func (c *HeadingMarker) RunHandlers(errorText string, ctx *Context, renderer renderer.Renderer, lastSegment Segment, logger *log.Logger, out io.Writer) ExecutionResult {
+	for _, h := range c.Handlers {
+		if match, ok := h.Mods.Values[OnFailureParameter]; ok {
+			r, cerr := regexp.Compile(match)
+			if cerr == nil {
+				if r.MatchString(errorText) {
+					h.Execute(ctx, renderer, lastSegment, logger, out)
+				}
+			}
+		} else {
+			h.Execute(ctx, renderer, lastSegment, logger, out)
+		}
+	}
+
+	return SuccessfulExecution
 }
 
 func (c *HeadingMarker) DeLevel(amount int) {

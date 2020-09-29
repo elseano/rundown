@@ -101,6 +101,7 @@ func ExecuteRundown(context *Context, rundown []Segment, renderer renderer.Rende
 
 	var skipToHeading = false
 	var lastSegment Segment
+	var currentHeading *HeadingMarker = nil
 
 	for _, segment := range rundown {
 		if skipToHeading {
@@ -117,6 +118,8 @@ func ExecuteRundown(context *Context, rundown []Segment, renderer renderer.Rende
 		// Ensure all rerequisites have been run, when running via shortcodes.
 		if segment.Kind() == "HeadingMarker" {
 			headingMarker := segment.(*HeadingMarker)
+			currentHeading = headingMarker
+
 			if headingMarker.ParentHeading != nil {
 				// Only run the parent pre-reqs, as the ones at the current level will be run
 				// as part of the current loop.
@@ -146,10 +149,19 @@ func ExecuteRundown(context *Context, rundown []Segment, renderer renderer.Rende
 			os.RemoveAll(tmpDir)
 			return result
 		} else { // Error
-			logger.Printf("Block returned FailedExecution")
-			fmt.Fprintf(out, "\n\n%s\n\n%s\n\nError: %s\n", aurora.Bold("Error executing script:"), aurora.Faint(result.Source), result.Message)
-			fmt.Fprintf(out, "\n%s\n", result.Output)
-			fmt.Fprintf(out, "%s %s\n\n", aurora.Red("✖"), "Aborted due to failure.")
+			if currentHeading != nil && len(currentHeading.Handlers) > 0 {
+				context.SetEnv("RUNDOWN_ERROR", result.Output)
+				fmt.Fprintf(out, "\n")
+				currentHeading.RunHandlers(result.Output, context, renderer, lastSegment, logger, out)
+				fmt.Fprintf(out, "\n%s\n\n", result.Message)
+				fmt.Fprintf(out, "%s %s\n\n", aurora.Red("✖"), "Aborted due to failure.")
+			} else {
+				logger.Printf("Block returned FailedExecution")
+				fmt.Fprintf(out, "\n\n%s\n\n%s\n\nError: %s\n", aurora.Bold("Error executing script:"), aurora.Faint(result.Source), result.Message)
+				fmt.Fprintf(out, "\n%s\n", result.Output)
+				fmt.Fprintf(out, "%s %s\n\n", aurora.Red("✖"), "Aborted due to failure.")
+			}
+
 			return result
 		}
 	}

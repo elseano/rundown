@@ -246,9 +246,8 @@ func (s *RundownInlineParser) CloseBlock(parent ast.Node, pc parser.Context) {
 type RundownBlock struct {
 	ast.BaseBlock
 
-	// ClosureLine is a line that closes this html block.
-	ClosureLine text.Segment
-	Modifiers   *Modifiers
+	ForCodeBlock bool
+	Modifiers    *Modifiers
 }
 
 func (n *RundownBlock) GetModifiers() *Modifiers {
@@ -258,12 +257,6 @@ func (n *RundownBlock) GetModifiers() *Modifiers {
 // IsRaw implements Node.IsRaw.
 func (n *RundownBlock) IsRaw() bool {
 	return true
-}
-
-// HasClosure returns true if this html block has a closure line,
-// otherwise false.
-func (n *RundownBlock) HasClosure() bool {
-	return n.ClosureLine.Start >= 0
 }
 
 // Dump implements Node.Dump.
@@ -282,9 +275,9 @@ func (n *RundownBlock) Kind() ast.NodeKind {
 // NewRundownBlock returns a new RundownBlock node.
 func NewRundownBlock(modifiers *Modifiers) *RundownBlock {
 	return &RundownBlock{
-		BaseBlock:   ast.BaseBlock{},
-		Modifiers:   modifiers,
-		ClosureLine: text.NewSegment(-1, -1),
+		BaseBlock:    ast.BaseBlock{},
+		Modifiers:    modifiers,
+		ForCodeBlock: false,
 	}
 }
 
@@ -393,10 +386,15 @@ func (a *rundownASTTransformer) Transform(doc *ast.Document, reader text.Reader,
 	// Also finds HTMLBlocks which are rundown start and end tags, and everything inbetween into
 	// a RundownBlock tag.
 
+	// Also finds Paragraphs which have only one RundownInline as a child, and converts to RundownBlock.
+
 	var startBlock *ast.HTMLBlock
 	var mods *Modifiers
+	var nextNode ast.Node
 
-	ast.Walk(doc, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+	for node := doc.FirstChild(); node != nil; node = nextNode {
+		nextNode = node.NextSibling()
+
 		if html, ok := node.(*ast.HTMLBlock); ok && startBlock == nil {
 			contents := getRawText(html, reader.Source())
 			if match := isRundownOpening.FindStringSubmatch(contents); match != nil {
@@ -419,13 +417,13 @@ func (a *rundownASTTransformer) Transform(doc *ast.Document, reader text.Reader,
 
 			startBlock = nil
 			mods = nil
-		} else if fcb, ok := node.(*ast.FencedCodeBlock); ok && !entering {
+		} else if fcb, ok := node.(*ast.FencedCodeBlock); ok {
 			var infoText string = ""
 
 			info := node.(*ast.FencedCodeBlock).Info
 
 			if info != nil {
-				infoText = string(info.Text(reader.Source()))
+				infoText = strings.TrimSpace(string(info.Text(reader.Source())))
 				splitInfo := ""
 
 				if split := strings.SplitN(infoText, " ", 2); len(split) == 2 { // Trim the syntax specifier
@@ -434,13 +432,40 @@ func (a *rundownASTTransformer) Transform(doc *ast.Document, reader text.Reader,
 
 				fencedMods := ParseModifiers(splitInfo, ":") // Fenced modifiers separate KV's with :
 
-				rundown := NewRundownBlock(fencedMods)
+				var rundown *RundownBlock = nil
 
-				fcb.Parent().InsertBefore(fcb.Parent(), fcb, rundown)
+				if strings.Count(infoText, " ") > 2 {
+					// Then assume modifiers are attached to fenced code block and move them
+					// to a preceding rundown block.
+					rundown = NewRundownBlock(fencedMods)
+				} else if rdb, ok := node.PreviousSibling().(*RundownBlock); ok {
+					// Otherwise, if we have a rundown block prior, it must relate to this
+					// code block.
+					rundown = rdb
+				}
+
+				if rundown != nil {
+					rundown.ForCodeBlock = true
+					fcb.Parent().InsertBefore(fcb.Parent(), fcb, rundown)
+				}
 			}
-			return ast.WalkSkipChildren, nil
+		} else if p, ok := node.(*ast.Paragraph); ok && p.ChildCount() == 1 {
+			// Convert Paragraph > RundownInline into RundownBlock > Paragraph.
+			// This makes the case of a Rundown Paragraph more obvious and easier to detect.
+			if rundown, ok := p.FirstChild().(*RundownInline); ok {
+				rundownBlock := NewRundownBlock(rundown.Modifiers)
+				innerP := ast.NewParagraph()
+
+				for c := rundown.FirstChild(); c != nil; {
+					c2 := c
+					c = c.NextSibling()
+					innerP.AppendChild(rundownBlock, c2)
+				}
+				rundownBlock.AppendChild(rundownBlock, innerP)
+				doc.ReplaceChild(doc, p, rundownBlock)
+
+			}
 		}
 
-		return ast.WalkContinue, nil
-	})
+	}
 }

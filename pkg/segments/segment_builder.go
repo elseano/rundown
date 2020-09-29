@@ -1,9 +1,9 @@
 package segments
 
 import (
+	"container/list"
 	"fmt"
 	"log"
-	"strings"
 
 	"github.com/go-errors/errors"
 
@@ -13,6 +13,152 @@ import (
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
 )
+
+type SegmentList struct {
+	list               *list.List
+	currentLevel       int
+	currentHeading     *HeadingMarker
+	source             *[]byte
+	currentHeadingTree map[int]*HeadingMarker
+}
+
+func NewSegmentList(source *[]byte) *SegmentList {
+	return &SegmentList{
+		list:               list.New(),
+		currentLevel:       1,
+		currentHeading:     nil,
+		source:             source,
+		currentHeadingTree: map[int]*HeadingMarker{},
+	}
+}
+
+func (s *SegmentList) List() *list.List {
+	return s.list
+}
+
+func (s *SegmentList) LastSegment() Segment {
+	if s, ok := s.list.Back().Value.(Segment); ok {
+		return s
+	}
+
+	return nil
+}
+
+func (s *SegmentList) CurrentHeading() *HeadingMarker {
+	return s.currentHeading
+}
+
+func (s *SegmentList) CurrentDisplaySegment() *DisplaySegment {
+	if last := s.LastSegment(); last != nil && last.Kind() == "DisplaySegment" {
+		return last.(*DisplaySegment)
+	}
+
+	level := 1
+	if s.CurrentHeading() != nil {
+		level = s.CurrentHeading().Level
+	}
+
+	display := &DisplaySegment{
+		BaseSegment{
+			Level:  level,
+			Nodes:  []ast.Node{},
+			Source: s.source,
+		},
+	}
+
+	s.list.PushBack(display)
+
+	return display
+
+}
+
+func (s *SegmentList) AppendAllContent(nodes []ast.Node) *DisplaySegment {
+	display := s.CurrentDisplaySegment()
+
+	for _, node := range nodes {
+		display.AppendNode(node)
+	}
+
+	return display
+}
+
+func (s *SegmentList) AppendContent(node ast.Node) *DisplaySegment {
+	display := s.CurrentDisplaySegment()
+	display.AppendNode(node)
+
+	return display
+}
+
+func (s *SegmentList) CurrentLevel() int {
+	level := 1
+	heading := s.CurrentHeading()
+	if heading != nil {
+		level = heading.Level
+	}
+
+	return level
+}
+
+func (s *SegmentList) AppendSegment(segment Segment) {
+	s.list.PushBack(segment)
+
+	if h, ok := segment.(*HeadingMarker); ok {
+		s.currentHeading = h
+	}
+}
+
+func (s *SegmentList) AppendCode(fcd *ast.FencedCodeBlock) {
+	var mods = markdown.NewModifiers()
+	if rundown, ok := fcd.PreviousSibling().(*markdown.RundownBlock); ok && rundown.ForCodeBlock {
+		mods.Ingest(rundown.Modifiers)
+	}
+
+	var segment Segment
+	segment = &CodeSegment{
+		BaseSegment: BaseSegment{
+			Level:  s.CurrentLevel(),
+			Nodes:  []ast.Node{fcd},
+			Source: s.source,
+		},
+		code:      captureLines(fcd, *s.source),
+		language:  string(fcd.Language(*s.source)),
+		modifiers: mods,
+	}
+
+	if mods.Flags[SetupFlag] {
+		segment = &SetupSegment{
+			BaseSegment: BaseSegment{
+				Level:  s.CurrentLevel(),
+				Nodes:  []ast.Node{fcd},
+				Source: s.source,
+			},
+			Segment: segment.(*CodeSegment),
+		}
+
+		s.CurrentHeading().AppendSetup(segment.(*SetupSegment))
+	}
+
+	s.AppendSegment(segment)
+}
+
+func (s *SegmentList) NewHeadingMarker(node *ast.Heading) *HeadingMarker {
+	var shortcode = ""
+	parent, hasParent := s.currentHeadingTree[node.Level-1]
+
+	if !hasParent {
+		parent = nil
+	}
+
+	if rundown, label := findRundownChildWithParameter(node, LabelParameter); rundown != nil {
+		shortcode = label
+	}
+
+	marker := NewHeadingMarker(node, *s.source, parent)
+	marker.ShortCode = shortcode
+	s.AppendSegment(marker)
+
+	return marker
+}
 
 func BuildSegments(contents string, md goldmark.Markdown, logger *log.Logger) []Segment {
 	defer func() {
@@ -82,188 +228,60 @@ func findRundownChildWithParameter(n ast.Node, param markdown.Parameter) (markdo
 }
 
 func PrepareSegments(source []byte, doc ast.Node, logger *log.Logger, indent int) []Segment {
-	var currentHeading *HeadingMarker
-	var currentHeadingTree = map[int]*HeadingMarker{}
-	var currentLevel = indent
-	var currentContentSegment = &DisplaySegment{
-		BaseSegment{
-			Level:  0,
-			Nodes:  []ast.Node{},
-			Source: &source,
-		},
-	}
-
-	var segments = []Segment{currentContentSegment}
-	var rundownBlocks = []ast.Node{}
 
 	logger.Printf("Constructing rundown segments")
 
+	var list = NewSegmentList(&source)
+
 	for node := doc.FirstChild(); node != nil; node = node.NextSibling() {
 		if node.Kind() == ast.KindHeading {
-			// Move any currently captured rundown blocks into the previous segment, if there is one.
-			if len(rundownBlocks) > 0 {
-				if currentContentSegment == nil {
-					currentContentSegment = &DisplaySegment{
-						BaseSegment{
-							Level:  currentLevel,
-							Nodes:  []ast.Node{},
-							Source: &source,
-						},
-					}
-					segments = append(segments, currentContentSegment)
-				}
-				for _, rundown := range rundownBlocks {
-					currentContentSegment.AppendNode(rundown)
-				}
-			}
+			list.NewHeadingMarker(node.(*ast.Heading))
 
-			headingNode := node.(*ast.Heading)
-			currentLevel = headingNode.Level
-			lastSegment := segments[len(segments)-1]
-
-			// We'd like some space between the heading and the code block.
-			if lastSegment.Kind() == "CodeSegment" {
-				segments = append(segments, NewSeparator(currentLevel))
-			}
-
-			var shortcode string = ""
-
-			// Is the first child a rundown block? Might be a label.
-			if rundown, ok := node.NextSibling().(*markdown.RundownBlock); ok {
-				if label, ok := rundown.Modifiers.Values[LabelParameter]; ok {
-					shortcode = label
-				}
-			}
-
-			// Otherwise, is there a rundown label specified in the heading?
-			if rundown, label := findRundownChildWithParameter(node, LabelParameter); rundown != nil {
-				shortcode = label
-			}
-
-			var parentHeading *HeadingMarker = nil
-			if parent, ok := currentHeadingTree[currentLevel-1]; ok {
-				parentHeading = parent
-			}
-
-			currentHeading = &HeadingMarker{
-				BaseSegment: BaseSegment{
-					Nodes:  []ast.Node{node},
-					Level:  currentLevel,
-					Source: &source,
-				},
-				Title:         strings.TrimSpace(string(headingNode.Text(source))),
-				ShortCode:     shortcode,
-				Setup:         []*SetupSegment{},
-				ParentHeading: parentHeading,
-			}
-
-			if desc, ok := node.NextSibling().(*ast.Paragraph); ok {
-				if rundown := findRundownChildWithFlag(desc, DescriptionFlag); rundown != nil {
-					currentHeading.Description = string(rundown.Text(source))
-				}
-			} else if rundown, desc := findRundownParameter(node.NextSibling(), DescriptionParameter); rundown != nil {
-				currentHeading.Description = desc
-			}
-
-			currentHeadingTree[currentLevel] = currentHeading
-
-			segments = append(segments, currentHeading)
-
-			rundownBlocks = []ast.Node{}
-
-			currentContentSegment = nil
 		} else if node.Kind() == ast.KindFencedCodeBlock {
-			var mods = markdown.NewModifiers()
-			var nodes = []ast.Node{}
+			list.AppendCode(node.(*ast.FencedCodeBlock))
 
-			for _, rundown := range rundownBlocks {
-				nodes = append(nodes, rundown)
-				mods.Ingest(rundown.(*markdown.RundownBlock).Modifiers)
+		} else if rundown, ok := node.(*markdown.RundownBlock); ok {
+			if rundown.Modifiers.Flags[OnFailureFlag] {
+				list.CurrentHeading().AppendHandler(rundown)
+			} else if _, ok := rundown.Modifiers.Values[OnFailureParameter]; ok {
+				list.CurrentHeading().AppendHandler(rundown)
+			} else if !rundown.ForCodeBlock {
+				list.AppendContent(rundown)
 			}
-
-			nodes = append(nodes, node)
-			rundownBlocks = []ast.Node{}
-
-			codeSegment := &CodeSegment{
-				BaseSegment: BaseSegment{
-					Level:  currentLevel,
-					Nodes:  nodes,
-					Source: &source,
-				},
-				code:      captureLines(node, source),
-				language:  string(node.(*ast.FencedCodeBlock).Language(source)),
-				modifiers: mods,
-			}
-
-			lastSegment := segments[len(segments)-1]
-			if lastCode, ok := lastSegment.(*CodeSegment); ok {
-				if mods.Flags[RevealFlag] && !lastCode.GetModifiers().Flags[RevealFlag] {
-					// Add some space.
-					segments = append(segments, NewSeparator(currentLevel))
-				}
-			}
-
-			// Setup modifiers get attached to their headings. When we run headings, we ensure
-			// they've executed all parent setups.
-			if mods.Flags[SetupFlag] == true {
-				setupSegment := &SetupSegment{
-					BaseSegment: BaseSegment{
-						Level:  currentLevel,
-						Nodes:  nodes,
-						Source: &source,
-					},
-					Segment: codeSegment,
-				}
-				currentHeading.Setup = append(currentHeading.Setup, setupSegment)
-				segments = append(segments, setupSegment)
-			} else {
-				segments = append(segments, codeSegment)
-			}
-
-			currentContentSegment = nil
-
-		} else if node.Kind() == markdown.KindRundownBlock && node.NextSibling() != nil {
-			rundownBlocks = append(rundownBlocks, node)
 		} else {
-			if currentContentSegment == nil {
-				if segments[len(segments)-1].Kind() == "CodeSegment" {
-					segments = append(segments, &Separator{
-						BaseSegment{
-							Level:  currentLevel,
-							Nodes:  []ast.Node{},
-							Source: &source,
-						},
-					})
-				}
-
-				currentContentSegment = &DisplaySegment{
-					BaseSegment{
-						Level:  currentLevel,
-						Nodes:  []ast.Node{},
-						Source: &source,
-					},
-				}
-				segments = append(segments, currentContentSegment)
-
-			}
-
-			for _, rundown := range rundownBlocks {
-				currentContentSegment.AppendNode(rundown)
-			}
-
-			currentContentSegment.AppendNode(node)
-			rundownBlocks = []ast.Node{}
+			list.AppendContent(node)
 		}
 
 	}
 
-	return padSegments(segments)
-
-	logger.Printf("Segments generated\n")
-
-	return segments
+	return padSegments(list)
 }
 
-func padSegments(segments []Segment) []Segment {
-	return segments
+func padSegments(segments *SegmentList) []Segment {
+	var lastSegment Segment = nil
+	var result = []Segment{}
+
+	for element := segments.List().Front(); element != nil; element = element.Next() {
+		segment := element.Value.(Segment)
+
+		lastCode, lastIsCode := lastSegment.(*CodeSegment)
+		currentHeading, currentIsHeading := segment.(*HeadingMarker)
+		currentCode, currentIsCode := segment.(*CodeSegment)
+
+		if lastIsCode && currentIsHeading {
+			result = append(result, NewSeparator(currentHeading.Level))
+		}
+
+		if lastIsCode && currentIsCode {
+			if currentCode.modifiers.Flags[RevealFlag] && !lastCode.modifiers.Flags[RevealFlag] {
+				result = append(result, NewSeparator(currentHeading.Level))
+			}
+		}
+
+		result = append(result, segment)
+
+		lastSegment = segment
+	}
+
+	return result
 }

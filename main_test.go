@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elseano/rundown/markdown"
-	"github.com/elseano/rundown/segments"
+	"github.com/elseano/rundown/pkg/markdown"
+	"github.com/elseano/rundown/pkg/segments"
+	"github.com/elseano/rundown/pkg/util"
 	"github.com/elseano/rundown/testutil"
-	"github.com/elseano/rundown/util"
 )
 
 func TestSimpleRundown(t *testing.T) {
@@ -43,6 +43,13 @@ func TestStdoutRundown(t *testing.T) {
 
 func TestFailureRundown(t *testing.T) {
 	source, expected := loadFile("_testdata/failure.md")
+	actual := run(t, source)
+
+	testutil.AssertLines(t, expected, actual)
+}
+
+func TestOnFailureRundown(t *testing.T) {
+	source, expected := loadFile("_testdata/on_failure.md")
 	actual := run(t, source)
 
 	testutil.AssertLines(t, expected, actual)
