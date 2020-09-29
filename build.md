@@ -5,7 +5,7 @@
 Just a simple build of `rundown`:
 
 ``` bash reveal setup
-go build -o rundown
+go build -o rundown cmd/rundown/main.go
 ```
 
 # Build Examples <r label=docs/>
@@ -42,9 +42,9 @@ GIT_COMMIT=$(git rev-list -1 HEAD)
 FLAGS="-X main.GitCommit=$GIT_COMMIT -X main.Version=$VERSION"
 
 # Building MacOS
-GOOS=darwin go build -ldflags="$FLAGS" -o dist/darwin-amd64/rundown
+GOOS=darwin go build -ldflags="$FLAGS" -o dist/darwin-amd64/rundown cmd/rundown/main.go
 # Building Linux
-GOOS=linux go build -ldflags="$FLAGS" -o dist/linux-amd64/rundown
+GOOS=linux go build -ldflags="$FLAGS" -o dist/linux-amd64/rundown cmd/rundown/main.go
 
 # Preparing release
 cp LICENSE build/bash_autocomplete README.md dist/darwin-amd64/
@@ -90,7 +90,7 @@ puts "Next build version will be #{vers}"
 To debug with Delve, build Rundown with optimisations disabled:
 
 ``` bash reveal setup
-go build -gcflags="all=-N -l" -o rundown
+go build -gcflags="all=-N -l" -o rundown cmd/rundown/main.go
 ```
 
 <r stop-ok comment="Don't continue into the Delve process by default, as it's hard to exit." />
