@@ -50,6 +50,8 @@ func init() {
 
 	rootCmd.AddCommand(astCmd)
 	rootCmd.AddCommand(inspectCmd)
+	rootCmd.AddCommand(emojiCmd)
+	rootCmd.AddCommand(checkCmd)
 }
 
 func run(cmd *cobra.Command, args []string) {

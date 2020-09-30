@@ -30,9 +30,9 @@ You can also use the rundown tag to alter how text renders.
 
 This is a alternative to the Tag Format specifically for fenced code blocks, and has limited support in markdown renderers.
 
-* **GitHub** :tick:
-* **GitLab** :cross: Breaks syntax highlighting.
-* **VS Code** :tick:
+* **GitHub** :check_mark_button:
+* **GitLab** :cross_mark: Breaks syntax highlighting.
+* **VS Code** :check_mark_button:
 
     ``` bash nospin
     sleep 1

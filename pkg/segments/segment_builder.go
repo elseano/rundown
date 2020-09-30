@@ -8,6 +8,7 @@ import (
 	"github.com/go-errors/errors"
 
 	"github.com/elseano/rundown/pkg/markdown"
+	"github.com/elseano/rundown/pkg/util"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -126,7 +127,7 @@ func (s *SegmentList) AppendCode(fcd *ast.FencedCodeBlock) {
 			Nodes:  []ast.Node{fcd},
 			Source: s.source,
 		},
-		code:      captureLines(fcd, *s.source),
+		code:      util.NodeLines(fcd, *s.source),
 		language:  string(fcd.Language(*s.source)),
 		modifiers: mods,
 	}
@@ -193,17 +194,6 @@ const (
 	DisplayBlock = iota + 1
 	ExecuteBlock
 )
-
-func captureLines(v ast.Node, source []byte) string {
-	var result = ""
-
-	for i := 0; i < v.Lines().Len(); i++ {
-		line := v.Lines().At(i)
-		result = result + string(line.Value(source))
-	}
-
-	return result
-}
 
 func findRundownParameter(n ast.Node, param markdown.Parameter) (markdown.RundownNode, string) {
 	if rundown, ok := n.(markdown.RundownNode); ok {

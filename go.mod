@@ -18,6 +18,7 @@ require (
 	github.com/kyokomi/emoji v2.2.4+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/manifoldco/promptui v0.7.0
+	github.com/olekukonko/tablewriter v0.0.4
 	github.com/papertrail/go-tail v0.0.0-20180509224916-973c153b0431
 	github.com/paulrademacher/climenu v0.0.0-20151110221007-a1afbb4e378b
 	github.com/pkg/term v1.0.0 // indirect

@@ -9,6 +9,7 @@ Supports emoji rendering via `:name:`. For example:
 * Sad `:disappointed_face:` - :disappointed_face:
 * Dazed `:flushed_face:` - :flushed_face:
 * Dazed `:dog_face:` - :dog_face:
+* Or `:bullseye:` - :kite:
 
 But not :notemoji: because it's invalid.
 
