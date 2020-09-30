@@ -6,6 +6,8 @@ This text should be _italic_.
 
 This text `should be code`.
 
+This is [a link](http://www.google.com).
+
 This text:
 
 * Should be
