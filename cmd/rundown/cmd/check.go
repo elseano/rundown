@@ -38,15 +38,17 @@ var checkCmd = &cobra.Command{
 func checkExec(cmd *cobra.Command, args []string) {
 
 	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"TYPE", "MESSAGE", "SUBJECT", "CONTEXT"})
+
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetColumnAlignment([]int{tablewriter.ALIGN_LEFT, tablewriter.ALIGN_LEFT, tablewriter.ALIGN_LEFT})
-	table.SetCenterSeparator("  ")
-	table.SetColumnSeparator("  ")
-	table.SetRowSeparator("")
-	table.SetHeaderLine(false)
+	// table.SetCenterSeparator("  ")
+	// table.SetColumnSeparator("  ")
+	table.SetRowSeparator(".")
+	table.SetRowLine(true)
+	table.SetHeaderLine(true)
 	table.SetBorder(false)
-
-	table.SetColumnSeparator("")
+	// table.SetColumnSeparator("")
 
 	md := markdown.PrepareMarkdown()
 	b, _ := ioutil.ReadFile(argFilename)
@@ -66,7 +68,7 @@ func checkExec(cmd *cobra.Command, args []string) {
 			// Ensure valid emoji
 
 			if _, ok := emoji.CodeMap()[":"+emojiNode.EmojiCode+":"]; !ok {
-				table.Append([]string{"Unknown emoji code", ":" + emojiNode.EmojiCode + ":", util.NodeLines(emojiNode.Parent(), b)})
+				table.Append([]string{"ERROR", "Unknown emoji code", ":" + emojiNode.EmojiCode + ":", util.NodeLines(emojiNode.Parent(), b)})
 			}
 		}
 
@@ -75,7 +77,7 @@ func checkExec(cmd *cobra.Command, args []string) {
 			// Ensure labels are unique
 			if label, ok := rundown.GetModifiers().Values[segments.LabelParameter]; ok {
 				if _, set := existingLabels[label]; set {
-					table.Append([]string{"Label already in use", label, util.NodeLines(rundown, b)})
+					table.Append([]string{"ERROR", "Label already in use", label, util.NodeLines(rundown, b)})
 				}
 
 				existingLabels[label] = true
@@ -83,7 +85,13 @@ func checkExec(cmd *cobra.Command, args []string) {
 
 			// Find invalid modifiers
 			for _, err := range segments.ValidateModifiers(rundown.GetModifiers()) {
-				table.Append([]string{"Unknown rundown attribute", err.Error(), util.NodeLines(rundown, b)})
+				table.Append([]string{"ERROR", "Unknown rundown attribute", err.Error(), util.NodeLines(rundown, b)})
+			}
+		}
+
+		if _, ok := node.Parent().(*gast.ListItem); ok {
+			if cb, cbOk := node.(*gast.FencedCodeBlock); cbOk {
+				table.Append([]string{"WARNING", "Code block inside list.", "If this is unintended, separate the list item and the code block with <!-- -->", util.NodeLines(cb, b)})
 			}
 		}
 

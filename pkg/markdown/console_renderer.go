@@ -664,12 +664,12 @@ var ListItemAttributeFilter = GlobalAttributeFilter.Extend(
 
 func (r *Renderer) renderListItem(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
-		fc := n.FirstChild()
-		if fc != nil {
-			if _, ok := fc.(*ast.TextBlock); !ok {
-				_ = w.WriteByte('\n')
-			}
-		}
+		// fc := n.FirstChild()
+		// if fc != nil {
+		// 	if _, ok := fc.(*ast.TextBlock); !ok {
+		// 		_ = w.WriteByte('\n')
+		// 	}
+		// }
 
 		_, _ = w.WriteString(r.blockStyles.Peek().Begin())
 
@@ -680,6 +680,12 @@ func (r *Renderer) renderListItem(w util.BufWriter, source []byte, n ast.Node, e
 			n.Dump(source, 1)
 		} else {
 			_, _ = w.WriteString(r.blockStyles.Peek().End())
+		}
+
+		// If we have a List as the last child, then that list will have
+		// already placed us on a newline. Otherwise, print a newline.
+		if _, isList := n.LastChild().(*ast.List); !isList {
+			_ = w.WriteByte('\n')
 		}
 	}
 	return ast.WalkContinue, nil
@@ -697,7 +703,12 @@ func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, n ast.Node, 
 			return ast.WalkSkipChildren, nil
 		}
 
-		r.writeString(w, paddingForLevel(r.currentLevel))
+		// Indent in two cases:
+		// 1. We're not inside a list.
+		// 2. We're inside a list, but not the first child.
+		if _, ok := n.Parent().(*ast.ListItem); !ok || n.Parent().FirstChild() != n {
+			r.writeString(w, paddingForLevel(r.currentLevel))
+		}
 
 		// if n.Attributes() != nil {
 		// 	_, _ = w.WriteString("<p")
@@ -707,20 +718,30 @@ func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, n ast.Node, 
 		// 	_, _ = w.WriteString("<p>")
 		// }
 	} else {
-		_, _ = w.WriteString("\n\n")
-		// _, _ = w.WriteString("</p>\n")
+		// Loose lists end with with ListItem > Paragraph, which breaks formatting
+		// on the console. So don't insert newlines.
+		if _, ok := n.Parent().(*ast.ListItem); !ok {
+			_, _ = w.WriteString("\n\n")
+		} else if n.NextSibling() != nil {
+			// However, if there's additional block elements after the paragraph,
+			// then we'll make sure that block element is on it's own line.
+			_, _ = w.WriteString("\n")
+		}
 	}
 	return ast.WalkContinue, nil
 }
 
 func (r *Renderer) renderTextBlock(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if !entering {
-		// _, ok := n.NextSibling().(ast.Node)
-		// _, ok2 := n.Parent().(*ast.ListItem)
 
-		// if ok && !ok2 {
-		_ = w.WriteByte('\n')
-		// }
+		// Special case, we have an embedded list as the next sibling, add a newline.
+		if _, ok := n.Parent().(*ast.ListItem); ok {
+			if _, isList := n.NextSibling().(*ast.List); isList {
+				_ = w.WriteByte('\n')
+			}
+		}
+
+		// Otherwise, just let the parent ListItem handle the line breaks.
 	}
 	return ast.WalkContinue, nil
 }
