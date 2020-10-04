@@ -442,9 +442,11 @@ func (r *Renderer) renderRundownInline(w util.BufWriter, source []byte, node ast
 			w.Write(buf.Bytes())
 		}
 	} else {
-		err := r.Config.RundownHandler.OnRundownNode(node, entering)
-		if err != nil {
-			return ast.WalkStop, err
+		if r.Config.RundownHandler != nil {
+			err := r.Config.RundownHandler.OnRundownNode(node, entering)
+			if err != nil {
+				return ast.WalkStop, err
+			}
 		}
 	}
 
@@ -541,7 +543,7 @@ func (r *Renderer) syntaxHighlightText(w util.BufWriter, language string, source
 		formatter := formatters.TTY256
 
 		iterator, _ := lexer.Tokenise(nil, target)
-		_ = formatter.Format(&buf, styles.Get("github"), iterator) == nil
+		_ = formatter.Format(&buf, styles.Pygments, iterator) == nil
 	} else {
 		buf.WriteString(target)
 	}
@@ -579,6 +581,7 @@ func (r *Renderer) renderFencedCodeBlock(w util.BufWriter, source []byte, node a
 			r.syntaxHighlightText(w, string(language), source, node)
 		}
 	} else {
+		_, _ = w.WriteString("\r\n") // Block level element, add blank line.
 	}
 
 	return ast.WalkContinue, nil
@@ -851,13 +854,18 @@ func (r *Renderer) renderEmphasis(w util.BufWriter, source []byte, node ast.Node
 
 	if entering {
 		if n.Level == 2 {
-			r.inlineStyles.Push(Color(aurora.BoldFm))
+			w.WriteString(Color(aurora.BoldFm).Begin())
 		} else {
-			r.inlineStyles.Push(Color(aurora.ItalicFm))
+			w.WriteString(Color(aurora.ItalicFm).Begin())
 		}
 	} else {
-		r.inlineStyles.Pop()
+		if n.Level == 2 {
+			w.WriteString(Color(aurora.BoldFm).End())
+		} else {
+			w.WriteString(Color(aurora.ItalicFm).End())
+		}
 	}
+
 	return ast.WalkContinue, nil
 }
 

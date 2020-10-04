@@ -98,6 +98,8 @@ This text should be italic.
 
 This text should be code.
 
+This is http://www.google.com|a link.
+
 This text:
 
 • Should be

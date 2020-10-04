@@ -44,10 +44,10 @@ func ShortcodeMenu(doc []segments.Segment) string {
 	peppers := processHeadings(doc)
 
 	templates := &promptui.SelectTemplates{
-		Label:    "{{ . }}?",
-		Active:   "{{ \">\" | yellow }} {{ .Level }}{{ .Name | bold | cyan }} ({{ .ShortCode }})",
-		Inactive: "  {{ .Level }}{{ .Name | cyan }} ({{ .ShortCode | faint }})",
-		Selected: "{{ \">\" | blue }} {{ .Level }}{{ .Name | blue }}",
+		Label:    "{{ . | bold }}",
+		Active:   "{{ \">\" | yellow }} {{ .Level | faint }}{{ .Name | bold | cyan }} ({{ .ShortCode }})",
+		Inactive: "  {{ .Level | faint }}{{ .Name | cyan }} ({{ .ShortCode | faint }})",
+		Selected: "{{ \">\" | blue }} {{ .Name | blue }}",
 		Details: `
      {{ .Description | faint }}`,
 	}

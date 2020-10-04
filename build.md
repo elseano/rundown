@@ -152,9 +152,10 @@ Now that the container is ready, run the tests.
 docker run rdlinux
 ```
 
-# Building a video
+# Building a video <r label=video/>
 
 <r desc>Builds an animated gif video from a quicktime file.</r>
+<r opt="input" desc="The input QuickTime file"/>
 
 <!--~
 ``` bash stdout nospin
