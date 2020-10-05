@@ -659,6 +659,8 @@ func (s BulletSequenceStyle) Wrap(str string) string {
 	return s.Begin() + str + s.End()
 }
 
+var bulletLevels = []string{"•", "◦", "⁃"}
+
 func (r *Renderer) renderList(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	n := node.(*ast.List)
 
@@ -666,13 +668,32 @@ func (r *Renderer) renderList(w util.BufWriter, source []byte, node ast.Node, en
 		if n.IsOrdered() {
 			r.blockStyles.Push(NewIntegerSequence(n.Start, paddingForLevel(r.currentLevel)))
 		} else {
-			r.blockStyles.Push(NewBulletSequence("•", paddingForLevel(r.currentLevel)))
+			var (
+				depth          = 0
+				p     ast.Node = n
+			)
+
+			for {
+				if _, ok := p.Parent().(*ast.ListItem); ok {
+					depth++
+					p = p.Parent()
+				} else {
+					break
+				}
+
+				if depth > 2 {
+					depth = 2
+					break
+				}
+			}
+
+			r.blockStyles.Push(NewBulletSequence(bulletLevels[depth], paddingForLevel(r.currentLevel)))
 		}
 		r.SetLevel(r.currentLevel + 1)
 	} else {
-		if _, ok := node.Parent().(*ast.ListItem); !ok {
-			_, _ = w.WriteString("\n")
-		}
+		// if _, ok := node.Parent().(*ast.ListItem); !ok {
+		_, _ = w.WriteString("\n")
+		// }
 		r.blockStyles.Pop()
 		r.SetLevel(r.currentLevel - 1)
 	}
