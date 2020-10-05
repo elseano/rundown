@@ -5,6 +5,10 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"os"
+	"regexp"
+
+	icolor "image/color"
 
 	// "fmt"
 
@@ -23,6 +27,8 @@ import (
 	"github.com/alecthomas/chroma/styles"
 
 	"github.com/logrusorgru/aurora"
+
+	"github.com/eliukblau/pixterm/pkg/ansimage"
 
 	rdutil "github.com/elseano/rundown/pkg/util"
 )
@@ -906,11 +912,42 @@ var ImageAttributeFilter = GlobalAttributeFilter.Extend(
 	[]byte("width"),
 )
 
+var urlMatch = regexp.MustCompile("^http(s?)://")
+
 func (r *Renderer) renderImage(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	if !entering {
 		return ast.WalkContinue, nil
 	}
-	// n := node.(*ast.Image)
+
+	// Currently disabled due to issues with word wrapping.
+	return ast.WalkContinue, nil
+
+	if val, set := os.LookupEnv("COLORTERM"); !set || (val != "truecolor" && val != "24bit") {
+		// Only render images when we're sure we're in truecolor mode.
+		return ast.WalkContinue, nil
+	}
+
+	n := node.(*ast.Image)
+	var image *ansimage.ANSImage
+
+	if urlMatch.Match(n.Destination) {
+		if i, err := ansimage.NewScaledFromURL(string(n.Destination), 40, r.Config.ConsoleWidth-5, icolor.Black, ansimage.ScaleModeFit, ansimage.NoDithering); err != nil {
+			_, _ = w.WriteString("Error: " + err.Error())
+		} else {
+			image = i
+		}
+	} else {
+		if i, err := ansimage.NewScaledFromFile(string(n.Destination), 40, r.Config.ConsoleWidth-5, icolor.Black, ansimage.ScaleModeFit, ansimage.NoDithering); err != nil {
+			_, _ = w.WriteString("Error: " + err.Error())
+		} else {
+			image = i
+		}
+	}
+
+	if image != nil {
+		w.WriteString(image.Render())
+		// image.DrawExt(false, true)
+	}
 	// _, _ = w.WriteString("<img src=\"")
 	// if !IsDangerousURL(n.Destination) {
 	// 	_, _ = w.Write(util.EscapeHTML(util.URLEscape(n.Destination, true)))
