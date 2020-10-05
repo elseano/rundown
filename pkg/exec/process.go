@@ -15,7 +15,7 @@ import (
 var stdinChannel = make(chan []byte, 500)
 var stdinMutex sync.Mutex
 
-// Wraps STDIN, as reading directly from it when executing multiple processes
+// Reading directly from STDIN when executing multiple processes
 // creates issues, as STDIN read is blocking and you can't cancel it.
 // Instead, this is the only place we read from STDIN, and we direct the
 // byte stream to the io.Reader returned by Claim().
