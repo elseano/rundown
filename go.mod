@@ -10,6 +10,7 @@ require (
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 	github.com/containerd/fifo v0.0.0-20200410184934-f15a3290365b
 	github.com/creack/pty v1.1.11
+	github.com/eliukblau/pixterm v1.3.1
 	github.com/fatih/color v1.7.0
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-errors/errors v1.1.1
