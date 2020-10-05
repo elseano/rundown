@@ -335,6 +335,10 @@ func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(ast.KindTextBlock, r.renderTextBlock)
 	reg.Register(ast.KindThematicBreak, r.renderThematicBreak)
 	reg.Register(KindRundownBlock, r.renderRundownBlock)
+	reg.Register(KindSection, r.renderNothing)
+	reg.Register(KindSectionedDocument, r.renderNothing)
+	reg.Register(KindContainer, r.renderNothing)
+	reg.Register(KindExecutionBlock, r.renderExecutionBlock)
 
 	// inlines
 
@@ -406,6 +410,15 @@ func (r *Renderer) renderRundownBlock(w util.BufWriter, source []byte, node ast.
 		}
 	}
 
+	return ast.WalkContinue, nil
+}
+
+func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if entering {
+		_, _ = w.WriteString("✔ Running (Complete)\n")
+	} else if _, ok := node.NextSibling().(*ExecutionBlock); !ok {
+		_, _ = w.WriteString("\n")
+	}
 	return ast.WalkContinue, nil
 }
 
@@ -946,7 +959,7 @@ func (r *Renderer) renderImage(w util.BufWriter, source []byte, node ast.Node, e
 
 	if image != nil {
 		w.WriteString(image.Render())
-		// image.DrawExt(false, true)
+		image.DrawExt(false, true)
 	}
 	// _, _ = w.WriteString("<img src=\"")
 	// if !IsDangerousURL(n.Destination) {
@@ -968,10 +981,6 @@ func (r *Renderer) renderImage(w util.BufWriter, source []byte, node ast.Node, e
 }
 
 func (r *Renderer) renderRawHTML(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
-	if !entering {
-		return ast.WalkSkipChildren, nil
-	}
-	_, _ = w.WriteString("<!-- raw HTML omitted -->")
 	return ast.WalkSkipChildren, nil
 }
 

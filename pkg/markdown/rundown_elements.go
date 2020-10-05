@@ -2,6 +2,8 @@ package markdown
 
 import (
 	"bytes"
+	"container/list"
+	"crypto/md5"
 	"fmt"
 	"regexp"
 	"strings"
@@ -352,7 +354,259 @@ func (b *rundownBlockParser) CanAcceptIndentedLine() bool {
 
 /*
  *
- * FencedCodeBlock + Rundown AST Transformer
+ * EXECUTION BLOCK
+ *
+ * Represents code to be executed.
+ *
+ */
+
+type ExecutionBlock struct {
+	ast.BaseBlock
+
+	Modifiers *Modifiers
+	Syntax    string
+	Origin    *ast.FencedCodeBlock
+	ID        string
+}
+
+// IsRaw implements Node.IsRaw.
+func (n *ExecutionBlock) SetOrigin(fcb *ast.FencedCodeBlock, source []byte) {
+	n.Origin = fcb
+
+	h := md5.New()
+	h.Write(fcb.Text(source))
+	m := h.Sum(nil)
+	m2 := m[len(m)-5:]
+
+	n.ID = fmt.Sprintf("%d:%x", fcb.Lines().At(0).Start, m2)
+}
+
+// Dump implements Node.Dump.
+func (n *ExecutionBlock) Dump(source []byte, level int) {
+	ast.DumpHelper(n, source, level, map[string]string{
+		"Modifiers": n.Modifiers.String(),
+		"ID":        n.ID,
+		"Syntax":    n.Syntax,
+	}, nil)
+}
+
+// KindRundownBlock is a NodeKind of the RundownBlock node.
+var KindExecutionBlock = ast.NewNodeKind("ExecutionBlock")
+
+// Kind implements Node.Kind.
+func (n *ExecutionBlock) Kind() ast.NodeKind {
+	return KindExecutionBlock
+}
+
+// NewRundownBlock returns a new RundownBlock node.
+func NewExecutionBlock(syntax string, modifiers *Modifiers) *ExecutionBlock {
+	return &ExecutionBlock{
+		BaseBlock: ast.BaseBlock{},
+		Modifiers: modifiers,
+		Syntax:    syntax,
+	}
+}
+
+/*
+ *
+ * SECTION CONTAINER
+ *
+ * Groups heading and contents together.
+ *
+ */
+
+type Section struct {
+	ast.BaseBlock
+
+	Handlers    *Container
+	Options     *Container
+	Description list.List // Description is a list as we want to keep it inside the DOM.
+	Setups      list.List // Setups is a list to keep them in the DOM too.
+
+	Label *string
+	Level int
+}
+
+// Dump implements Node.Dump.
+func (n *Section) Dump(source []byte, level int) {
+	label := "(not set)"
+	if n.Label != nil {
+		label = *n.Label
+	}
+
+	descList := []string{}
+	for descE := n.Description.Front(); descE != nil; descE = descE.Next() {
+		descList = append(descList, string(descE.Value.(ast.Node).Text(source)))
+	}
+
+	ast.DumpHelper(n, source, level, map[string]string{
+		"Level":       fmt.Sprintf("%d", n.Level),
+		"Label":       fmt.Sprintf("%s", label),
+		"Description": fmt.Sprintf("%#v", descList),
+	}, func(subLevel int) {
+		n.Handlers.Dump(source, subLevel)
+		n.Options.Dump(source, subLevel)
+
+		for setup := n.Setups.Front(); setup != nil; setup = setup.Next() {
+			fmt.Printf("%sSetups {\n", strings.Repeat("    ", subLevel))
+			setup.Value.(ast.Node).Dump(source, subLevel+1)
+			fmt.Printf("%s}\n", strings.Repeat("    ", subLevel))
+		}
+	})
+}
+
+// KindRundownBlock is a NodeKind of the RundownBlock node.
+var KindSection = ast.NewNodeKind("Section")
+
+// Kind implements Node.Kind.
+func (n *Section) Kind() ast.NodeKind {
+	return KindSection
+}
+
+// NewRundownBlock returns a new RundownBlock node.
+func NewSectionFromHeading(heading *ast.Heading) *Section {
+	// Find rundown child
+	var (
+		rundown *RundownInline = nil
+		label   *string
+	)
+
+	for child := heading.FirstChild(); child != nil; child = child.NextSibling() {
+		if rd, ok := child.(*RundownInline); ok {
+			rundown = rd
+			break
+		}
+	}
+
+	if rundown != nil {
+		label = rundown.Modifiers.GetValue(Parameter("label"))
+	}
+
+	return &Section{
+		BaseBlock: ast.BaseBlock{},
+		Label:     label,
+		Level:     heading.Level,
+		Handlers:  NewContainer("Handlers"),
+		Options:   NewContainer("Options"),
+	}
+}
+
+func (n *Section) appendHandler(rundown RundownNode) {
+	n.Handlers.AppendChild(n.Handlers, rundown)
+}
+
+func (n *Section) appendOption(rundown RundownNode) {
+	n.Options.AppendChild(n.Options, rundown)
+}
+
+func (n *Section) appendDesc(rundown RundownNode) {
+	n.Description.PushBack(rundown)
+
+	// Add the Description element, as we also consider it to be part of the
+	// normal content flow.
+	n.AppendChild(n, rundown)
+}
+
+func (n *Section) appendSetup(exec *ExecutionBlock) {
+	n.Setups.PushBack(exec)
+
+	// Add the Description element, as we also consider it to be part of the
+	// normal content flow.
+	n.AppendChild(n, exec)
+}
+
+func (n *Section) Append(child ast.Node) {
+	if rundown, ok := child.(*RundownBlock); ok {
+		switch {
+		case rundown.Modifiers.HasAny("on-failure"):
+			n.appendHandler(rundown)
+			return
+		case rundown.Modifiers.HasAll("opt", "desc"):
+			n.appendOption(rundown)
+			return
+		case rundown.Modifiers.HasAny("desc"):
+			n.appendDesc(rundown)
+			return
+		}
+	} else if exec, ok := child.(*ExecutionBlock); ok {
+		if exec.Modifiers.HasAny("setup") {
+			n.appendSetup(exec)
+		}
+	}
+
+	n.AppendChild(n, child)
+}
+
+type Container struct {
+	ast.Document
+	Name string
+}
+
+var KindContainer = ast.NewNodeKind("Container")
+
+// Kind implements Node.Kind.
+func (n *Container) Kind() ast.NodeKind {
+	return KindContainer
+}
+
+func NewContainer(name string) *Container {
+	return &Container{
+		Document: *ast.NewDocument(),
+		Name:     name,
+	}
+}
+
+func (n *Container) Dump(source []byte, level int) {
+	ast.DumpHelper(n, source, level, map[string]string{
+		"Name": n.Name,
+	}, nil)
+}
+
+/*
+ *
+ * SECTIONEDDOCUMENT CONTAINER
+ *
+ * Maintains an index of sections within the document.
+ *
+ */
+
+type SectionedDocument struct {
+	ast.Document
+	Sections []*Section
+}
+
+// Dump implements Node.Dump.
+func (n *SectionedDocument) Dump(source []byte, level int) {
+	ast.DumpHelper(n, source, level, nil, nil)
+}
+
+// KindRundownBlock is a NodeKind of the RundownBlock node.
+var KindSectionedDocument = ast.NewNodeKind("SectionedDocument")
+
+// Kind implements Node.Kind.
+func (n *SectionedDocument) Kind() ast.NodeKind {
+	return KindSectionedDocument
+}
+
+// NewRundownBlock returns a new RundownBlock node.
+func NewSectionedDocument() *SectionedDocument {
+	return &SectionedDocument{
+		Document: *ast.NewDocument(),
+		Sections: []*Section{},
+	}
+}
+
+func (n *SectionedDocument) AddSection(section *Section) {
+	n.Sections = append(n.Sections, section)
+}
+
+/*
+ *
+ * Rundown AST Transformer
+ * - Moves FCB modifiers into dedicated Rundown blocks.
+ * - Handles loose RundownBlocks
+ * - Builds Section container nodes & rearranges handlers.
+ * - Builds ExecutionBlock nodes.
  *
  */
 
@@ -379,7 +633,27 @@ func getRawText(n ast.Node, source []byte) string {
 var isRundownOpening = regexp.MustCompile(`<(?:r|rundown)\s+(.*?)\s*(?:/>|>)`)
 var isRundownClosing = regexp.MustCompile(`</(?:r|rundown)>`)
 
+func (a *rundownASTTransformer) fixConsecutiveTexts(doc *ast.Document, reader text.Reader, pc parser.Context) {
+	ast.Walk(doc, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+		text, isText := node.(*ast.Text)
+
+		if isText {
+			for {
+				if next, nextText := node.NextSibling().(*ast.Text); nextText {
+					text.Segment = text.Segment.WithStop(next.Segment.Stop)
+					node.Parent().RemoveChild(node.Parent(), next)
+				} else {
+					break
+				}
+			}
+		}
+
+		return ast.WalkContinue, nil
+	})
+}
+
 func (a *rundownASTTransformer) Transform(doc *ast.Document, reader text.Reader, pc parser.Context) {
+	a.fixConsecutiveTexts(doc, reader, pc)
 	// Finds FencedCodeBlocks, and transforms their syntax line additions into RundownBlock elements
 	// which provides consistency later.
 
@@ -418,6 +692,9 @@ func (a *rundownASTTransformer) Transform(doc *ast.Document, reader text.Reader,
 			startBlock = nil
 			mods = nil
 		} else if fcb, ok := node.(*ast.FencedCodeBlock); ok {
+			// If this is a Fenced Code Block, and has an syntax specified, then
+			// create an ExecutionBlock.
+
 			var infoText string = ""
 
 			info := node.(*ast.FencedCodeBlock).Info
@@ -425,29 +702,36 @@ func (a *rundownASTTransformer) Transform(doc *ast.Document, reader text.Reader,
 			if info != nil {
 				infoText = strings.TrimSpace(string(info.Text(reader.Source())))
 				splitInfo := ""
+				split := strings.SplitN(infoText, " ", 2)
 
-				if split := strings.SplitN(infoText, " ", 2); len(split) == 2 { // Trim the syntax specifier
+				if len(split) == 2 { // Trim the syntax specifier
+					fcb.Info.Segment = fcb.Info.Segment.WithStop(fcb.Info.Segment.Start + len(split[0]))
 					splitInfo = split[1]
 				}
 
 				fencedMods := ParseModifiers(splitInfo, ":") // Fenced modifiers separate KV's with :
 
-				var rundown *RundownBlock = nil
-
-				if len(splitInfo) > 0 {
-					// Then assume modifiers are attached to fenced code block and move them
-					// to a preceding rundown block.
-					rundown = NewRundownBlock(fencedMods)
-				} else if rdb, ok := node.PreviousSibling().(*RundownBlock); ok {
-					// Otherwise, if we have a rundown block prior, it must relate to this
-					// code block.
-					rundown = rdb
+				if len(splitInfo) == 0 {
+					// If there's no modifiers on the FCB, then check for a preceding Rundown block.
+					if rdb, ok := node.PreviousSibling().(*RundownBlock); ok {
+						fencedMods.Ingest(rdb.Modifiers)
+						rdb.Parent().RemoveChild(rdb.Parent(), rdb)
+					}
 				}
 
-				if rundown != nil {
-					rundown.ForCodeBlock = true
-					fcb.Parent().InsertBefore(fcb.Parent(), fcb, rundown)
+				// Insert the Execution Block after the FCB if we're running this thing.
+				if len(split[0]) > 0 && fencedMods.Flags[Flag("norun")] != true {
+					eb := NewExecutionBlock(split[0], fencedMods)
+					eb.SetLines(fcb.Lines())
+					eb.SetOrigin(fcb, reader.Source())
+					fcb.Parent().InsertAfter(fcb.Parent(), fcb, eb)
 				}
+
+				// If the FCB isn't set to reveal, delete it.
+				if fencedMods.Flags[Flag("reveal")] != true {
+					fcb.Parent().RemoveChild(fcb.Parent(), fcb)
+				}
+
 			}
 		} else if p, ok := node.(*ast.Paragraph); ok && p.ChildCount() == 1 {
 			// Convert Paragraph > RundownInline into RundownBlock > Paragraph.
@@ -467,5 +751,52 @@ func (a *rundownASTTransformer) Transform(doc *ast.Document, reader text.Reader,
 			}
 		}
 
+	}
+
+	a.TransformSections(doc, reader, pc)
+}
+
+func (a *rundownASTTransformer) TransformSections(doc *ast.Document, reader text.Reader, pc parser.Context) {
+	toc := NewSectionedDocument()
+	var currentSection *Section = nil
+	var currentSectionTree = map[int]*Section{}
+	var subjectNodes list.List
+
+	// Because we're rearranging the AST, we're going to capture the list of block elements first.
+	for node := doc.FirstChild(); node != nil; node = node.NextSibling() {
+		subjectNodes.PushBack(node)
+	}
+
+	// Now traverse the elements, shunting them into Sections
+	for nodeE := subjectNodes.Front(); nodeE != nil; nodeE = nodeE.Next() {
+		node := nodeE.Value.(ast.Node)
+
+		if heading, ok := node.(*ast.Heading); ok {
+			section := NewSectionFromHeading(heading)
+			toc.AddSection(section)
+
+			var parent ast.Node = doc
+
+			if p, ok := currentSectionTree[section.Level-1]; ok {
+				parent = p
+			}
+
+			parent.AppendChild(parent, section)
+
+			// if currentSection != nil {
+			// 	currentSection.Append(section)
+			// }
+
+			currentSection = section
+			currentSectionTree[section.Level] = section
+		}
+
+		if currentSection != nil {
+			currentSection.Append(node)
+		}
+	}
+
+	if currentSection != nil {
+		toc.AppendChild(toc, doc)
 	}
 }

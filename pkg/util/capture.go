@@ -1,9 +1,11 @@
 package util
 
 import (
-	"os"
-	"io"
 	"bytes"
+	"io"
+	"os"
+
+	"github.com/yuin/goldmark/ast"
 )
 
 func CaptureStdout(f func()) string {
@@ -21,3 +23,6 @@ func CaptureStdout(f func()) string {
 	return buf.String()
 }
 
+func DumpNode(node ast.Node, source []byte) string {
+	return CaptureStdout(func() { node.Dump(source, 1) })
+}

@@ -44,6 +44,50 @@ func (m *Modifiers) String() string {
 	return fmt.Sprintf("Flags: %s, Values: %v", keys, m.Values)
 }
 
+func (m *Modifiers) HasAny(names ...string) bool {
+	for _, name := range names {
+		if _, ok := m.Flags[Flag(name)]; ok {
+			return true
+		}
+
+		if _, ok := m.Values[Parameter(name)]; ok {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (m *Modifiers) HasAll(names ...string) bool {
+	for _, name := range names {
+		if _, ok := m.Flags[Flag(name)]; ok {
+			continue
+		}
+
+		if _, ok := m.Values[Parameter(name)]; ok {
+			continue
+		}
+
+		return false
+	}
+
+	return true
+}
+
+func (m *Modifiers) GetValue(name Parameter) *string {
+	if val, ok := m.Values[name]; ok {
+		return &val
+	}
+	return nil
+}
+
+func (m *Modifiers) GetFlag(name Flag) *bool {
+	if val, ok := m.Flags[name]; ok {
+		return &val
+	}
+	return nil
+}
+
 var nameMatch = `[a-z_\-0-9]+`
 var kvMatch = `[\=\:]`
 var modifierDetect = regexp.MustCompile(`(` + nameMatch + kvMatch + `\".*?\")\s*|(` + nameMatch + kvMatch + `'.*?')\s*|(` + nameMatch + kvMatch + `[^\s]+)\s*|(` + nameMatch + `)\s*`)
