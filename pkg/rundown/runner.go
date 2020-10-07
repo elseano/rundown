@@ -144,20 +144,37 @@ func (r *Runner) getAST(md goldmark.Markdown) (ast.Node, []byte) {
 	return doc, bytes
 }
 
-func (r *Runner) GetShortCodes() map[string]*ShortCodeInfo {
+type DocumentShortCodes struct {
+	Codes map[string]*ShortCodeInfo
+	Order []string
+}
+
+func (d *DocumentShortCodes) Append(info *ShortCodeInfo) {
+	d.Codes[info.Code] = info
+	d.Order = append(d.Order, info.Code)
+}
+
+func NewDocumentShortCodes() *DocumentShortCodes {
+	return &DocumentShortCodes{
+		Codes: map[string]*ShortCodeInfo{},
+		Order: []string{},
+	}
+}
+
+func (r *Runner) GetShortCodes() *DocumentShortCodes {
 	md, _, _ := r.getEngine()
 	doc, bytes := r.getAST(md)
 
 	return r.getShortCodes(doc, bytes)
 }
 
-func (r *Runner) getShortCodes(doc ast.Node, bytes []byte) map[string]*ShortCodeInfo {
-	codes := map[string]*ShortCodeInfo{}
+func (r *Runner) getShortCodes(doc ast.Node, bytes []byte) *DocumentShortCodes {
+	codes := NewDocumentShortCodes()
 
 	if toc, ok := doc.(*markdown.SectionedDocument); ok {
 		for _, section := range toc.Sections {
 			if info := BuildShortCodeInfo(section, bytes); info != nil {
-				codes[info.Code] = info
+				codes.Append(info)
 			}
 		}
 	}
@@ -203,14 +220,14 @@ func ParseShortCodeSpecs(specs []string) ([]*ShortCodeSpec, error) {
 func (r *Runner) RunCodes(codeArgs []*ShortCodeSpec) error {
 	md, www, ctx := r.getEngine()
 	doc, bytes := r.getAST(md)
-	sections := r.getShortCodes(doc, bytes)
+	shortCodes := r.getShortCodes(doc, bytes)
 
-	if len(sections) == 0 {
+	if len(shortCodes.Codes) == 0 {
 		return errors.New("Document does not support ShortCodes")
 	}
 
 	for _, code := range codeArgs {
-		section := sections[code.Code]
+		section := shortCodes.Codes[code.Code]
 		if section == nil {
 			return errors.New("Invalid ShortCode: " + code.Code)
 		}
@@ -235,7 +252,7 @@ func (r *Runner) RunCodes(codeArgs []*ShortCodeSpec) error {
 	}
 
 	for _, code := range codeArgs {
-		section := sections[code.Code].Section
+		section := shortCodes.Codes[code.Code].Section
 		section.ForceRootLevel()
 
 		for _, opt := range code.Options {

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"syscall"
 
-	"golang.org/x/crypto/ssh/terminal"
+	"github.com/elseano/rundown/pkg/util"
 )
 
 type Context struct {
@@ -24,22 +24,6 @@ type Context struct {
 	Invocation      string
 	ConsoleWidth    int
 	Logger          *log.Logger
-}
-
-func intMin(a, b int) int {
-	if a > b {
-		return b
-	}
-	return a
-}
-
-func getConsoleWidth() int {
-	width, _, err := terminal.GetSize(0)
-	if err != nil {
-		width = 80
-	}
-
-	return width
 }
 
 func receiveLoop(filename string, messages chan<- string) {
@@ -90,7 +74,7 @@ func NewContext() *Context {
 		Env:             map[string]string{"RUNDOWN": tmpFile.Name()},
 		ForcedLevelZero: false,
 		Repeat:          false,
-		ConsoleWidth:    intMin(getConsoleWidth(), 120),
+		ConsoleWidth:    util.IntMin(util.GetConsoleWidth(), 120),
 		Messages:        messages,
 		TempDir:         tmpDir,
 	}

@@ -43,7 +43,17 @@ func (r *StdinReader) doInit() {
 	})
 }
 
-func (r *StdinReader) Claim() io.Reader {
+type stdinReaderCloser struct {
+	io.ReadCloser
+	reader *StdinReader
+}
+
+func (r *stdinReaderCloser) Close() error {
+	r.reader.Stop()
+	return nil
+}
+
+func (r *StdinReader) Claim() io.ReadCloser {
 	stdinMutex.Lock()
 	r.doInit()
 
@@ -66,7 +76,7 @@ func (r *StdinReader) Claim() io.Reader {
 
 	}()
 
-	return stdinR
+	return &stdinReaderCloser{ReadCloser: stdinR, reader: r}
 }
 
 func (r *StdinReader) Stop() {

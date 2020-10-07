@@ -373,12 +373,16 @@ type ExecutionBlock struct {
 func (n *ExecutionBlock) SetOrigin(fcb *ast.FencedCodeBlock, source []byte) {
 	n.Origin = fcb
 
-	h := md5.New()
-	h.Write(fcb.Text(source))
-	m := h.Sum(nil)
-	m2 := m[len(m)-5:]
+	if fcb.Lines().Len() == 0 {
+		n.ID = "0:000"
+	} else {
+		h := md5.New()
+		h.Write(fcb.Text(source))
+		m := h.Sum(nil)
+		m2 := m[len(m)-5:]
 
-	n.ID = fmt.Sprintf("%d:%x", fcb.Lines().At(0).Start, m2)
+		n.ID = fmt.Sprintf("%d:%x", fcb.Lines().At(0).Start, m2)
+	}
 }
 
 // Dump implements Node.Dump.
