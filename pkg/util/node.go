@@ -5,8 +5,14 @@ import (
 )
 
 func NodeLines(v ast.Node, source []byte) string {
+	text := string(v.Text(source))
+	if text != "" {
+		return text
+	}
+
+	// We can't walk the lines for Inline elements, so just return empty string.
 	if v.Type() == ast.TypeInline {
-		return string(v.Text(source))
+		return ""
 	}
 
 	var result = ""
