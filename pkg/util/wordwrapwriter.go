@@ -5,6 +5,7 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 type WordWrapWriter struct {
@@ -33,14 +34,17 @@ func (w *WordWrapWriter) SetAfterWrap(wrapper func(writer io.Writer) int) {
 
 func (w *WordWrapWriter) trueLength(b []byte) int {
 	noc := RemoveColors(string(b))
-	return len(strings.TrimSuffix(noc, "\n"))
+
+	return utf8.RuneCountInString(strings.TrimSuffix(noc, "\n"))
 }
 
 var wordSplitter = regexp.MustCompile("([\r ])?([^\r ]*)")
 
 func (w *WordWrapWriter) Write(b []byte) (n int, err error) {
-	for _, line := range bytes.SplitAfter(b, []byte("\n")) {
-		for _, word := range wordSplitter.FindAllSubmatch(line, -1) {
+	lines := bytes.SplitAfter(b, []byte("\n"))
+	for _, line := range lines {
+		words := wordSplitter.FindAllSubmatch(line, -1)
+		for _, word := range words {
 			spaceBytes := word[1]
 			wordBytes := word[2]
 

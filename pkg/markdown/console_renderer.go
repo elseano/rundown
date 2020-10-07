@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"regexp"
@@ -58,9 +59,18 @@ const optLevelLevel renderer.OptionName = "LevelLevel"
 const optConsoleWidth renderer.OptionName = "ConsoleWidth"
 const optLevelChange renderer.OptionName = "LevelChange"
 
+type ExecutionResult string
+
+const (
+	Continue ExecutionResult = "Continue"
+	Skip                     = "Skip"
+	Stop                     = "Stop"
+)
+
 type RundownHandler interface {
 	Mutate([]byte, ast.Node) ([]byte, error)
 	OnRundownNode(node ast.Node, entering bool) error
+	OnExecute(node *ExecutionBlock, source []byte, out io.Writer) (ExecutionResult, error)
 }
 
 type withRundownHandler struct {
@@ -192,18 +202,20 @@ type Option interface {
 // nodes as Console strings
 type Renderer struct {
 	Config
-	blockStyles  *StyleStack
-	inlineStyles *StyleStack
-	currentLevel int
+	blockStyles       *StyleStack
+	inlineStyles      *StyleStack
+	currentLevel      int
+	currentlySkipping bool
 }
 
 // NewRenderer returns a new Renderer with given options.
 func NewRenderer(opts ...Option) renderer.NodeRenderer {
 	r := &Renderer{
-		Config:       NewConfig(),
-		blockStyles:  NewStyleStack(),
-		inlineStyles: NewStyleStack(),
-		currentLevel: 1,
+		Config:            NewConfig(),
+		blockStyles:       NewStyleStack(),
+		inlineStyles:      NewStyleStack(),
+		currentLevel:      1,
+		currentlySkipping: false,
 	}
 
 	for _, opt := range opts {
@@ -323,22 +335,22 @@ func (r *Renderer) levelLinesWithPrefix(prefix string, lines string, b util.BufW
 func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	// blocks
 
-	reg.Register(ast.KindDocument, r.renderDocument)
-	reg.Register(ast.KindHeading, r.renderHeading)
-	reg.Register(ast.KindBlockquote, r.renderBlockquote)
-	reg.Register(ast.KindCodeBlock, r.renderCodeBlock)
-	reg.Register(ast.KindFencedCodeBlock, r.renderFencedCodeBlock)
-	reg.Register(ast.KindHTMLBlock, r.renderHTMLBlock)
-	reg.Register(ast.KindList, r.renderList)
-	reg.Register(ast.KindListItem, r.renderListItem)
-	reg.Register(ast.KindParagraph, r.renderParagraph)
-	reg.Register(ast.KindTextBlock, r.renderTextBlock)
-	reg.Register(ast.KindThematicBreak, r.renderThematicBreak)
-	reg.Register(KindRundownBlock, r.renderRundownBlock)
-	reg.Register(KindSection, r.renderNothing)
-	reg.Register(KindSectionedDocument, r.renderNothing)
-	reg.Register(KindContainer, r.renderNothing)
-	reg.Register(KindExecutionBlock, r.renderExecutionBlock)
+	reg.Register(ast.KindDocument, r.skippable(r.renderDocument))
+	reg.Register(ast.KindHeading, r.skippable(r.renderHeading))
+	reg.Register(ast.KindBlockquote, r.skippable(r.renderBlockquote))
+	reg.Register(ast.KindCodeBlock, r.skippable(r.renderCodeBlock))
+	reg.Register(ast.KindFencedCodeBlock, r.skippable(r.renderFencedCodeBlock))
+	reg.Register(ast.KindHTMLBlock, r.skippable(r.renderHTMLBlock))
+	reg.Register(ast.KindList, r.skippable(r.renderList))
+	reg.Register(ast.KindListItem, r.skippable(r.renderListItem))
+	reg.Register(ast.KindParagraph, r.skippable(r.renderParagraph))
+	reg.Register(ast.KindTextBlock, r.skippable(r.renderTextBlock))
+	reg.Register(ast.KindThematicBreak, r.skippable(r.renderThematicBreak))
+	reg.Register(KindRundownBlock, r.skippable(r.renderRundownBlock))
+	reg.Register(KindSection, r.skippable(r.renderNothing))
+	reg.Register(KindSectionedDocument, r.skippable(r.renderNothing))
+	reg.Register(KindContainer, r.skippable(r.renderNothing))
+	reg.Register(KindExecutionBlock, r.skippable(r.renderExecutionBlock))
 
 	// inlines
 
@@ -360,6 +372,20 @@ func (r *Renderer) writeLines(w util.BufWriter, source []byte, n ast.Node) {
 	for i := 0; i < l; i++ {
 		line := n.Lines().At(i)
 		_, _ = w.Write(line.Value(source))
+	}
+}
+
+func (r *Renderer) skippable(render func(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error)) func(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	return func(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+		if _, isSection := node.(*Section); isSection {
+			r.currentlySkipping = false
+		}
+
+		if r.currentlySkipping {
+			return ast.WalkSkipChildren, nil
+		}
+
+		return render(w, source, node, entering)
 	}
 }
 
@@ -415,7 +441,22 @@ func (r *Renderer) renderRundownBlock(w util.BufWriter, source []byte, node ast.
 
 func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
-		_, _ = w.WriteString("✔ Running (Complete)\n")
+		if r.Config.RundownHandler != nil {
+			result, err := r.Config.RundownHandler.OnExecute(node.(*ExecutionBlock), source, w)
+			if err != nil {
+				return ast.WalkStop, err
+			}
+
+			switch result {
+			case Continue:
+				return ast.WalkContinue, nil
+			case Skip:
+				r.currentlySkipping = true
+				return ast.WalkSkipChildren, nil
+			case Stop:
+				return ast.WalkStop, nil
+			}
+		}
 	} else if _, ok := node.NextSibling().(*ExecutionBlock); !ok {
 		_, _ = w.WriteString("\n")
 	}
@@ -953,9 +994,6 @@ func (r *Renderer) renderImage(w util.BufWriter, source []byte, node ast.Node, e
 		return ast.WalkContinue, nil
 	}
 
-	// Currently disabled due to issues with word wrapping.
-	return ast.WalkContinue, nil
-
 	if val, set := os.LookupEnv("COLORTERM"); !set || (val != "truecolor" && val != "24bit") {
 		// Only render images when we're sure we're in truecolor mode.
 		return ast.WalkContinue, nil
@@ -963,41 +1001,35 @@ func (r *Renderer) renderImage(w util.BufWriter, source []byte, node ast.Node, e
 
 	n := node.(*ast.Image)
 	var image *ansimage.ANSImage
+	var maxWidth = r.Config.ConsoleWidth - 1 - (r.currentLevel * 2)
 
 	if urlMatch.Match(n.Destination) {
-		if i, err := ansimage.NewScaledFromURL(string(n.Destination), 40, r.Config.ConsoleWidth-5, icolor.Black, ansimage.ScaleModeFit, ansimage.NoDithering); err != nil {
+		if i, err := ansimage.NewScaledFromURL(string(n.Destination), 40, maxWidth, icolor.Black, ansimage.ScaleModeFit, ansimage.NoDithering); err != nil {
 			_, _ = w.WriteString("Error: " + err.Error())
 		} else {
 			image = i
 		}
 	} else {
-		if i, err := ansimage.NewScaledFromFile(string(n.Destination), 40, r.Config.ConsoleWidth-5, icolor.Black, ansimage.ScaleModeFit, ansimage.NoDithering); err != nil {
+		if i, err := ansimage.NewScaledFromFile(string(n.Destination), 40, maxWidth, icolor.Black, ansimage.ScaleModeFit, ansimage.NoDithering); err != nil {
 			_, _ = w.WriteString("Error: " + err.Error())
 		} else {
 			image = i
 		}
 	}
 
+	w.Flush() // Start with empty.
+
 	if image != nil {
-		w.WriteString(image.Render())
-		image.DrawExt(false, true)
+		lines := strings.Split(image.Render(), "\n")
+		for _, line := range lines {
+			w.WriteString(line + "\n")
+
+			// Must flush every line to avoid filling buffer.
+			// Otherwise WordWrapWriter gets confused by half-formed escape codes on buffer full.
+			w.Flush()
+		}
 	}
-	// _, _ = w.WriteString("<img src=\"")
-	// if !IsDangerousURL(n.Destination) {
-	// 	_, _ = w.Write(util.EscapeHTML(util.URLEscape(n.Destination, true)))
-	// }
-	// _, _ = w.WriteString(`" alt="`)
-	// _, _ = w.Write(util.EscapeHTML(n.Text(source)))
-	// _ = w.WriteByte('"')
-	// if n.Title != nil {
-	// 	_, _ = w.WriteString(` title="`)
-	// 	r.Writer.Write(w, n.Title)
-	// 	_ = w.WriteByte('"')
-	// }
-	// if n.Attributes() != nil {
-	// 	RenderAttributes(w, n, ImageAttributeFilter)
-	// }
-	// _, _ = w.WriteString(">")
+
 	return ast.WalkSkipChildren, nil
 }
 
