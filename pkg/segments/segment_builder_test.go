@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elseano/rundown/pkg/markdown"
+	"github.com/elseano/rundown/pkg/rundown"
 	"github.com/elseano/rundown/pkg/util"
 	"github.com/elseano/rundown/testutil"
 
@@ -52,7 +53,7 @@ func TestPrepareSegmentsSpacing(t *testing.T) {
 }
 
 func renderSeg(seg Segment, md goldmark.Markdown, contents []byte, logger *log.Logger) string {
-	context := &Context{
+	context := &rundown.Context{
 		Env: map[string]string{
 			"RUNDOWN": "",
 		},

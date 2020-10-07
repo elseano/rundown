@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elseano/rundown/pkg/markdown"
+	"github.com/elseano/rundown/pkg/rundown"
 	"github.com/elseano/rundown/pkg/segments"
 	"github.com/elseano/rundown/pkg/util"
 	"github.com/elseano/rundown/testutil"
@@ -104,7 +105,7 @@ func run(t *testing.T, source string) string {
 
 	var buffer bytes.Buffer
 
-	context := segments.NewContext()
+	context := rundown.NewContext()
 	context.ConsoleWidth = 80
 
 	segments.ExecuteRundown(context, result, md.Renderer(), logger, &buffer)

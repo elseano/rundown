@@ -8,6 +8,7 @@ import (
 	"github.com/go-errors/errors"
 
 	"github.com/elseano/rundown/pkg/markdown"
+	"github.com/elseano/rundown/pkg/rundown"
 	"github.com/elseano/rundown/pkg/util"
 
 	"github.com/yuin/goldmark"
@@ -132,7 +133,7 @@ func (s *SegmentList) AppendCode(fcd *ast.FencedCodeBlock) {
 		modifiers: mods,
 	}
 
-	if mods.Flags[SetupFlag] {
+	if mods.Flags[rundown.SetupFlag] {
 		segment = &SetupSegment{
 			BaseSegment: BaseSegment{
 				Level:  s.CurrentLevel(),
@@ -156,7 +157,7 @@ func (s *SegmentList) NewHeadingMarker(node *ast.Heading) *HeadingMarker {
 		parent = nil
 	}
 
-	if rundown, label := findRundownChildWithParameter(node, LabelParameter); rundown != nil {
+	if rundown, label := findRundownChildWithParameter(node, rundown.LabelParameter); rundown != nil {
 		shortcode = label
 	}
 
@@ -238,13 +239,13 @@ func PrepareSegments(source []byte, doc ast.Node, logger *log.Logger, indent int
 		} else if node.Kind() == ast.KindFencedCodeBlock {
 			list.AppendCode(node.(*ast.FencedCodeBlock))
 
-		} else if rundown, ok := node.(*markdown.RundownBlock); ok {
-			if rundown.Modifiers.Flags[OnFailureFlag] {
-				list.CurrentHeading().AppendHandler(rundown)
-			} else if _, ok := rundown.Modifiers.Values[OnFailureParameter]; ok {
-				list.CurrentHeading().AppendHandler(rundown)
-			} else if !rundown.ForCodeBlock {
-				list.AppendContent(rundown)
+		} else if rd, ok := node.(*markdown.RundownBlock); ok {
+			if rd.Modifiers.Flags[rundown.OnFailureFlag] {
+				list.CurrentHeading().AppendHandler(rd)
+			} else if _, ok := rd.Modifiers.Values[rundown.OnFailureParameter]; ok {
+				list.CurrentHeading().AppendHandler(rd)
+			} else if !rd.ForCodeBlock {
+				list.AppendContent(rd)
 			}
 		} else {
 			list.AppendContent(node)
@@ -274,13 +275,13 @@ func padSegments(segments *SegmentList) []Segment {
 		}
 
 		if lastIsCode && currentIsCode {
-			if currentCode.modifiers.Flags[RevealFlag] && !lastCode.modifiers.Flags[RevealFlag] {
+			if currentCode.modifiers.Flags[rundown.RevealFlag] && !lastCode.modifiers.Flags[rundown.RevealFlag] {
 				result = append(result, NewSeparator(currentCode.Level))
 			}
 		}
 
 		if lastIsSetup && currentIsCode {
-			if currentCode.modifiers.Flags[RevealFlag] && !lastSetup.Segment.modifiers.Flags[RevealFlag] {
+			if currentCode.modifiers.Flags[rundown.RevealFlag] && !lastSetup.Segment.modifiers.Flags[rundown.RevealFlag] {
 				result = append(result, NewSeparator(currentCode.Level))
 			}
 		}

@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
-	"github.com/elseano/rundown/internal/cli"
-	"github.com/elseano/rundown/pkg/segments"
+	"github.com/elseano/rundown/pkg/rundown"
+	"github.com/logrusorgru/aurora"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
@@ -55,26 +57,103 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	logger := cli.BuildLogger(flagDebug)
+	rd, err := rundown.LoadFile(argFilename)
+	if err != nil {
+		panic(err)
+	}
+
+	rd.SetLogger(flagDebug)
 
 	if flagCodes {
-		cli.DisplayShortCodes(argFilename, logger)
-	} else if len(argShortcodes) > 0 {
-		cli.RunShortCode(segments.NewContext(), argFilename, argShortcodes, logger)
-	} else {
-		if flagAsk {
-			cli.RunHeading(segments.NewContext(), argFilename, logger)
-		} else if flagAskRepeat {
-			context := segments.NewContext()
-			context.Repeat = true
-			context.Invocation = strings.Join(os.Args, " ")
+		shortcodes := rd.GetShortCodes()
 
-			for {
-				cli.RunHeading(context, argFilename, logger)
+		table := tablewriter.NewWriter(os.Stdout)
+		table.SetColumnAlignment([]int{tablewriter.ALIGN_RIGHT, tablewriter.ALIGN_LEFT, tablewriter.ALIGN_LEFT})
+		table.SetCenterSeparator("")
+		table.SetColumnSeparator("")
+		table.SetRowSeparator("")
+		table.SetRowLine(false)
+		table.SetHeaderLine(false)
+		table.SetBorder(false)
+		table.SetAutoWrapText(false)
+
+		list := sort.StringSlice{}
+
+		for _, code := range shortcodes {
+			list = append(list, code.Code)
+		}
+
+		list.Sort()
+
+		for _, codeName := range list {
+			code := shortcodes[codeName]
+
+			display := aurora.Bold(code.Name).String()
+			if code.Description != "" {
+				display = display + "\n" + code.Description
 			}
-		} else {
-			cli.ExecuteFile(argFilename, logger)
+
+			table.Append([]string{aurora.Bold(code.Code).String(), "", display})
+
+			sortedOptions := sort.StringSlice{}
+
+			for k := range code.Options {
+				sortedOptions = append(sortedOptions, k)
+			}
+
+			sortedOptions.Sort()
+
+			for _, optCode := range sortedOptions {
+				opt := code.Options[optCode]
+				spec := ""
+
+				if opt.Default != "" {
+					spec = spec + " (default: " + opt.Default + ")"
+				} else if opt.Required {
+					spec = spec + " (required)"
+				}
+
+				table.Append([]string{"", "+" + opt.Code + "=[" + opt.Type + "]", opt.Description + spec})
+			}
+
+			table.Append([]string{"", "", ""})
+		}
+
+		table.Render()
+	} else if len(argShortcodes) > 0 {
+		codes, err := rundown.ParseShortCodeSpecs(argShortcodes)
+		if err != nil {
+			fmt.Printf("Error: %s\n", err.Error())
+			os.Exit(1)
+		}
+
+		err = rd.RunCodes(codes)
+		if err != nil {
+			handleError(err)
+		}
+	} else {
+		err = rd.RunSequential()
+		if err != nil {
+			handleError(err)
 		}
 	}
-	fmt.Printf("\n")
+}
+
+func handleError(err error) {
+	if stopError, ok := err.(*rundown.StopError); ok {
+		if stopError.Result.IsError {
+			fmt.Printf("\n\n%s - %s in:\n\n", aurora.Bold("Error"), stopError.Result.Message)
+			for i, line := range strings.Split(strings.TrimSpace(stopError.Result.Source), "\n") {
+				fmt.Printf(aurora.Faint("%3d:").String()+" %s\n", i+1, line)
+			}
+
+			fmt.Println()
+
+			fmt.Println(stopError.Result.Output)
+			os.Exit(127)
+		}
+	}
+
+	fmt.Printf("\n\n\n%s: %s\n", aurora.Bold("Error"), err.Error())
+	os.Exit(1)
 }

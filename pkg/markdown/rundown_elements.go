@@ -425,6 +425,25 @@ type Section struct {
 
 	Label *string
 	Level int
+	Name  string
+}
+
+// Forces the section to be at Level 1, and all children are shifted accordingly.
+func (n *Section) ForceRootLevel() {
+	levelDelta := -n.Level + 1
+
+	ast.Walk(n, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+		if entering {
+			switch node.Kind() {
+			case ast.KindHeading:
+				node.(*ast.Heading).Level += levelDelta
+			case KindSection:
+				node.(*Section).Level += levelDelta
+			}
+		}
+
+		return ast.WalkContinue, nil
+	})
 }
 
 // Dump implements Node.Dump.
@@ -464,7 +483,7 @@ func (n *Section) Kind() ast.NodeKind {
 }
 
 // NewRundownBlock returns a new RundownBlock node.
-func NewSectionFromHeading(heading *ast.Heading) *Section {
+func NewSectionFromHeading(heading *ast.Heading, source []byte) *Section {
 	// Find rundown child
 	var (
 		rundown *RundownInline = nil
@@ -486,6 +505,7 @@ func NewSectionFromHeading(heading *ast.Heading) *Section {
 		BaseBlock: ast.BaseBlock{},
 		Label:     label,
 		Level:     heading.Level,
+		Name:      string(heading.Text(source)),
 		Handlers:  NewContainer("Handlers"),
 		Options:   NewContainer("Options"),
 	}
@@ -501,10 +521,6 @@ func (n *Section) appendOption(rundown RundownNode) {
 
 func (n *Section) appendDesc(rundown RundownNode) {
 	n.Description.PushBack(rundown)
-
-	// Add the Description element, as we also consider it to be part of the
-	// normal content flow.
-	n.AppendChild(n, rundown)
 }
 
 func (n *Section) appendSetup(exec *ExecutionBlock) {
@@ -526,12 +542,30 @@ func (n *Section) Append(child ast.Node) {
 			return
 		case rundown.Modifiers.HasAny("desc"):
 			n.appendDesc(rundown)
+
+			// Add the Description element, as we also consider it to be part of the
+			// normal content flow.
+			n.AppendChild(n, rundown)
+
 			return
 		}
 	} else if exec, ok := child.(*ExecutionBlock); ok {
 		if exec.Modifiers.HasAny("setup") {
 			n.appendSetup(exec)
 		}
+	} else if para, ok := child.(*ast.Paragraph); ok {
+		// Search for any embedded description nodes.
+		ast.Walk(para, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+			if entering {
+				if rd, ok := node.(*RundownInline); ok {
+					if rd.Modifiers.HasAny("desc") {
+						// Only need to add to the desc, as the parent block will be added to the tree.
+						n.appendDesc(rd)
+					}
+				}
+			}
+			return ast.WalkContinue, nil
+		})
 	}
 
 	n.AppendChild(n, child)
@@ -772,7 +806,7 @@ func (a *rundownASTTransformer) TransformSections(doc *ast.Document, reader text
 		node := nodeE.Value.(ast.Node)
 
 		if heading, ok := node.(*ast.Heading); ok {
-			section := NewSectionFromHeading(heading)
+			section := NewSectionFromHeading(heading, reader.Source())
 			toc.AddSection(section)
 
 			var parent ast.Node = doc

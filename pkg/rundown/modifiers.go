@@ -1,4 +1,4 @@
-package segments
+package rundown
 
 import (
 	"errors"
@@ -69,13 +69,13 @@ var validParameters = map[markdown.Parameter]bool{
 func ValidateModifiers(subject *markdown.Modifiers) []error {
 	result := []error{}
 
-	for key, _ := range subject.Flags {
+	for key := range subject.Flags {
 		if _, ok := validFlags[key]; !ok {
 			result = append(result, errors.New(string(key)))
 		}
 	}
 
-	for key, _ := range subject.Values {
+	for key := range subject.Values {
 		if _, ok := validParameters[key]; !ok {
 			result = append(result, errors.New(string(key)))
 		}

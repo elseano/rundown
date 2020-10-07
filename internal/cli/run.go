@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/elseano/rundown/pkg/markdown"
+	"github.com/elseano/rundown/pkg/rundown"
 	"github.com/elseano/rundown/pkg/segments"
 	"github.com/logrusorgru/aurora"
 	"github.com/urfave/cli/v2"
@@ -108,7 +109,7 @@ func DisplayShortCodes(filename string, logger *log.Logger) {
 	os.Exit(0)
 }
 
-func RunShortCode(context *segments.Context, filename string, requestedShortCodes []string, logger *log.Logger) {
+func RunShortCode(context *rundown.Context, filename string, requestedShortCodes []string, logger *log.Logger) {
 	loadedSegments := FileToSegments(filename, logger)
 
 	runAt := -1
@@ -143,14 +144,14 @@ func RunShortCode(context *segments.Context, filename string, requestedShortCode
 
 	fmt.Printf(aurora.Faint("Rundown running %s shortcodes: %s\n\n").String(), filename, strings.Join(requestedShortCodes, ", "))
 
-	result := segments.ExecuteRundown(segments.NewContext(), toRun, md.Renderer(), logger, os.Stdout)
+	result := segments.ExecuteRundown(rundown.NewContext(), toRun, md.Renderer(), logger, os.Stdout)
 	if result.IsError {
 		os.Exit(1)
 	}
 
 }
 
-func RunHeading(context *segments.Context, filename string, logger *log.Logger) {
+func RunHeading(context *rundown.Context, filename string, logger *log.Logger) {
 	loadedSegments := FileToSegments(filename, logger)
 
 	fmt.Printf(aurora.Faint("Rundown running %s\n\n").String(), filename)
@@ -170,7 +171,7 @@ func RunHeading(context *segments.Context, filename string, logger *log.Logger) 
 
 func ExecuteFile(filename string, logger *log.Logger) {
 	loadedSegments := FileToSegments(filename, logger)
-	result := segments.ExecuteRundown(segments.NewContext(), loadedSegments, md.Renderer(), logger, os.Stdout)
+	result := segments.ExecuteRundown(rundown.NewContext(), loadedSegments, md.Renderer(), logger, os.Stdout)
 	if result.IsError {
 		os.Exit(1)
 	}
@@ -218,12 +219,12 @@ func DefaultRun(c *cli.Context) error {
 	if c.Bool("codes") {
 		DisplayShortCodes(filename, logger)
 	} else if len(shortCode) > 0 {
-		RunShortCode(segments.NewContext(), filename, shortCode, logger)
+		RunShortCode(rundown.NewContext(), filename, shortCode, logger)
 	} else {
 		if c.Bool("ask") {
-			RunHeading(segments.NewContext(), filename, logger)
+			RunHeading(rundown.NewContext(), filename, logger)
 		} else if c.Bool("ask-repeat") {
-			context := segments.NewContext()
+			context := rundown.NewContext()
 			context.Repeat = true
 			context.Invocation = strings.Join(os.Args, " ")
 

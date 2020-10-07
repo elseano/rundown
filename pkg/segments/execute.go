@@ -16,6 +16,7 @@ import (
 
 	// "strings"
 
+	"github.com/elseano/rundown/pkg/rundown"
 	"github.com/logrusorgru/aurora"
 	"github.com/yuin/goldmark/renderer"
 )
@@ -72,7 +73,7 @@ func receiveLoop(filename string, messages chan<- string, logger *log.Logger) {
 	}
 }
 
-func ExecuteRundown(context *Context, rundown []Segment, renderer renderer.Renderer, logger *log.Logger, out io.Writer) ExecutionResult {
+func ExecuteRundown(context *rundown.Context, rundownSegs []Segment, renderer renderer.Renderer, logger *log.Logger, out io.Writer) rundown.ExecutionResult {
 	// Using a buffered channel allows us to capture all messages correctly. Unsure how to test that reliably though.
 	messages := make(chan string, 200)
 
@@ -103,7 +104,7 @@ func ExecuteRundown(context *Context, rundown []Segment, renderer renderer.Rende
 	var lastSegment Segment
 	var currentHeading *HeadingMarker = nil
 
-	for _, segment := range rundown {
+	for _, segment := range rundownSegs {
 		if skipToHeading {
 			if _, ok := segment.(*HeadingMarker); !ok {
 				continue
@@ -113,7 +114,7 @@ func ExecuteRundown(context *Context, rundown []Segment, renderer renderer.Rende
 			skipToHeading = false
 		}
 
-		var result ExecutionResult
+		var result rundown.ExecutionResult
 
 		// Ensure all prerequisites have been run, when running via shortcodes.
 		if segment.Kind() == "HeadingMarker" {
@@ -140,12 +141,12 @@ func ExecuteRundown(context *Context, rundown []Segment, renderer renderer.Rende
 
 		lastSegment = segment
 
-		if result == SkipToNextHeading {
+		if result == rundown.SkipToNextHeading {
 			logger.Printf("Block returned SkipToNextHeading")
 			skipToHeading = true
-		} else if result == SuccessfulExecution {
+		} else if result == rundown.SuccessfulExecution {
 			logger.Printf("Block returned SuccessfulExecution")
-		} else if result == StopOkResult || result == StopFailResult {
+		} else if result == rundown.StopOkResult || result == rundown.StopFailResult {
 			os.RemoveAll(tmpDir)
 			return result
 		} else { // Error
@@ -167,5 +168,5 @@ func ExecuteRundown(context *Context, rundown []Segment, renderer renderer.Rende
 	}
 
 	os.RemoveAll(tmpDir)
-	return SuccessfulExecution
+	return rundown.SuccessfulExecution
 }

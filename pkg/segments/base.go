@@ -8,37 +8,16 @@ import (
 	"strings"
 
 	"github.com/elseano/rundown/pkg/markdown"
+	"github.com/elseano/rundown/pkg/rundown"
+	rd "github.com/elseano/rundown/pkg/rundown"
 	"github.com/elseano/rundown/pkg/util"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/renderer"
 )
 
-type ExecutionResult struct {
-	Message string
-	Kind    string
-	Source  string
-	Output  string
-	IsError bool
-}
-
-var (
-	SuccessfulExecution = ExecutionResult{Kind: "Success", IsError: false}
-	SkipToNextHeading   = ExecutionResult{Kind: "Skip", IsError: false}
-	StopFailResult      = ExecutionResult{Kind: "Stop", IsError: true}
-	StopOkResult        = ExecutionResult{Kind: "Stop", IsError: false}
-)
-
-type StopError struct {
-	Result ExecutionResult
-}
-
-func (e *StopError) Error() string {
-	return e.Result.Message
-}
-
 type Segment interface {
 	fmt.Stringer
-	Execute(c *Context, renderer renderer.Renderer, lastSegment Segment, logger *log.Logger, out io.Writer) ExecutionResult
+	Execute(c *rundown.Context, renderer renderer.Renderer, lastSegment Segment, logger *log.Logger, out io.Writer) rundown.ExecutionResult
 	Kind() string
 	GetLevel() int
 	DeLevel(amount int)
@@ -50,14 +29,14 @@ type Segment interface {
 
 type RundownHandler struct {
 	markdown.RundownHandler
-	ctx *Context
+	ctx *rundown.Context
 }
 
 func (v *RundownHandler) Mutate(input []byte, node ast.Node) ([]byte, error) {
 	rundown := node.(markdown.RundownNode)
 
-	if rundown.GetModifiers().Flags[EnvAwareFlag] {
-		result, err := SubEnv(string(input), v.ctx)
+	if rundown.GetModifiers().Flags[rd.EnvAwareFlag] {
+		result, err := rd.SubEnv(string(input), v.ctx)
 
 		if err != nil {
 			return input, err
@@ -72,12 +51,12 @@ func (v *RundownHandler) Mutate(input []byte, node ast.Node) ([]byte, error) {
 func (v *RundownHandler) OnRundownNode(node ast.Node, entering bool) error {
 	if !entering {
 		if rundown, ok := node.(*markdown.RundownBlock); ok {
-			if rundown.GetModifiers().Flags[StopOkFlag] {
-				return &StopError{Result: StopOkResult}
+			if rundown.GetModifiers().Flags[rd.StopOkFlag] {
+				return &rd.StopError{Result: rd.StopOkResult}
 			}
 
-			if rundown.GetModifiers().Flags[StopFailFlag] {
-				return &StopError{Result: StopFailResult}
+			if rundown.GetModifiers().Flags[rd.StopFailFlag] {
+				return &rd.StopError{Result: rd.StopFailResult}
 			}
 		}
 	}
@@ -85,7 +64,7 @@ func (v *RundownHandler) OnRundownNode(node ast.Node, entering bool) error {
 	return nil
 }
 
-func NewRundownHandler(ctx *Context) *RundownHandler {
+func NewRundownHandler(ctx *rundown.Context) *RundownHandler {
 	return &RundownHandler{
 		ctx: ctx,
 	}
@@ -137,7 +116,7 @@ func renderNodes(renderer renderer.Renderer, nodes []ast.Node, source []byte, ou
 	return nil
 }
 
-func (c *BaseSegment) Execute(ctx *Context, renderer renderer.Renderer, lastSegment Segment, logger *log.Logger, out io.Writer) ExecutionResult {
+func (c *BaseSegment) Execute(ctx *rundown.Context, renderer renderer.Renderer, lastSegment Segment, logger *log.Logger, out io.Writer) rundown.ExecutionResult {
 	// We can't change options on a renderer after it's rendered something
 	// so we always use a fresh renderer.
 	subRenderer := markdown.PrepareMarkdown().Renderer()
@@ -159,11 +138,11 @@ func (c *BaseSegment) Execute(ctx *Context, renderer renderer.Renderer, lastSegm
 	})
 
 	if err := renderNodes(subRenderer, c.Nodes, *c.Source, www); err != nil {
-		if er, ok := err.(*StopError); ok {
+		if er, ok := err.(*rd.StopError); ok {
 			return er.Result
 		}
 
-		return ExecutionResult{
+		return rd.ExecutionResult{
 			Message: err.Error(),
 			Kind:    "Error",
 			Source:  "",
@@ -172,7 +151,7 @@ func (c *BaseSegment) Execute(ctx *Context, renderer renderer.Renderer, lastSegm
 		}
 	}
 
-	return SuccessfulExecution
+	return rd.SuccessfulExecution
 }
 
 func (s *BaseSegment) String() string {

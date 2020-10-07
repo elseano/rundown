@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/elseano/rundown/pkg/markdown"
+	"github.com/elseano/rundown/pkg/rundown"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/renderer"
 )
@@ -28,9 +29,9 @@ func (s *Separator) String() string {
 
 func (c *Separator) Kind() string { return "Separator" }
 
-func (c *Separator) Execute(ctx *Context, renderer renderer.Renderer, lastSegment Segment, logger *log.Logger, out io.Writer) ExecutionResult {
+func (c *Separator) Execute(ctx *rundown.Context, renderer renderer.Renderer, lastSegment Segment, logger *log.Logger, out io.Writer) rundown.ExecutionResult {
 	out.Write([]byte("\r\n"))
-	return SuccessfulExecution
+	return rundown.SuccessfulExecution
 }
 
 type SetupSegment struct {
@@ -53,12 +54,12 @@ func (s *SetupSegment) String() string {
 
 func (c *SetupSegment) Kind() string { return "SetupSegment" }
 
-func (c *SetupSegment) Execute(ctx *Context, renderer renderer.Renderer, lastSegment Segment, logger *log.Logger, out io.Writer) ExecutionResult {
+func (c *SetupSegment) Execute(ctx *rundown.Context, renderer renderer.Renderer, lastSegment Segment, logger *log.Logger, out io.Writer) rundown.ExecutionResult {
 	if !c.HasRun {
 		c.HasRun = true
 		return c.Segment.Execute(ctx, renderer, lastSegment, logger, out)
 	} else {
-		return SuccessfulExecution
+		return rundown.SuccessfulExecution
 	}
 }
 
@@ -103,14 +104,14 @@ func NewHeadingMarker(node ast.Node, source []byte, parent *HeadingMarker) *Head
 	var shortcode string = ""
 
 	// Is the first child a rundown block? Might be a label.
-	if rundown, ok := node.NextSibling().(*markdown.RundownBlock); ok {
-		if label, ok := rundown.Modifiers.Values[LabelParameter]; ok {
+	if rd, ok := node.NextSibling().(*markdown.RundownBlock); ok {
+		if label, ok := rd.Modifiers.Values[rundown.LabelParameter]; ok {
 			shortcode = label
 		}
 	}
 
 	// Otherwise, is there a rundown label specified in the heading?
-	if rundown, label := findRundownChildWithParameter(node, LabelParameter); rundown != nil {
+	if rundown, label := findRundownChildWithParameter(node, rundown.LabelParameter); rundown != nil {
 		shortcode = label
 	}
 
@@ -128,10 +129,10 @@ func NewHeadingMarker(node ast.Node, source []byte, parent *HeadingMarker) *Head
 	}
 
 	if desc, ok := node.NextSibling().(*ast.Paragraph); ok {
-		if rundown := findRundownChildWithFlag(desc, DescriptionFlag); rundown != nil {
+		if rundown := findRundownChildWithFlag(desc, rundown.DescriptionFlag); rundown != nil {
 			currentHeading.Description = string(rundown.Text(source))
 		}
-	} else if rundown, desc := findRundownParameter(node.NextSibling(), DescriptionParameter); rundown != nil {
+	} else if rundown, desc := findRundownParameter(node.NextSibling(), rundown.DescriptionParameter); rundown != nil {
 		currentHeading.Description = desc
 	}
 
@@ -161,8 +162,8 @@ func (s *HeadingMarker) AppendSetup(setup *SetupSegment) {
 
 func (c *HeadingMarker) Kind() string { return "HeadingMarker" }
 
-func (c *HeadingMarker) RunSetups(ctx *Context, renderer renderer.Renderer, lastSegment Segment, logger *log.Logger, out io.Writer) (ExecutionResult, int) {
-	var result ExecutionResult
+func (c *HeadingMarker) RunSetups(ctx *rundown.Context, renderer renderer.Renderer, lastSegment Segment, logger *log.Logger, out io.Writer) (rundown.ExecutionResult, int) {
+	var result rundown.ExecutionResult
 	var count = 0
 
 	if c.ParentHeading != nil {
@@ -183,12 +184,12 @@ func (c *HeadingMarker) RunSetups(ctx *Context, renderer renderer.Renderer, last
 		}
 	}
 
-	return SuccessfulExecution, count
+	return rundown.SuccessfulExecution, count
 }
 
-func (c *HeadingMarker) RunHandlers(errorText string, ctx *Context, renderer renderer.Renderer, lastSegment Segment, logger *log.Logger, out io.Writer) ExecutionResult {
+func (c *HeadingMarker) RunHandlers(errorText string, ctx *rundown.Context, renderer renderer.Renderer, lastSegment Segment, logger *log.Logger, out io.Writer) rundown.ExecutionResult {
 	for _, h := range c.Handlers {
-		if match, ok := h.Mods.Values[OnFailureParameter]; ok {
+		if match, ok := h.Mods.Values[rundown.OnFailureParameter]; ok {
 			r, cerr := regexp.Compile(match)
 			if cerr == nil {
 				if r.MatchString(errorText) {
@@ -200,7 +201,7 @@ func (c *HeadingMarker) RunHandlers(errorText string, ctx *Context, renderer ren
 		}
 	}
 
-	return SuccessfulExecution
+	return rundown.SuccessfulExecution
 }
 
 func (c *HeadingMarker) DeLevel(amount int) {

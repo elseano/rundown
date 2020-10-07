@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/elseano/rundown/pkg/rundown"
 	"github.com/elseano/rundown/pkg/util"
 
 	"github.com/kyokomi/emoji"
@@ -12,7 +13,6 @@ import (
 	gast "github.com/yuin/goldmark/ast"
 
 	"github.com/elseano/rundown/pkg/markdown"
-	"github.com/elseano/rundown/pkg/segments"
 	"github.com/yuin/goldmark/text"
 
 	"github.com/olekukonko/tablewriter"
@@ -38,17 +38,15 @@ var checkCmd = &cobra.Command{
 func checkExec(cmd *cobra.Command, args []string) {
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"TYPE", "MESSAGE", "SUBJECT", "CONTEXT"})
 
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetColumnAlignment([]int{tablewriter.ALIGN_LEFT, tablewriter.ALIGN_LEFT, tablewriter.ALIGN_LEFT})
-	// table.SetCenterSeparator("  ")
-	// table.SetColumnSeparator("  ")
-	table.SetRowSeparator(".")
-	table.SetRowLine(true)
-	table.SetHeaderLine(true)
+	table.SetCenterSeparator("")
+	table.SetColumnSeparator("")
+	table.SetRowSeparator("")
+	table.SetRowLine(false)
+	table.SetHeaderLine(false)
 	table.SetBorder(false)
-	// table.SetColumnSeparator("")
+	table.SetAutoWrapText(false)
 
 	md := markdown.PrepareMarkdown()
 	b, _ := ioutil.ReadFile(argFilename)
@@ -72,20 +70,20 @@ func checkExec(cmd *cobra.Command, args []string) {
 			}
 		}
 
-		if rundown, ok := node.(markdown.RundownNode); ok {
+		if rd, ok := node.(markdown.RundownNode); ok {
 
 			// Ensure labels are unique
-			if label, ok := rundown.GetModifiers().Values[segments.LabelParameter]; ok {
+			if label, ok := rd.GetModifiers().Values[rundown.LabelParameter]; ok {
 				if _, set := existingLabels[label]; set {
-					table.Append([]string{"ERROR", "Label already in use", label, util.NodeLines(rundown, b)})
+					table.Append([]string{"ERROR", "Label already in use", label, util.NodeLines(rd, b)})
 				}
 
 				existingLabels[label] = true
 			}
 
 			// Find invalid modifiers
-			for _, err := range segments.ValidateModifiers(rundown.GetModifiers()) {
-				table.Append([]string{"ERROR", "Unknown rundown attribute", err.Error(), util.NodeLines(rundown, b)})
+			for _, err := range rundown.ValidateModifiers(rd.GetModifiers()) {
+				table.Append([]string{"ERROR", "Unknown rundown attribute", err.Error(), util.NodeLines(rd, b)})
 			}
 		}
 

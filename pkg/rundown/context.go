@@ -1,10 +1,16 @@
-package segments
+package rundown
 
 import (
+	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
 	"regexp"
 	"strings"
+	"syscall"
 
 	"golang.org/x/crypto/ssh/terminal"
 )
@@ -17,6 +23,7 @@ type Context struct {
 	Repeat          bool
 	Invocation      string
 	ConsoleWidth    int
+	Logger          *log.Logger
 }
 
 func intMin(a, b int) int {
@@ -35,12 +42,57 @@ func getConsoleWidth() int {
 	return width
 }
 
+func receiveLoop(filename string, messages chan<- string) {
+
+	os.Remove(filename)
+	err := syscall.Mkfifo(filename, 0666)
+	if err != nil {
+		return
+	}
+
+	// RDWR so it doesn't block on opening.
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, os.ModeNamedPipe)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	reader := bufio.NewReader(file)
+
+	for {
+		line, err := reader.ReadBytes('\n')
+		if err != nil {
+			return
+		}
+
+		messages <- string(bytes.TrimRight(line, "\r\n"))
+	}
+}
+
 func NewContext() *Context {
+	messages := make(chan string, 200)
+
+	tmpDir, err := ioutil.TempDir("", "rundown")
+	if err != nil {
+		panic(err)
+	}
+	os.MkdirAll(tmpDir, 0644)
+
+	tmpFile, err := ioutil.TempFile(tmpDir, "rpc-*")
+	if err != nil {
+		panic(err)
+	}
+	tmpFile.Close()
+
+	go receiveLoop(tmpFile.Name(), messages)
+
 	return &Context{
-		Env:             map[string]string{},
+		Env:             map[string]string{"RUNDOWN": tmpFile.Name()},
 		ForcedLevelZero: false,
 		Repeat:          false,
 		ConsoleWidth:    intMin(getConsoleWidth(), 120),
+		Messages:        messages,
+		TempDir:         tmpDir,
 	}
 }
 
@@ -51,6 +103,10 @@ func (c *Context) SetEnvString(envString string) {
 
 func (c *Context) SetEnv(key, value string) {
 	c.Env[key] = value
+}
+
+func (c *Context) RemoveEnv(key string) {
+	delete(c.Env, key)
 }
 
 func (c *Context) EnvStringList() []string {
