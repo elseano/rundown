@@ -427,9 +427,10 @@ type Section struct {
 	Description list.List // Description is a list as we want to keep it inside the DOM.
 	Setups      list.List // Setups is a list to keep them in the DOM too.
 
-	Label *string
-	Level int
-	Name  string
+	Label        *string
+	FunctionName *string
+	Level        int
+	Name         string
 }
 
 // Forces the section to be at Level 1, and all children are shifted accordingly.
@@ -457,15 +458,21 @@ func (n *Section) Dump(source []byte, level int) {
 		label = *n.Label
 	}
 
+	functionName := "(not set)"
+	if n.FunctionName != nil {
+		functionName = *n.FunctionName
+	}
+
 	descList := []string{}
 	for descE := n.Description.Front(); descE != nil; descE = descE.Next() {
 		descList = append(descList, string(descE.Value.(ast.Node).Text(source)))
 	}
 
 	ast.DumpHelper(n, source, level, map[string]string{
-		"Level":       fmt.Sprintf("%d", n.Level),
-		"Label":       fmt.Sprintf("%s", label),
-		"Description": fmt.Sprintf("%#v", descList),
+		"Level":        fmt.Sprintf("%d", n.Level),
+		"Label":        fmt.Sprintf("%s", label),
+		"FunctionName": fmt.Sprintf("%s", functionName),
+		"Description":  fmt.Sprintf("%#v", descList),
 	}, func(subLevel int) {
 		n.Handlers.Dump(source, subLevel)
 		n.Options.Dump(source, subLevel)
@@ -490,8 +497,9 @@ func (n *Section) Kind() ast.NodeKind {
 func NewSectionFromHeading(heading *ast.Heading, source []byte) *Section {
 	// Find rundown child
 	var (
-		rundown *RundownInline = nil
-		label   *string
+		rundown      *RundownInline = nil
+		label        *string
+		functionName *string
 	)
 
 	for child := heading.FirstChild(); child != nil; child = child.NextSibling() {
@@ -505,13 +513,18 @@ func NewSectionFromHeading(heading *ast.Heading, source []byte) *Section {
 		label = rundown.Modifiers.GetValue(Parameter("label"))
 	}
 
+	if rundown != nil {
+		functionName = rundown.Modifiers.GetValue(Parameter("func"))
+	}
+
 	return &Section{
-		BaseBlock: ast.BaseBlock{},
-		Label:     label,
-		Level:     heading.Level,
-		Name:      string(heading.Text(source)),
-		Handlers:  NewContainer("Handlers"),
-		Options:   NewContainer("Options"),
+		BaseBlock:    ast.BaseBlock{},
+		Label:        label,
+		FunctionName: functionName,
+		Level:        heading.Level,
+		Name:         string(heading.Text(source)),
+		Handlers:     NewContainer("Handlers"),
+		Options:      NewContainer("Options"),
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/yuin/goldmark/ast"
 
@@ -46,6 +47,65 @@ func (v *rundownHandler) OnRundownNode(node ast.Node, entering bool) error {
 
 			if rundown.GetModifiers().Flags[StopFailFlag] {
 				return &StopError{Result: StopFailResult}
+			}
+
+			if setEnv, ok := rundown.GetModifiers().Flags[markdown.Flag("set-env")]; setEnv && ok {
+				for k, val := range rundown.GetModifiers().Values {
+					envName := strings.ReplaceAll(strings.ToUpper(string(k)), "-", "_")
+					v.ctx.SetEnv(envName, val)
+				}
+			}
+
+			if rundown.GetModifiers().HasAny("invoke") {
+				source := rundown.GetModifiers().GetValue("from")
+
+				if source == nil {
+					source = &v.ctx.CurrentFile
+				}
+
+				name := rundown.GetModifiers().GetValue("invoke")
+				if name == nil {
+					return errors.New("Invoke requires a ShortCode value")
+				}
+
+				rd, err := LoadFile(*source)
+				if err != nil {
+					return err
+				}
+
+				if info := rd.GetShortCodes().Functions[*name]; info != nil {
+					section := info.Section
+
+					mods := markdown.NewModifiers()
+					mods.Flags[markdown.Flag("set-env")] = true
+
+					for k, v := range rundown.GetModifiers().Values {
+						if strings.HasPrefix(string(k), "opt-") {
+							mods.Values[k] = v
+						}
+					}
+
+					// Create a rundown block which sets the environment to the invoke options.
+					envNode := markdown.NewRundownBlock(mods)
+
+					node.Parent().InsertAfter(node.Parent(), node, section)
+
+					// Remove the heading when invoking functions, unless we specify we want to keep the heading
+					if keepHeading, specified := mods.Flags[markdown.Flag("keep-heading")]; keepHeading == false || !specified {
+						section.RemoveChild(section, section.FirstChild())
+					}
+
+					// Add the environment setting. FIXME - We should nest the Section inside this node to wrap the context.
+					section.InsertBefore(section, section.FirstChild(), envNode)
+				} else {
+					// ShortCode not found in file.
+					if flag, ok := rundown.GetModifiers().Flags["ignore-missing"]; flag && ok {
+						return nil
+					}
+
+					return errors.New("Cannot find " + *name + " in " + *source)
+				}
+
 			}
 		}
 	}

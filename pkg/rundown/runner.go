@@ -17,6 +17,12 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
+type DocumentShortCodes struct {
+	Codes     map[string]*ShortCodeInfo
+	Order     []string
+	Functions map[string]*ShortCodeInfo
+}
+
 type ShortCodeOption struct {
 	Code        string
 	Type        string
@@ -26,11 +32,12 @@ type ShortCodeOption struct {
 }
 
 type ShortCodeInfo struct {
-	Code        string
-	Name        string
-	Description string
-	Options     map[string]*ShortCodeOption
-	Section     *markdown.Section
+	Code         string
+	FunctionName string
+	Name         string
+	Description  string
+	Options      map[string]*ShortCodeOption
+	Section      *markdown.Section
 }
 
 type ShortCodeSpec struct {
@@ -44,14 +51,24 @@ type ShortCodeOptionSpec struct {
 }
 
 func BuildShortCodeInfo(section *markdown.Section, source []byte) *ShortCodeInfo {
-	if section.Label == nil {
+	if section.Label == nil && section.FunctionName == nil {
 		return nil
 	}
 
 	var (
 		shortCodeDescription = ""
 		options              = map[string]*ShortCodeOption{}
+		labelStr             = ""
+		functionNameStr      = ""
 	)
+
+	if section.Label != nil {
+		labelStr = *section.Label
+	}
+
+	if section.FunctionName != nil {
+		functionNameStr = *section.FunctionName
+	}
 
 	for descE := section.Description.Front(); descE != nil; descE = descE.Next() {
 		desc := descE.Value.(markdown.RundownNode)
@@ -78,11 +95,12 @@ func BuildShortCodeInfo(section *markdown.Section, source []byte) *ShortCodeInfo
 	}
 
 	return &ShortCodeInfo{
-		Code:        strings.TrimSpace(*section.Label),
-		Name:        strings.TrimSpace(section.Name),
-		Description: strings.TrimSpace(shortCodeDescription),
-		Options:     options,
-		Section:     section,
+		Code:         strings.TrimSpace(labelStr),
+		FunctionName: strings.TrimSpace(functionNameStr),
+		Name:         strings.TrimSpace(section.Name),
+		Description:  strings.TrimSpace(shortCodeDescription),
+		Options:      options,
+		Section:      section,
 	}
 }
 
@@ -112,6 +130,7 @@ func (r *Runner) getEngine() (goldmark.Markdown, *util.WordWrapWriter, *Context)
 	renderer := md.Renderer()
 	ctx := NewContext()
 	ctx.Logger = r.logger
+	ctx.CurrentFile = r.filename
 
 	currentLevel := 0
 
@@ -144,20 +163,22 @@ func (r *Runner) getAST(md goldmark.Markdown) (ast.Node, []byte) {
 	return doc, bytes
 }
 
-type DocumentShortCodes struct {
-	Codes map[string]*ShortCodeInfo
-	Order []string
-}
-
 func (d *DocumentShortCodes) Append(info *ShortCodeInfo) {
-	d.Codes[info.Code] = info
-	d.Order = append(d.Order, info.Code)
+	if info.Code != "" {
+		d.Codes[info.Code] = info
+		d.Order = append(d.Order, info.Code)
+	}
+
+	if info.FunctionName != "" {
+		d.Functions[info.FunctionName] = info
+	}
 }
 
 func NewDocumentShortCodes() *DocumentShortCodes {
 	return &DocumentShortCodes{
-		Codes: map[string]*ShortCodeInfo{},
-		Order: []string{},
+		Codes:     map[string]*ShortCodeInfo{},
+		Order:     []string{},
+		Functions: map[string]*ShortCodeInfo{},
 	}
 }
 

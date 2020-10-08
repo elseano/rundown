@@ -1,18 +1,19 @@
 package rundown
 
 type ExecutionResult struct {
-	Message string
-	Kind    string
-	Source  string
-	Output  string
-	IsError bool
+	Message   string
+	Kind      string
+	Source    string
+	Output    string
+	IsError   bool
+	FocusLine int
 }
 
 var (
-	SuccessfulExecution = ExecutionResult{Kind: "Success", IsError: false}
-	SkipToNextHeading   = ExecutionResult{Kind: "Skip", IsError: false}
-	StopFailResult      = ExecutionResult{Kind: "Stop", IsError: true}
-	StopOkResult        = ExecutionResult{Kind: "Stop", IsError: false}
+	SuccessfulExecution = ExecutionResult{Kind: "Success", IsError: false, FocusLine: -1}
+	SkipToNextHeading   = ExecutionResult{Kind: "Skip", IsError: false, FocusLine: -1}
+	StopFailResult      = ExecutionResult{Kind: "Stop", IsError: true, FocusLine: -1}
+	StopOkResult        = ExecutionResult{Kind: "Stop", IsError: false, FocusLine: -1}
 )
 
 type StopError struct {

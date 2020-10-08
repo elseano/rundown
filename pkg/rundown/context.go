@@ -24,6 +24,7 @@ type Context struct {
 	Invocation      string
 	ConsoleWidth    int
 	Logger          *log.Logger
+	CurrentFile     string
 }
 
 func receiveLoop(filename string, messages chan<- string) {

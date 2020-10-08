@@ -425,15 +425,16 @@ func (r *Renderer) renderNothing(w util.BufWriter, source []byte, node ast.Node,
 func (r *Renderer) renderRundownBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	rundown := node.(*RundownBlock)
 
-	if rundown.Modifiers.Flags[Flag("ignore")] == true {
-		return ast.WalkSkipChildren, nil
-	}
-
 	if r.Config.RundownHandler != nil {
 		err := r.Config.RundownHandler.OnRundownNode(node, entering)
 		if err != nil {
 			return ast.WalkStop, err
 		}
+	}
+
+	// We don't render function/shortcode option contents, thats for reading only.
+	if rundown.Modifiers.HasAny("ignore", "opt") {
+		return ast.WalkSkipChildren, nil
 	}
 
 	return ast.WalkContinue, nil

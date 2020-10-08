@@ -45,4 +45,5 @@ Now we can reference that later.
 ``` bash stdout reveal nospin
 echo $SOMEVAL
 echo $MODE
+echo "We're all done"
 ```

@@ -358,12 +358,19 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 			} else if modifiers.Flags[SkipOnSuccessFlag] || modifiers.Flags[IgnoreFailureFlag] {
 				return SuccessfulExecution
 			} else {
+				fl := -1
+
+				if f, ok := DetectErrorLine(filename, captureBuffer.String()); ok {
+					fl = f
+				}
+
 				return ExecutionResult{
-					Message: we.String(),
-					Kind:    "Error",
-					Source:  contents,
-					Output:  strings.ReplaceAll(captureBuffer.String(), filename, "SCRIPT"),
-					IsError: true,
+					Message:   we.String(),
+					Kind:      "Error",
+					Source:    contents,
+					Output:    strings.ReplaceAll(captureBuffer.String(), filename, "SCRIPT"),
+					FocusLine: fl,
+					IsError:   true,
 				}
 			}
 		} else {
