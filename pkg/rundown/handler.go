@@ -118,6 +118,18 @@ func (v *rundownHandler) OnRundownNode(node ast.Node, entering bool) (ast.WalkSt
 
 					node.Parent().InsertAfter(node.Parent(), node, section)
 
+					// Adjust the section contents to be relative to the current level.
+					parentSection := node.Parent()
+					for {
+						if _, ok := parentSection.(*markdown.Section); ok {
+							break
+						}
+
+						parentSection = parentSection.Parent()
+					}
+
+					section.ForceLevel(parentSection.(*markdown.Section).Level)
+
 					// Remove the heading when invoking functions, unless we specify we want to keep the heading
 					if keepHeading, specified := mods.Flags[markdown.Flag("keep-heading")]; keepHeading == false || !specified {
 						section.RemoveChild(section, section.FirstChild())

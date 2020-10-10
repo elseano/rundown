@@ -103,4 +103,59 @@ For example:
 
 When you execute `rundown README.md compile`, rundown will first execute the parent heading's ("Build Project") `setup` code blocks.
 
+### Options
+
+Shortcodes support options, which are variables you can pass into your rundown scripts. Passing options into Rundown is done via the command line:
+
+``` bash norun reveal
+rundown README.md shortcode +option="Value"
+```
+
+Options always come after the shortcode, must be prefixed with a `+` symbol, and must be of the format key=value. Option tags are ignored unless they specify `opt`, `type` and `desc`.
+
+    ## Compile <r label=build/>
+
+    <r opt="arch" type="string" required default="linux" desc="Specify the architecture"/>
+
+    ``` bash
+    GO_ARCH=$OPT_ARCH go build -o rundown
+    ```
+
+To invoke this:
+
+``` bash reveal norun
+rundown README.md build +arch=linux
+```
+
 More examples can be found in the [Shortcodes Example](./examples/shortcodes.md) markdown file.
+
+## Functions <r label=functions/>
+
+While Shortcodes allow users to jump to certain points of your document, **Functions** allow authors to pull in functionality from elsewhere in the document, or even another document entirely.
+
+This can serve to clean up read-throughs of your rundown documents, as well as provide a modules-like functionality to larger Rundown scripts.
+
+### Defining a function
+
+A function is defined similiarly to shortcodes, via the `Heading`:
+
+~~~ markdown reveal norun
+# Wait for Status <r func="k8s:wait"/>
+
+<r opt="condition" type="string" default="ready" required desc="The condition to wait for"/>
+<r opt="app-name" type="string" required desc="The name of the app"/>
+
+Waiting for app <r sub-env>$OPT_APP_NAME</r> to have condition of <r sub-env>`$OPT_CONDITION`</r>.
+
+``` bash spinner:"Waiting..."
+kubectl wait --for=condition=$OPT_CONDITION pod -l app=$OPT_APP_NAME
+```
+~~~
+
+A function can then be invoked using the `invoke` attribute on the rundown tag. The contents of the rundown tag will be displayed for readers, but rundown will instead display the function's contents.
+
+``` markdown reveal norun
+<r invoke="k8s:wait" opt-app-name="my-cool-app">Then wait for your pods to be ready</r>
+```
+
+More examples can be found in the [Functions Example](./examples/functions.md) markdown file.

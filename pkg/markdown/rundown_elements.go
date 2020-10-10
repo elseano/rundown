@@ -451,6 +451,27 @@ func (n *Section) ForceRootLevel() {
 	})
 }
 
+// Shifts to Root Level, and then adds the given Level to all.
+func (n *Section) ForceLevel(newLevel int) {
+	n.ForceRootLevel()
+
+	// Because root level is level 1
+	levelDelta := newLevel - 1
+
+	ast.Walk(n, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+		if entering {
+			switch node.Kind() {
+			case ast.KindHeading:
+				node.(*ast.Heading).Level += levelDelta
+			case KindSection:
+				node.(*Section).Level += levelDelta
+			}
+		}
+
+		return ast.WalkContinue, nil
+	})
+}
+
 // Dump implements Node.Dump.
 func (n *Section) Dump(source []byte, level int) {
 	label := "(not set)"

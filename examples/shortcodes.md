@@ -61,18 +61,44 @@ In the above, if we run the `deploy-proxies` shortcode directly, the preceding `
 
 Structure your setup blocks to ensure that subsequent scripts fail for the right reason. For example, you probably don't want to install anything in a setup script, but you might want to verify something is installed.
 
+## Shortcode arguments
+
+Shortcodes can accept arguments when invoked from the command line. Here's a shortcode which defines 3 arguments:
+
+~~~ markdown reveal norun
 # Wait for Activity Complete <r label="wait-complete"/>
 
 <r desc>Waits for something to be complete, while showing progress</r>
 <r opt="name" type="string" required desc="The name of the object to wait for"/>
 <r opt="status" type="string" default="complete" desc="The status to wait for"/>
-<r opt="type" type="string" default="any" desc="The type of object to wait on if there's potential for a conflict"/>
+<r opt="type" type="string" default="any" desc="The type of object"/>
 
 * Name: <r sub-env>$OPT_NAME</r>
 * Status: <r sub-env>$OPT_STATUS</r>
 * Type: <r sub-env>$OPT_TYPE</r>
 
 Done.
+~~~
+
+The shortcode options are documented:
+
+```
+$ rundown README.md --help
+
+Supported options for README.md
+
+  wait-complete         Wait for Activity Complete 
+                        Waits for something to be complete, while showing progress                    
+                          +name=[string]   - The name of the object to wait for (required)
+                          +status=[string] - The status to wait for (default: complete)
+                          +type=[string]   - The type of object (default: any)
+```
+
+And the shortcode would be invoked like this:
+
+``` bash
+rundown README.md wait-complete +name="Cool Bro"
+```
 
 ## Subtask
 
