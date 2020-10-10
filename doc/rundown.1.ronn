@@ -6,17 +6,20 @@ rundown(1) -- Execute markdown files
 
 ## DESCRIPTION
 
-Rundown is a terminal application which turns Markdown into executable code, rendering the contents into the console as it progresses.
+Rundown is a terminal application which turns Markdown into executable code, rendering the contents into the 
+console as it progresses.
 
-As Rundown emphasises keeping the markdown still readable as a document, it's a great way to produce executable documentation. 
-Some of the usecases rundown suits are:
+As Rundown emphasises keeping the markdown still readable as a document, it's a great way to produce executable 
+documentation. Some of the usecases rundown suits are:
 
 * Automated setup guides
 * Tutorials
 * Code building scripts
 * Simple programs
 
-Rundown will run markdown perfectly fine. As your rundown files get more complex, you'll want to start using the rundown extensions. Rundown's extensions are transparent additions to the markdown format which aren't rendered by standard markdown renderers (i.e. Github, etc), meaning a reader won't even notice the additions. 
+Rundown will run markdown perfectly fine. As your rundown files get more complex, you'll want to start using the 
+rundown extensions. Rundown's extensions are transparent additions to the markdown format which aren't rendered 
+by standard markdown renderers (i.e. Github, etc), meaning a reader won't even notice the additions. 
 
 For more details on the rundown format, see rundown(7).
 
@@ -24,23 +27,57 @@ For more details on the rundown format, see rundown(7).
 
 Commands are optional. If you don't specify a command, rundown defaults to executing the file.
 
-  * `inspect`, `i`:
+  * `ast`:
     Inspect the Rundown AST. Handy for finding bugs in your rundown file.
   
-  * `select`, `s`:
-    Select the heading to run. By default, rundown will execute a file top to bottom, this changes
-    the execution to a specific heading and it's child headings.
+  * `emoji`:
+    Search for Emoji codes.
+
+  * `check`:
+    Check the Rundown file for errors.
   
-  * `shortcodes`, `c`:
-    Show available shortcodes in the file. Shortcodes can then be executed via `rundown <FILENAME> <SHORTCODE>`.
 
 ## OPTIONS
 
   * `--debug`, `--debug`=<debug_file>:
     Log rundown activities into a file named `debug.log` or the specified <debug_file>.
-
-  * `--ask`:
-    Shebang option which forces script to ask which heading to run, if no shortcode has been specified.
   
   * `--default`=<shortcode>
     Shebang option which specifies the default shortcode to run if none specified.
+
+  * `--ask`:
+    Select the heading to run. By default, rundown will execute a file top to bottom, this changes
+    the execution to a specific heading and it's child headings.
+
+  * `--ask-repeat`:
+    Like --ask, but runs in an ask-do loop until Quit is selected.
+  
+  * `--help`:
+    When added after a file has been specified, will render the available shortcodes and help 
+    documentation for the given file.
+
+## EXAMPLES
+
+Run a Rundown file:
+
+    rundown somefile.md
+
+Display help and the menu for a given file:
+
+    rundown somefile.md --help
+
+Run a ShortCode with options:
+
+    rundown somefile.md do:action +name="Wonderful" +dest="/etc"
+
+An executable rundown file which provides a default ShortCode, and Help.
+
+    #!/usr/bin/env rundown --default run
+
+    # Help using this file <r label="rundown:help"/>
+
+    This is some help description on how to use this file.
+
+    # Perform Action <r label="run"/>
+
+    Now performing some action.

@@ -14,14 +14,17 @@ require (
 	github.com/fatih/color v1.7.0
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-errors/errors v1.1.1
+	github.com/goccy/go-yaml v1.8.2
 	github.com/hpcloud/tail v1.0.0
 	github.com/kr/pty v1.1.1
 	github.com/kyokomi/emoji v2.2.4+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/manifoldco/promptui v0.7.0
+	github.com/mjibson/esc v0.2.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.4
 	github.com/papertrail/go-tail v0.0.0-20180509224916-973c153b0431
 	github.com/paulrademacher/climenu v0.0.0-20151110221007-a1afbb4e378b
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkg/term v1.0.0 // indirect
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.5 // indirect
@@ -30,7 +33,8 @@ require (
 	github.com/yuin/goldmark v1.2.1
 	github.com/yuin/goldmark-highlighting v0.0.0-20200307114337-60d527fdb691
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
-	golang.org/x/tools v0.0.0-20200916225323-c537a342ddf6
+	golang.org/x/tools v0.0.0-20201009162240-fcf82128ed91
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
+	gopkg.in/yaml.v2 v2.2.2
 )

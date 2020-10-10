@@ -1,10 +1,20 @@
 #!/usr/bin/env rundown --default build
 
+# The Rundown Build File <r label="rundown:help"/>
+
+![**Rundown**](logo.png)
+
+This file contains all the essentials on building, testing and releasing Rundown.
+
+By default, this script will just build a local copy of `rundown`. If you want to run the debugger, you'll want to run the `build:debug` or `delve` shortcodes.
+
 # Build simple <r label=build/>
 
 Just a simple build of `rundown`:
 
 ``` bash reveal setup env
+go get -u github.com/mjibson/esc
+
 export VERSION=`cat .current-version`
 export GIT_COMMIT=$(git rev-list -1 HEAD)
 
@@ -23,7 +33,8 @@ Build version <r sub-env>**$VERSION**</r>.
 
 <r desc>Takes the `_testdata/` markdown test files and copies the markdown section into the `docs/` folder.</r> This keeps documentation in sync with the tests.
 
-``` ruby
+``` bash spinner:"Generating man pages"
+ronn --roff doc/*.ronn
 ```
 
 ## Build release binaries <r label=release:build/>
@@ -58,8 +69,17 @@ GOOS=darwin go build -ldflags="$FLAGS" -o dist/darwin-amd64/rundown cmd/rundown/
 GOOS=linux go build -ldflags="$FLAGS" -o dist/linux-amd64/rundown cmd/rundown/main.go
 
 # Preparing release
-cp LICENSE build/bash_autocomplete README.md dist/darwin-amd64/
-cp LICENSE build/bash_autocomplete README.md dist/linux-amd64/
+cp LICENSE README.md logo.png dist/darwin-amd64/
+cp LICENSE README.md logo.png dist/linux-amd64/
+
+cp doc/rundown.1 dist/darwin-amd64/
+cp doc/rundown.1 dist/linux-amd64/
+
+mkdir dist/darwin-amd64/examples
+mkdir dist/linux-amd64/examples
+
+cp examples/*.md dist/darwin-amd64/examples
+cp examples/*.md dist/linux-amd64/examples
 
 # Creating platform archives...
 cd dist/darwin-amd64 && tar -zcf ../rundown-$VERSION-darwin-amd64.tgz . && cd ../..

@@ -88,15 +88,15 @@ func RenderShortCodes() error {
 
 		display := code.Name
 
-		if flagDefault == codeName {
-			display = display + " (" + aurora.Underline("default").String() + ")"
-		}
-
 		if code.Description != "" {
-			display = display + "\n" + aurora.Faint(code.Description).String()
+			display = code.Description
 		}
 
-		table.Append([]string{code.Code, display})
+		if flagDefault == codeName {
+			codeName = codeName + " (" + aurora.Underline("default").String() + ")"
+		}
+
+		table.Append([]string{codeName, display})
 
 		sortedOptions := sort.StringSlice{}
 
@@ -119,7 +119,7 @@ func RenderShortCodes() error {
 					spec = spec + " (required)"
 				}
 
-				table.Append([]string{"", "    +" + opt.Code + "=[" + opt.Type + "] - " + opt.Description + spec})
+				table.Append([]string{"  +" + opt.Code + "=[" + opt.Type + "]", "  " + opt.Description + spec})
 			}
 		}
 

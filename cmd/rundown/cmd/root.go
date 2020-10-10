@@ -35,6 +35,20 @@ var rootCmd = &cobra.Command{
 		exitCode := run(cmd, args)
 		os.Exit(exitCode)
 	},
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		cleanArgs := cmd.Flags().Args()
+
+		if len(cleanArgs) == 0 {
+			if _, err := os.Stat(toComplete); err != nil {
+				return nil, cobra.ShellCompDirectiveDefault
+			}
+		}
+
+		cleanArgs = append(cleanArgs, toComplete)
+		argFilename = cleanArgs[0]
+
+		return performCompletion(cleanArgs), cobra.ShellCompDirectiveNoFileComp
+	},
 }
 
 func RootCmd() *cobra.Command {
@@ -55,10 +69,12 @@ func init() {
 	rootCmd.Flags().StringVar(&flagDefault, "default", "", "Default shortcode to run if none specified")
 	rootCmd.Flags().IntVar(&flagCols, "cols", util.IntMin(util.GetConsoleWidth(), 120), "Number of columns in display")
 
+	rootCmd.MarkZshCompPositionalArgumentFile(1)
+
 	rootCmd.AddCommand(astCmd)
-	rootCmd.AddCommand(inspectCmd)
 	rootCmd.AddCommand(emojiCmd)
 	rootCmd.AddCommand(checkCmd)
+	rootCmd.AddCommand(completionCmd)
 
 	originalHelpFunc := rootCmd.HelpFunc()
 

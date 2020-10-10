@@ -1,0 +1,65 @@
+#!./rundown
+
+<r opt="prefix" type="string" default="/usr" required desc="Where to install Rundown"/>
+
+<!--
+This script installs Rundown using Rundown. 
+
+It's assumed to be run from a distribution zip file, 
+where install and rundown are both in the same folder.
+
+-->
+
+![Rundown](./logo.png)
+
+<!--~
+
+# Checking installation location
+
+Rundown will be installed into the prefix of <r sub-env>`$OPT_PREFIX`</r>.
+
+``` bash skip-on-success spinner:"Checking prefix location"
+test -d $OPT_PREFIX
+```
+
+The installation location <r sub-env>`$OPT_PREFIX`</r> doesn't exist.
+
+<r stop-fail="Cannot install to the chosen destination"/>
+
+-->
+
+# Installing rundown
+
+``` bash spinner:"Installing Binary"
+cp rundown $OPT_PREFIX/bin
+```
+
+``` bash spinner:"Installing Documentation"
+```
+
+``` bash spinner:"Installing Examples"
+```
+
+``` bash spinner:"Registering Autocompletion"
+```
+
+:rocket: Rundown has been installed.
+
+<r stop-ok/>
+
+# Help installing Rundown <r label="rundown:help"/>
+
+By default, this script will install rundown into `/usr` with the following locations:
+
+* The `rundown` executable will be installed to <r sub-env>`$OPT_PREFIX/bin/rundown`</r>.
+* Man pages will be installed to <r sub-env>`$OPT_PREFIX/share/man`</r>.
+* Examples & Documentation will be installed to <r sub-env>`$OPT_PREFIX/share/doc/rundown`</r>.
+* Bash Autocompletion will be added to <r sub-env>`$OPT_PREFIX/bash_completition.d/`</r>, if available.
+* ZSH Autocompletion will be added to <r sub-env>`$OPT_PREFIX/share/zsh/site-functions`</r>, if available.
+* Fish Autocompletion will be added to <r sub-env>`$OPT_PREFIX/share/fish/completions`</r>, if available.
+
+To install in an alternate location, such as `/usr/local`, run:
+
+``` bash norun reveal
+./install +prefix="/usr/local"
+```
