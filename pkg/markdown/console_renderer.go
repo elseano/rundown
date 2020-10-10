@@ -1013,7 +1013,9 @@ func (r *Renderer) renderImage(w util.BufWriter, source []byte, node ast.Node, e
 	if image != nil {
 		lines := strings.Split(image.Render(), "\n")
 		for _, line := range lines {
-			w.WriteString(line + "\n")
+			if line != "" {
+				w.WriteString(line + "\n")
+			}
 
 			// Must flush every line to avoid filling buffer.
 			// Otherwise WordWrapWriter gets confused by half-formed escape codes on buffer full.
