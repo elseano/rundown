@@ -17,10 +17,50 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
+var InvocationError = errors.New("InvocationError")
+
+type InvalidOptionsError struct {
+	OptionName string
+	ShortCode  string
+	Message    string
+}
+
+func (e *InvalidOptionsError) Error() string {
+	if e.ShortCode != "" {
+		return fmt.Sprintf("ShortCode %s option %s error: %s", e.ShortCode, e.OptionName, e.Message)
+	} else {
+		return fmt.Sprintf("Document option %s error: %s", e.OptionName, e.Message)
+	}
+}
+
+func (e *InvalidOptionsError) Is(err error) bool {
+	return err == InvocationError
+}
+
+type InvalidShortCodeError struct {
+	ShortCode string
+}
+
+func (e *InvalidShortCodeError) Error() string {
+	return fmt.Sprintf("Document doesn't have shortcode %s", e.ShortCode)
+}
+
+func (e *InvalidShortCodeError) Is(err error) bool {
+	return err == InvocationError
+}
+
 type DocumentShortCodes struct {
-	Codes     map[string]*ShortCodeInfo
-	Order     []string
+	// The shortcodes defined in the document
+	Codes map[string]*ShortCodeInfo
+
+	// The order of the shortcodes for presentation purposes.
+	Order []string
+
+	// Functions defined within the document.
 	Functions map[string]*ShortCodeInfo
+
+	// Document-wide options defined on the Root section.
+	Options map[string]*ShortCodeOption
 }
 
 type ShortCodeOption struct {
@@ -40,6 +80,11 @@ type ShortCodeInfo struct {
 	Section      *markdown.Section
 }
 
+type DocumentSpec struct {
+	ShortCodes []*ShortCodeSpec
+	Options    map[string]*ShortCodeOptionSpec
+}
+
 type ShortCodeSpec struct {
 	Code    string
 	Options map[string]*ShortCodeOptionSpec
@@ -57,7 +102,6 @@ func BuildShortCodeInfo(section *markdown.Section, source []byte) *ShortCodeInfo
 
 	var (
 		shortCodeDescription = ""
-		options              = map[string]*ShortCodeOption{}
 		labelStr             = ""
 		functionNameStr      = ""
 	)
@@ -80,19 +124,7 @@ func BuildShortCodeInfo(section *markdown.Section, source []byte) *ShortCodeInfo
 		}
 	}
 
-	for opt := section.Options.FirstChild(); opt != nil; opt = opt.NextSibling() {
-		rdOpt := opt.(markdown.RundownNode)
-
-		option := &ShortCodeOption{
-			Code:        strings.TrimSpace(rdOpt.GetModifiers().Values[markdown.Parameter("opt")]),
-			Type:        strings.TrimSpace(rdOpt.GetModifiers().Values[markdown.Parameter("type")]),
-			Required:    rdOpt.GetModifiers().Flags[markdown.Flag("required")],
-			Description: strings.TrimSpace(rdOpt.GetModifiers().Values[markdown.Parameter("desc")]),
-			Default:     strings.TrimSpace(rdOpt.GetModifiers().Values[markdown.Parameter("default")]),
-		}
-
-		options[option.Code] = option
-	}
+	options := BuildOptions(section)
 
 	return &ShortCodeInfo{
 		Code:         strings.TrimSpace(labelStr),
@@ -104,13 +136,66 @@ func BuildShortCodeInfo(section *markdown.Section, source []byte) *ShortCodeInfo
 	}
 }
 
+func BuildOptions(section *markdown.Section) map[string]*ShortCodeOption {
+	options := map[string]*ShortCodeOption{}
+
+	for opt := section.Options.FirstChild(); opt != nil; opt = opt.NextSibling() {
+		rdOpt := opt.(markdown.RundownNode)
+
+		option := BuildOptionInfo(rdOpt)
+
+		options[option.Code] = option
+	}
+
+	return options
+}
+
+func BuildOptionInfo(rdOpt markdown.RundownNode) *ShortCodeOption {
+	mods := rdOpt.GetModifiers()
+
+	if !mods.HasAny("opt") {
+		return nil
+	}
+
+	option := &ShortCodeOption{
+		Code:        strings.TrimSpace(mods.Values[markdown.Parameter("opt")]),
+		Type:        strings.TrimSpace(mods.Values[markdown.Parameter("type")]),
+		Required:    mods.Flags[markdown.Flag("required")],
+		Description: strings.TrimSpace(mods.Values[markdown.Parameter("desc")]),
+		Default:     strings.TrimSpace(mods.Values[markdown.Parameter("default")]),
+	}
+
+	return option
+}
+
 type Runner struct {
-	filename string
-	logger   *log.Logger
+	filename     string
+	logger       *log.Logger
+	out          io.Writer
+	consoleWidth int
+}
+
+func FromSource(source string) (*Runner, error) {
+	f, err := ioutil.TempFile("", "")
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	f.WriteString(source)
+	return &Runner{filename: f.Name(), out: os.Stdout, consoleWidth: -1}, nil
 }
 
 func LoadFile(filename string) (*Runner, error) {
-	return &Runner{filename: filename}, nil
+	return &Runner{filename: filename, out: os.Stdout, consoleWidth: -1}, nil
+}
+
+func (r *Runner) SetOutput(out io.Writer) {
+	r.out = out
+}
+
+func (r *Runner) SetConsoleWidth(width int) {
+	r.consoleWidth = width
 }
 
 func (r *Runner) SetLogger(isLogging bool) {
@@ -131,6 +216,10 @@ func (r *Runner) getEngine() (goldmark.Markdown, *util.WordWrapWriter, *Context)
 	ctx := NewContext()
 	ctx.Logger = r.logger
 	ctx.CurrentFile = r.filename
+	if r.consoleWidth > 0 {
+		ctx.ConsoleWidth = r.consoleWidth
+	}
+	ctx.RawOut = r.out
 
 	currentLevel := 0
 
@@ -141,7 +230,7 @@ func (r *Runner) getEngine() (goldmark.Markdown, *util.WordWrapWriter, *Context)
 	}))
 	renderer.AddOptions(markdown.WithLevel(currentLevel))
 
-	www := util.NewWordWrapWriter(os.Stdout, ctx.ConsoleWidth)
+	www := util.NewWordWrapWriter(r.out, ctx.ConsoleWidth)
 
 	www.SetAfterWrap(func(out io.Writer) int {
 		n, _ := out.Write(bytes.Repeat([]byte("  "), currentLevel-1))
@@ -152,15 +241,24 @@ func (r *Runner) getEngine() (goldmark.Markdown, *util.WordWrapWriter, *Context)
 }
 
 func (r *Runner) getAST(md goldmark.Markdown) (ast.Node, []byte) {
-	bytes, _ := ioutil.ReadFile(r.filename)
-	reader := text.NewReader(bytes)
+	byteData, _ := ioutil.ReadFile(r.filename)
+
+	// Trim shebang
+	if bytes.HasPrefix(byteData, []byte("#!")) {
+		b2 := bytes.SplitN(byteData, []byte("\n"), 2)
+		if len(b2) == 2 {
+			byteData = b2[1]
+		}
+	}
+
+	reader := text.NewReader(byteData)
 	doc := md.Parser().Parse(reader)
 
 	for d := doc; d != nil; d = d.Parent() {
 		doc = d
 	}
 
-	return doc, bytes
+	return doc, byteData
 }
 
 func (d *DocumentShortCodes) Append(info *ShortCodeInfo) {
@@ -176,6 +274,7 @@ func (d *DocumentShortCodes) Append(info *ShortCodeInfo) {
 
 func NewDocumentShortCodes() *DocumentShortCodes {
 	return &DocumentShortCodes{
+		Options:   map[string]*ShortCodeOption{},
 		Codes:     map[string]*ShortCodeInfo{},
 		Order:     []string{},
 		Functions: map[string]*ShortCodeInfo{},
@@ -196,6 +295,9 @@ func (r *Runner) getShortCodes(doc ast.Node, bytes []byte) *DocumentShortCodes {
 		for _, section := range toc.Sections {
 			if info := BuildShortCodeInfo(section, bytes); info != nil {
 				codes.Append(info)
+			} else if section.Name == "Root" {
+				opts := BuildOptions(section)
+				codes.Options = opts
 			}
 		}
 	}
@@ -203,20 +305,19 @@ func (r *Runner) getShortCodes(doc ast.Node, bytes []byte) *DocumentShortCodes {
 	return codes
 }
 
-func ParseShortCodeSpecs(specs []string) ([]*ShortCodeSpec, error) {
+func ParseShortCodeSpecs(specs []string) (*DocumentSpec, error) {
 	var (
-		result                     = []*ShortCodeSpec{}
+		result = &DocumentSpec{
+			ShortCodes: []*ShortCodeSpec{},
+			Options:    map[string]*ShortCodeOptionSpec{},
+		}
 		currentCode *ShortCodeSpec = nil
 	)
 
 	for _, spec := range specs {
 		if parts := strings.SplitN(spec, "=", 2); strings.HasPrefix(spec, "+") {
-			if currentCode == nil {
-				return nil, errors.New("Option " + parts[0] + " specified before ShortCode")
-			}
-
 			if len(parts) == 1 {
-				return nil, errors.New("Option " + parts[0] + " requires value")
+				return nil, &InvalidOptionsError{OptionName: parts[0], Message: "Value is required"}
 			}
 
 			opt := &ShortCodeOptionSpec{
@@ -224,38 +325,129 @@ func ParseShortCodeSpecs(specs []string) ([]*ShortCodeSpec, error) {
 				Value: parts[1],
 			}
 
-			currentCode.Options[opt.Code] = opt
+			if currentCode == nil {
+				result.Options[opt.Code] = opt
+			} else {
+				currentCode.Options[opt.Code] = opt
+			}
 		} else {
 			currentCode = &ShortCodeSpec{
 				Code:    spec,
 				Options: map[string]*ShortCodeOptionSpec{},
 			}
 
-			result = append(result, currentCode)
+			result.ShortCodes = append(result.ShortCodes, currentCode)
 		}
 	}
 
 	return result, nil
 }
 
-func (r *Runner) RunCodes(codeArgs []*ShortCodeSpec) error {
+func (r *Runner) RunCodesWithoutValidation(docSpec *DocumentSpec) error {
 	md, www, ctx := r.getEngine()
 	doc, bytes := r.getAST(md)
 	shortCodes := r.getShortCodes(doc, bytes)
 
-	if len(shortCodes.Codes) == 0 {
-		return errors.New("Document does not support ShortCodes")
+	for _, opt := range shortCodes.Options {
+		optSpec, isSet := docSpec.Options[opt.Code]
+
+		if opt.Default != "" && !isSet {
+			optSpec = &ShortCodeOptionSpec{Code: opt.Code, Value: opt.Default}
+		}
+
+		if optSpec != nil {
+			ctx.SetEnv("OPT_"+strings.ToUpper(opt.Code), optSpec.Value)
+		}
 	}
 
-	for _, code := range codeArgs {
+	if len(docSpec.ShortCodes) > 0 {
+
+		for _, code := range docSpec.ShortCodes {
+			section := shortCodes.Codes[code.Code].Section
+			section.ForceRootLevel()
+
+			for _, opt := range code.Options {
+				ctx.SetEnv("OPT_"+strings.ToUpper(opt.Code), opt.Value)
+			}
+
+			err := md.Renderer().Render(www, bytes, section)
+
+			if err != nil {
+				if stopError, ok := err.(*StopError); ok && stopError.StopHandlers != nil && stopError.StopHandlers.ChildCount() > 0 {
+					// Add some space between last node and the output.
+					www.Write([]byte("\r\n"))
+
+					ctx.SetError(stopError)
+					md.Renderer().Render(www, bytes, stopError.StopHandlers)
+				}
+				return err
+			}
+
+			for _, opt := range code.Options {
+				ctx.RemoveEnv("OPT_" + strings.ToUpper(opt.Code))
+			}
+		}
+	} else {
+		err := md.Renderer().Render(www, bytes, doc)
+
+		if err != nil {
+			if stopError, ok := err.(*StopError); ok && stopError.StopHandlers != nil && stopError.StopHandlers.ChildCount() > 0 {
+				// Add some space between last node and the output.
+				www.Write([]byte("\r\n"))
+
+				ctx.SetError(stopError)
+				md.Renderer().Render(www, bytes, stopError.StopHandlers)
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *Runner) RunCodes(docSpec *DocumentSpec) error {
+	md, _, _ := r.getEngine()
+	doc, bytes := r.getAST(md)
+	shortCodes := r.getShortCodes(doc, bytes)
+
+	if len(shortCodes.Codes) == 0 && len(docSpec.ShortCodes) > 0 {
+		return &InvalidShortCodeError{ShortCode: docSpec.ShortCodes[0].Code}
+	}
+
+	if len(shortCodes.Options) == 0 && len(docSpec.Options) > 0 {
+		for key := range docSpec.Options {
+			return &InvalidOptionsError{OptionName: key, Message: "Option not defined"}
+		}
+	}
+
+	for optName := range docSpec.Options {
+		opt := shortCodes.Options[optName]
+		if opt == nil {
+			return &InvalidOptionsError{OptionName: optName, Message: "Option not defined"}
+		}
+	}
+
+	for _, opt := range shortCodes.Options {
+		_, isSet := docSpec.Options[opt.Code]
+
+		if opt.Required && opt.Default == "" && !isSet {
+			return &InvalidOptionsError{OptionName: opt.Code, Message: "Is required"}
+		}
+
+		if opt.Default != "" && !isSet {
+			docSpec.Options[opt.Code] = &ShortCodeOptionSpec{Code: opt.Code, Value: opt.Default}
+		}
+	}
+
+	for _, code := range docSpec.ShortCodes {
 		section := shortCodes.Codes[code.Code]
 		if section == nil {
-			return errors.New("Invalid ShortCode: " + code.Code)
+			return &InvalidShortCodeError{ShortCode: code.Code}
 		}
 
 		for _, opt := range code.Options {
 			if section.Options[opt.Code] == nil {
-				return errors.New("Invalid ShortCode Option: " + code.Code + " +" + opt.Code)
+				return &InvalidOptionsError{OptionName: opt.Code, ShortCode: code.Code, Message: "Option not defined"}
 			}
 		}
 
@@ -263,7 +455,7 @@ func (r *Runner) RunCodes(codeArgs []*ShortCodeSpec) error {
 			_, isSet := code.Options[opt.Code]
 
 			if opt.Required && opt.Default == "" && !isSet {
-				return errors.New(fmt.Sprintf("ShortCode %s requires option %s to be specified", code.Code, opt.Code))
+				return &InvalidOptionsError{OptionName: opt.Code, ShortCode: code.Code, Message: "Option is required"}
 			}
 
 			if opt.Default != "" && !isSet {
@@ -272,36 +464,6 @@ func (r *Runner) RunCodes(codeArgs []*ShortCodeSpec) error {
 		}
 	}
 
-	for _, code := range codeArgs {
-		section := shortCodes.Codes[code.Code].Section
-		section.ForceRootLevel()
+	return r.RunCodesWithoutValidation(docSpec)
 
-		for _, opt := range code.Options {
-			ctx.SetEnv("OPT_"+strings.ToUpper(opt.Code), opt.Value)
-		}
-
-		err := md.Renderer().Render(www, bytes, section)
-		if err != nil {
-			return err
-		}
-
-		for _, opt := range code.Options {
-			ctx.RemoveEnv("OPT_" + strings.ToUpper(opt.Code))
-		}
-	}
-
-	return nil
-}
-
-func (r *Runner) RunSequential() error {
-	md, www, _ := r.getEngine()
-	doc, bytes := r.getAST(md)
-
-	err := md.Renderer().Render(www, bytes, doc)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

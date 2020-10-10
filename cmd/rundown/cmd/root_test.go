@@ -1,126 +1,121 @@
-package main
+package cmd
 
 import (
 	"bufio"
 	"bytes"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/elseano/rundown/pkg/markdown"
-	"github.com/elseano/rundown/pkg/rundown"
-	"github.com/elseano/rundown/pkg/segments"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/elseano/rundown/pkg/util"
 	"github.com/elseano/rundown/testutil"
 )
 
 func TestSimpleRundown(t *testing.T) {
-	source, expected := loadFile("_testdata/simple.md")
-	actual := run(t, source)
+	expected, actual := runSequential(t, "_testdata/simple.md")
 
 	testutil.AssertLines(t, expected, actual)
 }
 
 func TestSpacingRundown(t *testing.T) {
-	source, expected := loadFile("_testdata/spacing.md")
-	actual := run(t, source)
+	expected, actual := runSequential(t, "_testdata/spacing.md")
 
 	testutil.AssertLines(t, expected, actual)
 }
 
 func TestRpcRundown(t *testing.T) {
-	source, expected := loadFile("_testdata/rpc.md")
-	actual := run(t, source)
+	expected, actual := runSequential(t, "_testdata/rpc.md")
 
 	testutil.AssertLines(t, expected, actual)
 }
 
 func TestStdoutRundown(t *testing.T) {
-	source, expected := loadFile("_testdata/stdout.md")
-	actual := run(t, source)
+	expected, actual := runSequential(t, "_testdata/stdout.md")
 
 	testutil.AssertLines(t, expected, actual)
 }
 
 func TestFailureRundown(t *testing.T) {
-	source, expected := loadFile("_testdata/failure.md")
-	actual := run(t, source)
+	expected, actual := runSequential(t, "_testdata/failure.md")
 
 	testutil.AssertLines(t, expected, actual)
 }
 
 func TestOnFailureRundown(t *testing.T) {
-	source, expected := loadFile("_testdata/on_failure.md")
-	actual := run(t, source)
+	expected, actual := runSequential(t, "_testdata/on_failure.md")
 
 	testutil.AssertLines(t, expected, actual)
 }
 
 func TestEmojiRundown(t *testing.T) {
-	source, expected := loadFile("_testdata/emoji.md")
-	actual := run(t, source)
+	expected, actual := runSequential(t, "_testdata/emoji.md")
 
 	testutil.AssertLines(t, expected, actual)
 }
 
 func TestHiddenRundown(t *testing.T) {
-	source, expected := loadFile("_testdata/hidden.md")
-	actual := run(t, source)
+	expected, actual := runSequential(t, "_testdata/hidden.md")
 
 	testutil.AssertLines(t, expected, actual)
 }
 
 func TestFormattingRundown(t *testing.T) {
-	source, expected := loadFile("_testdata/formatting.md")
-	actual := run(t, source)
+	expected, actual := runSequential(t, "_testdata/formatting.md")
 
 	testutil.AssertLines(t, expected, actual)
 }
 
 func TestStopOkRundown(t *testing.T) {
-	source, expected := loadFile("_testdata/stop.md")
-	actual := run(t, source)
+	expected, actual := runSequential(t, "_testdata/stop.md")
 
 	testutil.AssertLines(t, expected, actual)
 }
 
 func TestStopFailRundown(t *testing.T) {
-	source, expected := loadFile("_testdata/stopfail.md")
-	actual := run(t, source)
+	expected, actual := runSequential(t, "_testdata/stopfail.md")
 
 	testutil.AssertLines(t, expected, actual)
 }
 
 // Blah
-func run(t *testing.T, source string) string {
-	logger := testutil.NewTestLogger(t)
+func runSequential(t *testing.T, filename string) (string, string) {
+	source, expected := loadFile(filename)
 
-	md := markdown.PrepareMarkdown()
+	tf, err := ioutil.TempFile("", "")
+	assert.Nil(t, err)
 
-	result := segments.BuildSegments(source, md, logger)
-
-	for _, seg := range result {
-		t.Log(seg.String())
-	}
+	tf.WriteString(source)
+	tf.Close()
+	defer os.Remove(tf.Name())
 
 	var buffer bytes.Buffer
 
-	context := rundown.NewContext()
-	context.ConsoleWidth = 80
-
-	segments.ExecuteRundown(context, result, md.Renderer(), logger, &buffer)
+	root := RootCmd()
+	root.SetArgs([]string{tf.Name()})
+	root.SetOut(&buffer)
+	root.SetErr(&buffer)
+	root.PreRun(root, []string{tf.Name()})
+	root.ParseFlags([]string{"--cols", "80"})
+	run(root, []string{tf.Name()})
 
 	fixed := strings.TrimSpace(util.CollapseReturns(util.RemoveColors(buffer.String())))
+
+	t.Logf("Rendering result for %s:", filename)
 
 	for i, line := range strings.Split(fixed, "\n") {
 		t.Logf("%3d: %s\n", i, line)
 	}
 
-	return fixed
+	return expected, fixed
 }
 
 func loadFile(filename string) (source string, expected string) {
-	fp, err := os.Open(filename)
+	absFilename, _ := filepath.Abs("../../../" + filename)
+	fp, err := os.Open(absFilename)
 	if err != nil {
 		panic(err)
 	}

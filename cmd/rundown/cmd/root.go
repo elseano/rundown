@@ -2,8 +2,11 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
+	"os"
 
 	"github.com/elseano/rundown/pkg/rundown"
+	"github.com/elseano/rundown/pkg/util"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +31,14 @@ var rootCmd = &cobra.Command{
 		}
 
 	},
-	Run: run,
+	Run: func(cmd *cobra.Command, args []string) {
+		exitCode := run(cmd, args)
+		os.Exit(exitCode)
+	},
+}
+
+func RootCmd() *cobra.Command {
+	return rootCmd
 }
 
 func Execute() error {
@@ -38,41 +48,87 @@ func Execute() error {
 func init() {
 	rootCmd.Version = Version + " (" + GitCommit + ")"
 
-	rootCmd.Flags().BoolVarP(&flagCodes, "codes", "c", false, "Displays available shortcodes for the given file")
+	rootCmd.Flags().BoolVarP(&flagCodes, "help", "h", false, "Displays help & shortcodes for the given file")
 	rootCmd.Flags().BoolVar(&flagDebug, "debug", false, "Write debugging into to debug.log")
 	rootCmd.Flags().BoolVarP(&flagAsk, "ask", "a", false, "Ask which shortcode to run")
 	rootCmd.Flags().BoolVar(&flagAskRepeat, "ask-repeat", false, "Continually ask which shortcode to run")
 	rootCmd.Flags().StringVar(&flagDefault, "default", "", "Default shortcode to run if none specified")
+	rootCmd.Flags().IntVar(&flagCols, "cols", util.IntMin(util.GetConsoleWidth(), 120), "Number of columns in display")
 
 	rootCmd.AddCommand(astCmd)
 	rootCmd.AddCommand(inspectCmd)
 	rootCmd.AddCommand(emojiCmd)
 	rootCmd.AddCommand(checkCmd)
+
+	originalHelpFunc := rootCmd.HelpFunc()
+
+	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		if len(args) > 0 && args[0] != "" {
+			help(cmd, args)
+		} else {
+			originalHelpFunc(cmd, args)
+		}
+	})
 }
 
-func run(cmd *cobra.Command, args []string) {
+func help(cmd *cobra.Command, args []string) {
+	argFilename = args[0]
+
 	rd, err := rundown.LoadFile(argFilename)
 	if err != nil {
 		panic(err)
 	}
 
 	rd.SetLogger(flagDebug)
+	rd.SetOutput(cmd.OutOrStdout())
+	rd.SetConsoleWidth(flagCols)
+
+	codes, err := rundown.ParseShortCodeSpecs([]string{"rundown:help"})
+	if err == nil {
+		rd.RunCodesWithoutValidation(codes)
+	}
+
+	err = RenderShortCodes()
+	if err != nil {
+		fmt.Printf("Document %s provides no help information %s.\n", argFilename, err.Error())
+	}
+
+	os.Exit(0)
+}
+
+func run(cmd *cobra.Command, args []string) int {
+	rd, err := rundown.LoadFile(argFilename)
+	if err != nil {
+		panic(err)
+	}
+
+	rd.SetLogger(flagDebug)
+	rd.SetOutput(cmd.OutOrStdout())
+	rd.SetConsoleWidth(flagCols)
 
 	switch {
 
 	case flagCodes:
-		err := RenderShortCodes()
-		handleError(err)
+
+		codes, err := rundown.ParseShortCodeSpecs([]string{"help"})
+		if err == nil {
+			rd.RunCodes(codes)
+		}
+
+		err = RenderShortCodes()
+		return handleError(cmd.OutOrStderr(), err)
 
 	case flagAsk:
 		KillReadlineBell()
 
 		spec, err := AskShortCode()
-		handleError(err)
+		if err != nil {
+			return handleError(cmd.OutOrStderr(), err)
+		}
 
 		if spec != nil {
-			err = rd.RunCodes([]*rundown.ShortCodeSpec{spec})
-			handleError(err)
+			err = rd.RunCodes(&rundown.DocumentSpec{ShortCodes: []*rundown.ShortCodeSpec{spec}, Options: map[string]*rundown.ShortCodeOptionSpec{}})
+			return handleError(cmd.OutOrStderr(), err)
 		}
 
 	case flagAskRepeat:
@@ -80,33 +136,43 @@ func run(cmd *cobra.Command, args []string) {
 
 		for {
 			spec, err := AskShortCode()
-			handleError(err)
+			if err != nil {
+				return handleError(cmd.OutOrStderr(), err)
+			}
 
 			if spec == nil {
 				break
 			}
 
-			err = rd.RunCodes([]*rundown.ShortCodeSpec{spec})
-			handleError(err)
+			err = rd.RunCodes(&rundown.DocumentSpec{ShortCodes: []*rundown.ShortCodeSpec{spec}, Options: map[string]*rundown.ShortCodeOptionSpec{}})
+			return handleError(cmd.OutOrStderr(), err)
 		}
 
-	case len(argShortcodes) > 0 || flagDefault != "":
+	default:
 		specs := argShortcodes
 
-		if len(specs) == 0 {
+		if len(specs) == 0 && flagDefault != "" {
 			specs = []string{flagDefault}
 		}
 
 		codes, err := rundown.ParseShortCodeSpecs(specs)
-		handleError(err)
+		if err == nil {
+			err = rd.RunCodes(codes)
+		}
 
-		err = rd.RunCodes(codes)
-		handleError(err)
+		if err != nil {
+			if errors.Is(err, rundown.InvocationError) {
+				codes, err2 := rundown.ParseShortCodeSpecs([]string{"rundown:help"})
+				if err2 == nil {
+					rd.RunCodesWithoutValidation(codes)
+				}
 
-	default:
-		err = rd.RunSequential()
-		handleError(err)
+				err2 = RenderShortCodes()
+			}
+		}
 
+		return handleError(cmd.OutOrStderr(), err)
 	}
 
+	return 0
 }

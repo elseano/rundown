@@ -6,6 +6,7 @@ var (
 	flagAsk       bool
 	flagAskRepeat bool
 	flagDefault   string
+	flagCols      int
 
 	argFilename   string
 	argShortcodes = []string{}

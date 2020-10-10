@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -25,6 +26,8 @@ type Context struct {
 	ConsoleWidth    int
 	Logger          *log.Logger
 	CurrentFile     string
+	RawOut          io.Writer
+	CurrentError    error
 }
 
 func receiveLoop(filename string, messages chan<- string) {
@@ -88,6 +91,10 @@ func (c *Context) SetEnvString(envString string) {
 
 func (c *Context) SetEnv(key, value string) {
 	c.Env[key] = value
+}
+
+func (c *Context) SetError(err error) {
+	c.CurrentError = err
 }
 
 func (c *Context) RemoveEnv(key string) {

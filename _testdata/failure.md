@@ -18,6 +18,10 @@ true
 
 You won't see this.
 
+#### Target
+
+Should skip to here.
+
 ## Errors with skip-on-failure
 
 If `skip-on-failure` succeeds, then flow continues.
@@ -33,6 +37,10 @@ idontexistcall
 ```
 
 You shouldn't see this.
+
+## Target
+
+Should skip to here.
 
 ## Supporting process exit
 
@@ -97,6 +105,9 @@ Rundown has a few different ways it handles and interprets errors.
 
   ≡ Running (Passed)
 
+      Target
+      Should skip to here.
+
   Errors with skip-on-failure
   If skip-on-failure succeeds, then flow continues.
 
@@ -105,6 +116,9 @@ Rundown has a few different ways it handles and interprets errors.
   If the script errors, then flow jumps to the next heading.
 
   ≡ Running (Passed)
+
+  Target
+  Should skip to here.
 
   Supporting process exit
   Scripts can exit with a non-zero code which will be treated as a failure.
@@ -149,17 +163,12 @@ Rundown has a few different ways it handles and interprets errors.
   ✖ Running (Failed)
 
 
-Error executing script:
+❌ Error - exit status 127 in:
 
-#!/usr/bin/env bash
-
-set -Eeuo pipefail
-
-idontexistcall
-
-
-Error: exit status 127
+  1: #!/usr/bin/env bash
+  2: 
+  3: set -Eeuo pipefail
+  4: 
+  5: idontexistcall
 
 SCRIPT: line 5: idontexistcall: command not found
-
-✖ Aborted due to failure.

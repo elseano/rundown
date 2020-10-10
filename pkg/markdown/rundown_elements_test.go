@@ -23,7 +23,11 @@ func TestRundownInline(t *testing.T) {
 
 	t.Log(util.DumpNode(doc, contents))
 
-	assert.Equal(t, []string{"Document", ".Paragraph", "..Text", "..RundownInline", "...Text", "..Text"}, kindsFor(doc))
+	assert.Equal(t, []string{"Document", ".Section", "..Paragraph", "...Text", "...RundownInline", "....Text", "...Text"}, kindsFor(doc))
+
+	section, ok := nodeAt(doc, 1).(*Section)
+	assert.True(t, ok)
+	assert.Equal(t, "Root", section.Name)
 }
 
 func TestRundownBlock(t *testing.T) {
@@ -36,9 +40,9 @@ func TestRundownBlock(t *testing.T) {
 
 	t.Log(util.DumpNode(doc, contents))
 
-	assert.Equal(t, []string{"Document", ".RundownBlock", "..Paragraph", "...Text"}, kindsFor(doc))
+	assert.Equal(t, []string{"Document", ".Section", "..RundownBlock", "...Paragraph", "....Text"}, kindsFor(doc))
 
-	rundown := nodeAt(doc, 1).(*RundownBlock)
+	rundown := nodeAt(doc, 2).(*RundownBlock)
 	assert.True(t, rundown.Modifiers.Flags[Flag("some-attr")])
 	assert.Equal(t, rundown.Modifiers.Values[Parameter("some-val")], "val")
 }
@@ -59,9 +63,9 @@ echo Hello
 
 	t.Log(util.DumpNode(doc, contents))
 
-	assert.Equal(t, []string{"Document", ".Paragraph", "..Text", ".ExecutionBlock"}, kindsFor(doc))
+	assert.Equal(t, []string{"Document", ".Section", "..Paragraph", "...Text", "..ExecutionBlock"}, kindsFor(doc))
 
-	eb := nodeAt(doc, 3).(*ExecutionBlock)
+	eb := nodeAt(doc, 4).(*ExecutionBlock)
 	assert.Equal(t, "bash", eb.Syntax)
 	assert.True(t, eb.Modifiers.Flags[Flag("nospin")])
 }
@@ -82,7 +86,7 @@ echo Hello
 
 	t.Log(util.DumpNode(doc, contents))
 
-	assert.Equal(t, []string{"Document", ".Paragraph", "..Text", ".FencedCodeBlock", ".ExecutionBlock"}, kindsFor(doc))
+	assert.Equal(t, []string{"Document", ".Section", "..Paragraph", "...Text", "..FencedCodeBlock", "..ExecutionBlock"}, kindsFor(doc))
 }
 
 func TestExecutionBlockNorun(t *testing.T) {
@@ -101,7 +105,7 @@ echo Hello
 
 	t.Log(util.DumpNode(doc, contents))
 
-	assert.Equal(t, []string{"Document", ".Paragraph", "..Text"}, kindsFor(doc))
+	assert.Equal(t, []string{"Document", ".Section", "..Paragraph", "...Text"}, kindsFor(doc))
 }
 
 func TestExecutionBlockRevealNorun(t *testing.T) {
@@ -120,7 +124,7 @@ echo Hello
 
 	t.Log(util.DumpNode(doc, contents))
 
-	assert.Equal(t, []string{"Document", ".Paragraph", "..Text", ".FencedCodeBlock"}, kindsFor(doc))
+	assert.Equal(t, []string{"Document", ".Section", "..Paragraph", "...Text", "..FencedCodeBlock"}, kindsFor(doc))
 }
 
 func TestExecutionBlockRundown(t *testing.T) {
@@ -141,8 +145,8 @@ echo Hello
 
 	t.Log(util.DumpNode(doc, contents))
 
-	assert.Equal(t, []string{"Document", ".Paragraph", "..Text", ".ExecutionBlock"}, kindsFor(doc))
-	eb := nodeAt(doc, 3).(*ExecutionBlock)
+	assert.Equal(t, []string{"Document", ".Section", "..Paragraph", "...Text", "..ExecutionBlock"}, kindsFor(doc))
+	eb := nodeAt(doc, 4).(*ExecutionBlock)
 	assert.True(t, eb.Modifiers.Flags[Flag("nospin")])
 }
 
@@ -199,6 +203,7 @@ Blah
 		"....Text",
 	}, kindsFor(doc))
 
+	assert.NotEqual(t, "Root", nodeAt(doc, 2).(*Section).Name)
 	assert.NotNil(t, nodeAt(doc, 2).(*Section).Label)
 	assert.Equal(t, "one", *nodeAt(doc, 2).(*Section).Label)
 	assert.NotNil(t, nodeAt(doc, 9).(*Section).Label)
@@ -279,6 +284,70 @@ echo Hi
 	}, kindsFor(doc))
 
 	assert.Equal(t, []string{"ExecutionBlock"}, kindsForList(nodeAt(doc, 2).(*Section).Setups))
+}
+
+func TestSectionHeadingSkips(t *testing.T) {
+	contents := []byte(`
+# Heading
+
+One.
+
+#### Heading 2
+
+Two.
+
+#### Heading 3
+
+Three.
+
+## Heading 4
+
+Four.
+	`)
+
+	markdown := PrepareMarkdown()
+	reader := text.NewReader(contents)
+
+	doc := markdown.Parser().Parse(reader)
+	if doc.Parent() != nil {
+		doc = doc.Parent()
+	}
+
+	t.Log(util.DumpNode(doc, contents))
+
+	assert.Equal(t, []string{
+		"SectionedDocument",
+		".Document",
+
+		"..Section",
+		"...Heading",
+		"....Text",
+		"...Paragraph",
+		"....Text",
+
+		"...Section",
+		"....Heading",
+		".....Text",
+		"....Paragraph",
+		".....Text",
+
+		"...Section",
+		"....Heading",
+		".....Text",
+		"....Paragraph",
+		".....Text",
+
+		"...Section",
+		"....Heading",
+		".....Text",
+		"....Paragraph",
+		".....Text",
+	}, kindsFor(doc))
+
+	assert.Equal(t, 1, nodeAt(doc, 2).(*Section).Level)
+	assert.Equal(t, 4, nodeAt(doc, 7).(*Section).Level)
+	assert.Equal(t, 4, nodeAt(doc, 12).(*Section).Level)
+	assert.Equal(t, 2, nodeAt(doc, 17).(*Section).Level)
 }
 
 func nodeAt(node ast.Node, index int) ast.Node {

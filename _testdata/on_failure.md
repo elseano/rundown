@@ -16,7 +16,11 @@ true
 failed
 ```
 
-<r on-failure>You should only see me during a failure</r>
+<r on-failure>You should only see me during a **failure**.</r>
+
+<r on-failure="command not found">Please install the command.</r>
+
+<r on-failure="no match">You won't see me in rundown.</r>
 
 -----
 
@@ -29,9 +33,18 @@ Test of the on-failure attribute.
   Fail Case
   ✖ Running (Failed)
 
-  You should only see me during a failure
+  You should only see me during a failure.
+
+  Please install the command.
 
 
-exit status 127
 
-✖ Aborted due to failure.
+❌ Error - exit status 127 in:
+
+  1: #!/usr/bin/env bash
+  2: 
+  3: set -Eeuo pipefail
+  4: 
+  5: failed
+
+SCRIPT: line 5: failed: command not found

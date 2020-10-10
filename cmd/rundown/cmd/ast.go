@@ -34,6 +34,9 @@ func ast(cmd *cobra.Command, args []string) {
 	reader := text.NewReader(b)
 
 	doc := md.Parser().Parse(reader)
+	if doc.Parent() != nil {
+		doc = doc.Parent()
+	}
 
 	doc.Dump(b, 0)
 

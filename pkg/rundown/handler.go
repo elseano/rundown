@@ -3,7 +3,7 @@ package rundown
 import (
 	"errors"
 	"io"
-	"os"
+	"regexp"
 	"strings"
 
 	"github.com/yuin/goldmark/ast"
@@ -38,15 +38,26 @@ func (v *rundownHandler) Mutate(input []byte, node ast.Node) ([]byte, error) {
 	return input, nil
 }
 
-func (v *rundownHandler) OnRundownNode(node ast.Node, entering bool) error {
-	if !entering {
+func (v *rundownHandler) OnRundownNode(node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if entering {
 		if rundown, ok := node.(*markdown.RundownBlock); ok {
+			// We don't render function/shortcode option contents, thats for reading only.
+			if rundown.Modifiers.HasAny("ignore", "opt") {
+				return ast.WalkSkipChildren, nil
+			}
+
 			if rundown.GetModifiers().Flags[StopOkFlag] {
-				return &StopError{Result: StopOkResult}
+				return ast.WalkStop, &StopError{Result: StopOkResult}
 			}
 
 			if rundown.GetModifiers().Flags[StopFailFlag] {
-				return &StopError{Result: StopFailResult}
+				return ast.WalkStop, &StopError{Result: StopFailResult}
+			}
+
+			if message, ok := rundown.GetModifiers().Values[StopFailParameter]; ok {
+				r := StopFailResult
+				r.Message = message
+				return ast.WalkStop, &StopError{Result: r}
 			}
 
 			if setEnv, ok := rundown.GetModifiers().Flags[markdown.Flag("set-env")]; setEnv && ok {
@@ -54,6 +65,23 @@ func (v *rundownHandler) OnRundownNode(node ast.Node, entering bool) error {
 					envName := strings.ReplaceAll(strings.ToUpper(string(k)), "-", "_")
 					v.ctx.SetEnv(envName, val)
 				}
+			}
+
+			if rundown.Modifiers.HasAny("on-failure") {
+				if val, ok := rundown.Modifiers.Flags[markdown.Flag("on-failure")]; val && ok && v.ctx.CurrentError != nil {
+					return ast.WalkContinue, nil
+				}
+
+				if val, ok := rundown.Modifiers.Values[markdown.Parameter("on-failure")]; ok && v.ctx.CurrentError != nil {
+					if stopError, ok := v.ctx.CurrentError.(*StopError); ok {
+						r, _ := regexp.Compile(val)
+						if r.MatchString(stopError.Result.Output) {
+							return ast.WalkContinue, nil
+						}
+					}
+				}
+
+				return ast.WalkSkipChildren, nil
 			}
 
 			if rundown.GetModifiers().HasAny("invoke") {
@@ -65,12 +93,12 @@ func (v *rundownHandler) OnRundownNode(node ast.Node, entering bool) error {
 
 				name := rundown.GetModifiers().GetValue("invoke")
 				if name == nil {
-					return errors.New("Invoke requires a ShortCode value")
+					return ast.WalkStop, errors.New("Invoke requires a ShortCode value")
 				}
 
 				rd, err := LoadFile(*source)
 				if err != nil {
-					return err
+					return ast.WalkStop, err
 				}
 
 				if info := rd.GetShortCodes().Functions[*name]; info != nil {
@@ -100,21 +128,22 @@ func (v *rundownHandler) OnRundownNode(node ast.Node, entering bool) error {
 				} else {
 					// ShortCode not found in file.
 					if flag, ok := rundown.GetModifiers().Flags["ignore-missing"]; flag && ok {
-						return nil
+						return ast.WalkSkipChildren, nil
 					}
 
-					return errors.New("Cannot find " + *name + " in " + *source)
+					return ast.WalkStop, errors.New("Cannot find " + *name + " in " + *source)
 				}
 
 			}
 		}
 	}
 
-	return nil
+	return ast.WalkContinue, nil
 }
 
 func (v *rundownHandler) OnExecute(node *markdown.ExecutionBlock, source []byte, out io.Writer) (markdown.ExecutionResult, error) {
-	result := Execute(v.ctx, node, source, v.ctx.Logger, os.Stdout)
+	// We write to RawOut here, as out will be the word wrap writer.
+	result := Execute(v.ctx, node, source, v.ctx.Logger, v.ctx.RawOut)
 	switch result {
 	case SuccessfulExecution:
 		return markdown.Continue, nil
@@ -131,7 +160,16 @@ func (v *rundownHandler) OnExecute(node *markdown.ExecutionBlock, source []byte,
 		return markdown.Stop, errors.New("Stop requested")
 	}
 
-	return markdown.Stop, &StopError{Result: result}
+	var section *markdown.Section
+	var n ast.Node
+
+	for n = node; section == nil && n != nil; n = n.Parent() {
+		if s, ok := n.Parent().(*markdown.Section); ok {
+			section = s
+		}
+	}
+
+	return markdown.Stop, &StopError{Result: result, StopHandlers: section.Handlers}
 }
 
 func deleteNodesUntilSection(node ast.Node) {

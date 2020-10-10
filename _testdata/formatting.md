@@ -142,10 +142,11 @@ Sequential runs with a middle reveal should be spaced.
   • indented correctly
   • Really long bullet points will be wrapped, and they will be wrapped at the
     indentation level of the start of the bullet point text so it looks nice.
-    • Indented, and the wrapping should also observe that we're indented on
-      wrap an extra two spaces because this is a sub-bullet.
-  • And back to normal should work as expected as well given we just
-    deintented the line again.
+    ◦ Indented, and the wrapping should also observe that we're indented on wrap
+      an extra two spaces because this is a sub-bullet.
+
+  • And back to normal should work as expected as well given we just deintented
+    the line again.
   • 🍺
 
   1 So should

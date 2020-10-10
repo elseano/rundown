@@ -19,7 +19,7 @@ func RenderShortCodes() error {
 	rd.SetLogger(flagDebug)
 
 	shortCodes := rd.GetShortCodes()
-	if len(shortCodes.Codes) == 0 {
+	if len(shortCodes.Codes) == 0 && len(shortCodes.Options) == 0 {
 		return errors.New("No shortcodes in document")
 	}
 
@@ -33,6 +33,34 @@ func RenderShortCodes() error {
 	table.SetBorder(false)
 	table.SetAutoWrapText(false)
 
+	// Document Options
+	sortedOptions := sort.StringSlice{}
+
+	for k := range shortCodes.Options {
+		sortedOptions = append(sortedOptions, k)
+	}
+
+	sortedOptions.Sort()
+
+	if sortedOptions.Len() > 0 {
+
+		table.Append([]string{aurora.Bold("Document Options").String(), "", ""})
+
+		for _, optCode := range sortedOptions {
+			opt := shortCodes.Options[optCode]
+			spec := ""
+
+			if opt.Default != "" {
+				spec = spec + " (default: " + opt.Default + ")"
+			} else if opt.Required {
+				spec = spec + " (required)"
+			}
+
+			table.Append([]string{"", "+" + opt.Code + "=[" + opt.Type + "]", opt.Description + spec})
+		}
+	}
+
+	// Document Shortcodes & Options
 	list := sort.StringSlice{}
 
 	for _, code := range shortCodes.Codes {
@@ -41,7 +69,15 @@ func RenderShortCodes() error {
 
 	list.Sort()
 
+	if len(list) > 0 && len(sortedOptions) > 0 {
+		table.Append([]string{"", "", ""})
+	}
+
 	for _, codeName := range list {
+		if codeName == "rundown:help" {
+			continue
+		}
+
 		code := shortCodes.Codes[codeName]
 
 		display := aurora.Bold(code.Name).String()

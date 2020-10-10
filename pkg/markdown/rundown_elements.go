@@ -473,6 +473,7 @@ func (n *Section) Dump(source []byte, level int) {
 		"Label":        fmt.Sprintf("%s", label),
 		"FunctionName": fmt.Sprintf("%s", functionName),
 		"Description":  fmt.Sprintf("%#v", descList),
+		"Name":         n.Name,
 	}, func(subLevel int) {
 		n.Handlers.Dump(source, subLevel)
 		n.Options.Dump(source, subLevel)
@@ -491,6 +492,18 @@ var KindSection = ast.NewNodeKind("Section")
 // Kind implements Node.Kind.
 func (n *Section) Kind() ast.NodeKind {
 	return KindSection
+}
+
+func NewSectionForRoot() *Section {
+	return &Section{
+		BaseBlock:    ast.BaseBlock{},
+		Label:        nil,
+		FunctionName: nil,
+		Level:        0,
+		Name:         "Root",
+		Handlers:     NewContainer("Handlers"),
+		Options:      NewContainer("Options"),
+	}
 }
 
 // NewRundownBlock returns a new RundownBlock node.
@@ -691,8 +704,11 @@ func (a *rundownASTTransformer) fixConsecutiveTexts(doc *ast.Document, reader te
 		if isText {
 			for {
 				if next, nextText := node.NextSibling().(*ast.Text); nextText {
-					text.Segment = text.Segment.WithStop(next.Segment.Stop)
-					node.Parent().RemoveChild(node.Parent(), next)
+					if text.Merge(next, reader.Source()) {
+						node.Parent().RemoveChild(node.Parent(), next)
+					} else {
+						break
+					}
 				} else {
 					break
 				}
@@ -765,8 +781,12 @@ func (a *rundownASTTransformer) Transform(doc *ast.Document, reader text.Reader,
 				if len(splitInfo) == 0 {
 					// If there's no modifiers on the FCB, then check for a preceding Rundown block.
 					if rdb, ok := node.PreviousSibling().(*RundownBlock); ok {
-						fencedMods.Ingest(rdb.Modifiers)
-						rdb.Parent().RemoveChild(rdb.Parent(), rdb)
+
+						// Make sure this rundown block is tagged with things for a FCB.
+						if rdb.Modifiers.HasAny("stop-ok", "stop-fail", "desc", "opt") == false {
+							fencedMods.Ingest(rdb.Modifiers)
+							rdb.Parent().RemoveChild(rdb.Parent(), rdb)
+						}
 					}
 				}
 
@@ -834,12 +854,28 @@ func (a *rundownASTTransformer) TransformSections(doc *ast.Document, reader text
 
 			parent.AppendChild(parent, section)
 
-			// if currentSection != nil {
-			// 	currentSection.Append(section)
-			// }
-
 			currentSection = section
+
+			// Fill all sections downwards to be the currentSection.
+			// This allows us to pick the correct parent when headings skip levels.
 			currentSectionTree[section.Level] = section
+			currentSectionTree[section.Level+1] = section
+			currentSectionTree[section.Level+2] = section
+			currentSectionTree[section.Level+3] = section
+		} else if currentSection == nil {
+			// Special case - we have content without a heading.
+			// Create a root section, which allows us to have document-wide options.
+
+			section := NewSectionForRoot()
+			toc.AddSection(section)
+			doc.AppendChild(doc, section)
+			currentSection = section
+
+			currentSectionTree[section.Level] = section
+			currentSectionTree[section.Level+1] = section
+			currentSectionTree[section.Level+2] = section
+			currentSectionTree[section.Level+3] = section
+			currentSectionTree[section.Level+4] = section
 		}
 
 		if currentSection != nil {
@@ -847,7 +883,7 @@ func (a *rundownASTTransformer) TransformSections(doc *ast.Document, reader text
 		}
 	}
 
-	if currentSection != nil {
+	if len(toc.Sections) > 0 {
 		toc.AppendChild(toc, doc)
 	}
 }

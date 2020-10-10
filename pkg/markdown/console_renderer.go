@@ -69,7 +69,7 @@ const (
 
 type RundownHandler interface {
 	Mutate([]byte, ast.Node) ([]byte, error)
-	OnRundownNode(node ast.Node, entering bool) error
+	OnRundownNode(node ast.Node, entering bool) (ast.WalkStatus, error)
 	OnExecute(node *ExecutionBlock, source []byte, out io.Writer) (ExecutionResult, error)
 }
 
@@ -426,15 +426,12 @@ func (r *Renderer) renderRundownBlock(w util.BufWriter, source []byte, node ast.
 	rundown := node.(*RundownBlock)
 
 	if r.Config.RundownHandler != nil {
-		err := r.Config.RundownHandler.OnRundownNode(node, entering)
+		cmd, err := r.Config.RundownHandler.OnRundownNode(rundown, entering)
 		if err != nil {
 			return ast.WalkStop, err
 		}
-	}
 
-	// We don't render function/shortcode option contents, thats for reading only.
-	if rundown.Modifiers.HasAny("ignore", "opt") {
-		return ast.WalkSkipChildren, nil
+		return cmd, nil
 	}
 
 	return ast.WalkContinue, nil
@@ -488,7 +485,7 @@ func (r *Renderer) renderRundownInline(w util.BufWriter, source []byte, node ast
 		}
 
 		if r.Config.RundownHandler != nil {
-			err := r.Config.RundownHandler.OnRundownNode(node, entering)
+			_, err := r.Config.RundownHandler.OnRundownNode(node, entering)
 			if err != nil {
 				return ast.WalkStop, err
 			}
@@ -504,7 +501,7 @@ func (r *Renderer) renderRundownInline(w util.BufWriter, source []byte, node ast
 		}
 	} else {
 		if r.Config.RundownHandler != nil {
-			err := r.Config.RundownHandler.OnRundownNode(node, entering)
+			_, err := r.Config.RundownHandler.OnRundownNode(node, entering)
 			if err != nil {
 				return ast.WalkStop, err
 			}
@@ -1042,6 +1039,7 @@ func (r *Renderer) renderText(w util.BufWriter, source []byte, node ast.Node, en
 	if !entering {
 		return ast.WalkContinue, nil
 	}
+
 	n := node.(*ast.Text)
 	segment := n.Segment
 
@@ -1067,8 +1065,7 @@ func (r *Renderer) renderText(w util.BufWriter, source []byte, node ast.Node, en
 			_, _ = w.WriteString("\n")
 			r.writeString(w, paddingForLevel(r.currentLevel))
 		} else if n.SoftLineBreak() {
-			_ = w.WriteByte('\n')
-			r.writeString(w, paddingForLevel(r.currentLevel))
+			// Do nothing, let word wrapping handle this case.
 		}
 	}
 

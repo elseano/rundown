@@ -37,13 +37,11 @@ Code blocks can set environment variables, and they'll be provided to subsequent
 
 ``` bash reveal nospin
 echo "env: SOMEVAL=Test" > $RUNDOWN
-echo "\e[R env: MODE=thing"
 ```
 
 Now we can reference that later.
 
 ``` bash stdout reveal nospin
 echo $SOMEVAL
-echo $MODE
 echo "We're all done"
 ```

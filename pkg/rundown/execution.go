@@ -143,17 +143,22 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 		modifiers.Flags[NoRunFlag] = true
 	}
 
-	if modifiers.Flags[NamedFlag] && !modifiers.Flags[NoSpinFlag] {
+	if modifiers.HasAny("named", "spinner") && !modifiers.Flags[NoSpinFlag] {
 		logger.Println("Block is NAMED")
-		firstLine := strings.Split(strings.TrimSpace(content), "\n")[0]
-		matcher := regexp.MustCompile(`\s*.{1,2}\s+(.*)`)
-		matches := matcher.FindStringSubmatch(firstLine)
 
-		if len(matches) > 1 {
-			logger.Printf("Name is %s", matches[1])
-			spinnerName = matches[1]
-		} else {
-			logger.Println("No name detected")
+		if modifiers.Flags[NamedFlag] {
+			firstLine := strings.Split(strings.TrimSpace(content), "\n")[0]
+			matcher := regexp.MustCompile(`\s*.{1,2}\s+(.*)`)
+			matches := matcher.FindStringSubmatch(firstLine)
+
+			if len(matches) > 1 {
+				logger.Printf("Name is %s", matches[1])
+				spinnerName = matches[1]
+			} else {
+				logger.Println("No name detected")
+			}
+		} else if name, ok := modifiers.Values[markdown.Parameter("spinner")]; ok {
+			spinnerName = name
 		}
 	}
 
@@ -268,6 +273,10 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 		var waiter sync.WaitGroup
 
 		if modifiers.Flags[StdoutFlag] {
+			if _, ok := executionBlock.PreviousSibling().(*markdown.ExecutionBlock); ok {
+				out.Write([]byte("\r\n"))
+			}
+
 			stdoutReader, stdoutWriter, err := os.Pipe()
 			if err != nil {
 				spinner.Error("Error")
@@ -345,11 +354,6 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 					spinner.Success("Complete")
 				}
 			}
-		}
-
-		if !endedWithoutNewline {
-			logger.Println("Injecting newline")
-			// fmt.Fprint(output, "\r\n")
 		}
 
 		if we, ok := waitErr.(*exec.ExitError); ok {

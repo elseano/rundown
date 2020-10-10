@@ -48,20 +48,20 @@ func (v *RundownHandler) Mutate(input []byte, node ast.Node) ([]byte, error) {
 	return input, nil
 }
 
-func (v *RundownHandler) OnRundownNode(node ast.Node, entering bool) error {
+func (v *RundownHandler) OnRundownNode(node ast.Node, entering bool) (ast.WalkStatus, error) {
 	if !entering {
 		if rundown, ok := node.(*markdown.RundownBlock); ok {
 			if rundown.GetModifiers().Flags[rd.StopOkFlag] {
-				return &rd.StopError{Result: rd.StopOkResult}
+				return ast.WalkStop, &rd.StopError{Result: rd.StopOkResult}
 			}
 
 			if rundown.GetModifiers().Flags[rd.StopFailFlag] {
-				return &rd.StopError{Result: rd.StopFailResult}
+				return ast.WalkStop, &rd.StopError{Result: rd.StopFailResult}
 			}
 		}
 	}
 
-	return nil
+	return ast.WalkContinue, nil
 }
 
 func NewRundownHandler(ctx *rundown.Context) *RundownHandler {

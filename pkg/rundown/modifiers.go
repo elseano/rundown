@@ -56,6 +56,7 @@ const (
 	LabelParameter                          = "label"
 	DescriptionParameter                    = "desc"
 	OnFailureParameter                      = "on-failure"
+	StopFailParameter                       = "stop-fail"
 )
 
 var validParameters = map[markdown.Parameter]bool{
@@ -64,6 +65,7 @@ var validParameters = map[markdown.Parameter]bool{
 	LabelParameter:       true,
 	DescriptionParameter: true,
 	OnFailureParameter:   true,
+	StopFailParameter:    true,
 }
 
 func ValidateModifiers(subject *markdown.Modifiers) []error {

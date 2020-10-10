@@ -1,5 +1,7 @@
 package rundown
 
+import "github.com/elseano/rundown/pkg/markdown"
+
 type ExecutionResult struct {
 	Message   string
 	Kind      string
@@ -17,7 +19,8 @@ var (
 )
 
 type StopError struct {
-	Result ExecutionResult
+	Result       ExecutionResult
+	StopHandlers *markdown.Container
 }
 
 func (e *StopError) Error() string {
