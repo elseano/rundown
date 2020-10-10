@@ -123,10 +123,6 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 		indent = section.Level
 	}
 
-	// if context.ForcedLevelZero {
-	// 	indent = 0
-	// }
-
 	content := util.NodeLines(executionBlock, source)
 
 	logger.Printf("Block mods: %s\n", modifiers)
