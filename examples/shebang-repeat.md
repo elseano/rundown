@@ -18,6 +18,21 @@ Headings without shortcodes aren't included in the menu unless they're parents o
 * `--ask` - Present the menu once, if no shortcode is provided.
 * `--ask-repeat` - Like ask, but returns back to the menu after completion. Ctrl-C cancels.
 
+For example:
+
+``` bash reveal norun
+#!/usr/bin/env rundown --default execute:all
+```
+
+Note that specifying a default shortcode which has [mandatory options](./shortcodes.md#Shortcode%20arguments) without defaults will cause issues.
+
+## Built-in Help
+
+Rundown allows you to customise the help text displayed when the `--help` argument is provided to your script.
+
+By default, adding `--help` will display a list of all available shortcodes and their options. However, if your document includes a shortcode labelled `rundown:help`, rundown will render that shortcode's contents prior to displaying the list of shortcode options.
+
+
 # Investigate Servers <r label=i>
 
 <r desc>This will investigate servers.</r>

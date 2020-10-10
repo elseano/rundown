@@ -24,12 +24,12 @@ This file is a rundown file for example!
 Some of the additions Rundown brings are:
 
 * [Shortcodes](./examples/shortcodes.md), which allow you to only run portions of a markdown file.
-* Fenced code block execution and progress indicator [manipulation](./examples/spinner.md).
+* Fenced code block execution and progress indicator [manipulation](./examples/mods.md).
 * Optional failure handling, script skipping, and STDOUT presentation.
 * First-class [emoji](./examples/emoji.md) support either via UTF characters, or :rocket: (`:rocket:`) syntax.
 * [Invisible blocks](./examples/hidden.md), which are only rendered inside markdown and ignored by web based renderers.
-* Visually appealing console markdown rendering
-* [Shebang support](./examples/shebang-repeat.md), allowing you to make your markdown files executables (POSIX)
+* Visually appealing console markdown rendering, with support for images.
+* [Shebang support](./examples/shebang-repeat.md), allowing you to make your markdown files executable.
 * Rundown files can be designed to execute top to bottom, or present a menu to execute only a single part.
 * Fast - rundown is written in Go, and works on Linux and Mac. Windows support via WSL probably works.
 

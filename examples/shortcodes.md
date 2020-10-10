@@ -36,21 +36,23 @@ Shortcodes interrupt the standard top-down flow of a markdown file. Longer files
 
 <r desc>You can mark a code block as a `setup` block.</r> These blocks are special, as firstly, will be run prior to any child headings when skipping directly to that child heading, and secondly, they only run once per rundown execution. So if you're running two child headings in the same execution, the setup is only executed by the first shortcode.
 
-    # Deploying
+~~~ markdown reveal norun
+# Deploying
 
-    Before deploying, you'll want to make sure you've set your environment correctly.
+Before deploying, you'll want to make sure you've set your environment correctly.
 
-    ``` bash named env setup
-    # Ensure you've set your AWS Profile
-    export AWS_PROFILE=dev-environment
-    ```
+``` bash named env setup
+# Ensure you've set your AWS Profile
+export AWS_PROFILE=dev-environment
+```
 
-    ## Deploy Proxies <r label=deploy-proxies/>
+## Deploy Proxies <r label=deploy-proxies/>
 
-    ``` bash named
-    # Deploying proxies
-    kubectl apply -f deploy_proxies.yml
-    ```
+``` bash named
+# Deploying proxies
+kubectl apply -f deploy_proxies.yml
+```
+~~~
 
 In the above, if we run the `deploy-proxies` shortcode directly, the preceding `setup` block will also be run.
 
@@ -65,7 +67,7 @@ Structure your setup blocks to ensure that subsequent scripts fail for the right
 
 Shortcodes can accept arguments when invoked from the command line. Here's a shortcode which defines 3 arguments:
 
-~~~ markdown reveal norun
+~~~ html reveal norun
 # Wait for Activity Complete <r label="wait-complete"/>
 
 <r desc>Waits for something to be complete, while showing progress</r>
@@ -87,11 +89,10 @@ $ rundown README.md --help
 
 Supported options for README.md
 
-  wait-complete         Wait for Activity Complete 
-                        Waits for something to be complete, while showing progress                    
-                          +name=[string]   - The name of the object to wait for (required)
-                          +status=[string] - The status to wait for (default: complete)
-                          +type=[string]   - The type of object (default: any)
+  wait-complete         Waits for something to be complete, while showing progress                    
+    +name=[string]      The name of the object to wait for (required)
+    +status=[string]    The status to wait for (default: complete)
+    +type=[string]      The type of object (default: any)
 ```
 
 And the shortcode would be invoked like this:
@@ -100,6 +101,3 @@ And the shortcode would be invoked like this:
 rundown README.md wait-complete +name="Cool Bro"
 ```
 
-## Subtask
-
-This subtask will be invoked when `wait-complete` is invoked.
