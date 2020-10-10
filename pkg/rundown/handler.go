@@ -2,11 +2,11 @@ package rundown
 
 import (
 	"errors"
-	"io"
 	"regexp"
 	"strings"
 
 	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/util"
 
 	"github.com/elseano/rundown/pkg/markdown"
 )
@@ -153,7 +153,11 @@ func (v *rundownHandler) OnRundownNode(node ast.Node, entering bool) (ast.WalkSt
 	return ast.WalkContinue, nil
 }
 
-func (v *rundownHandler) OnExecute(node *markdown.ExecutionBlock, source []byte, out io.Writer) (markdown.ExecutionResult, error) {
+func (v *rundownHandler) OnExecute(node *markdown.ExecutionBlock, source []byte, out util.BufWriter) (markdown.ExecutionResult, error) {
+	// Make sure everything has been sent to the output, as we'll be using
+	// the raw output for execution.
+	out.Flush()
+
 	// We write to RawOut here, as out will be the word wrap writer.
 	result := Execute(v.ctx, node, source, v.ctx.Logger, v.ctx.RawOut)
 	switch result {

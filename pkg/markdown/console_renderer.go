@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"regexp"
@@ -70,7 +69,7 @@ const (
 type RundownHandler interface {
 	Mutate([]byte, ast.Node) ([]byte, error)
 	OnRundownNode(node ast.Node, entering bool) (ast.WalkStatus, error)
-	OnExecute(node *ExecutionBlock, source []byte, out io.Writer) (ExecutionResult, error)
+	OnExecute(node *ExecutionBlock, source []byte, out util.BufWriter) (ExecutionResult, error)
 }
 
 type withRundownHandler struct {
@@ -335,22 +334,22 @@ func (r *Renderer) levelLinesWithPrefix(prefix string, lines string, b util.BufW
 func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	// blocks
 
-	reg.Register(ast.KindDocument, r.skippable(r.renderDocument))
-	reg.Register(ast.KindHeading, r.skippable(r.renderHeading))
-	reg.Register(ast.KindBlockquote, r.skippable(r.renderBlockquote))
-	reg.Register(ast.KindCodeBlock, r.skippable(r.renderCodeBlock))
-	reg.Register(ast.KindFencedCodeBlock, r.skippable(r.renderFencedCodeBlock))
-	reg.Register(ast.KindHTMLBlock, r.skippable(r.renderHTMLBlock))
-	reg.Register(ast.KindList, r.skippable(r.renderList))
-	reg.Register(ast.KindListItem, r.skippable(r.renderListItem))
-	reg.Register(ast.KindParagraph, r.skippable(r.renderParagraph))
-	reg.Register(ast.KindTextBlock, r.skippable(r.renderTextBlock))
-	reg.Register(ast.KindThematicBreak, r.skippable(r.renderThematicBreak))
-	reg.Register(KindRundownBlock, r.skippable(r.renderRundownBlock))
-	reg.Register(KindSection, r.skippable(r.renderNothing))
-	reg.Register(KindSectionedDocument, r.skippable(r.renderNothing))
-	reg.Register(KindContainer, r.skippable(r.renderNothing))
-	reg.Register(KindExecutionBlock, r.skippable(r.renderExecutionBlock))
+	reg.Register(ast.KindDocument, r.blockCommon(r.renderDocument))
+	reg.Register(ast.KindHeading, r.blockCommon(r.renderHeading))
+	reg.Register(ast.KindBlockquote, r.blockCommon(r.renderBlockquote))
+	reg.Register(ast.KindCodeBlock, r.blockCommon(r.renderCodeBlock))
+	reg.Register(ast.KindFencedCodeBlock, r.blockCommon(r.renderFencedCodeBlock))
+	reg.Register(ast.KindHTMLBlock, r.blockCommon(r.renderHTMLBlock))
+	reg.Register(ast.KindList, r.blockCommon(r.renderList))
+	reg.Register(ast.KindListItem, r.blockCommon(r.renderListItem))
+	reg.Register(ast.KindParagraph, r.blockCommon(r.renderParagraph))
+	reg.Register(ast.KindTextBlock, r.blockCommon(r.renderTextBlock))
+	reg.Register(ast.KindThematicBreak, r.blockCommon(r.renderThematicBreak))
+	reg.Register(KindRundownBlock, r.blockCommon(r.renderRundownBlock))
+	reg.Register(KindSection, r.blockCommon(r.renderNothing))
+	reg.Register(KindSectionedDocument, r.blockCommon(r.renderNothing))
+	reg.Register(KindContainer, r.blockCommon(r.renderNothing))
+	reg.Register(KindExecutionBlock, r.blockCommon(r.renderExecutionBlock))
 
 	// inlines
 
@@ -375,17 +374,11 @@ func (r *Renderer) writeLines(w util.BufWriter, source []byte, n ast.Node) {
 	}
 }
 
-func (r *Renderer) skippable(render func(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error)) func(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+func (r *Renderer) blockCommon(render func(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error)) func(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	return func(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
-		if _, isSection := node.(*Section); isSection {
-			r.currentlySkipping = false
-		}
-
-		if r.currentlySkipping {
-			return ast.WalkSkipChildren, nil
-		}
-
-		return render(w, source, node, entering)
+		result, err := render(w, source, node, entering)
+		w.Flush()
+		return result, err
 	}
 }
 

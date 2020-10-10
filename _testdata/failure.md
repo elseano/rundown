@@ -129,7 +129,7 @@ Rundown has a few different ways it handles and interprets errors.
   Without the skip-on-failure or ignore-failure flags, a failing script will
   terminate the rundown file.
 
-  You can add helpful troubleshooting documentation for failure cases using the 
+  You can add helpful troubleshooting documentation for failure cases using the
   <rundown> tag with the on-failure attribute. The contents of the tag will be
   shown prior to exiting.
 
