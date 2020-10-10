@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 
 	"github.com/elseano/rundown/pkg/rundown"
@@ -24,7 +26,7 @@ func RenderShortCodes() error {
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetColumnAlignment([]int{tablewriter.ALIGN_RIGHT, tablewriter.ALIGN_LEFT, tablewriter.ALIGN_LEFT})
+	table.SetColumnAlignment([]int{tablewriter.ALIGN_LEFT, tablewriter.ALIGN_LEFT, tablewriter.ALIGN_LEFT})
 	table.SetCenterSeparator("")
 	table.SetColumnSeparator("")
 	table.SetRowSeparator("")
@@ -32,6 +34,7 @@ func RenderShortCodes() error {
 	table.SetHeaderLine(false)
 	table.SetBorder(false)
 	table.SetAutoWrapText(false)
+	table.SetAutoMergeCells(true)
 
 	// Document Options
 	sortedOptions := sort.StringSlice{}
@@ -42,9 +45,12 @@ func RenderShortCodes() error {
 
 	sortedOptions.Sort()
 
+	cleanFilename := filepath.Base(argFilename)
+	fmt.Printf(aurora.Underline("\nSupported options for %s\n\n").String(), cleanFilename)
+
 	if sortedOptions.Len() > 0 {
 
-		table.Append([]string{aurora.Bold("Document Options").String(), "", ""})
+		// table.Append([]string{cleanFilename, "The following options are supported"})
 
 		for _, optCode := range sortedOptions {
 			opt := shortCodes.Options[optCode]
@@ -56,7 +62,7 @@ func RenderShortCodes() error {
 				spec = spec + " (required)"
 			}
 
-			table.Append([]string{"", "+" + opt.Code + "=[" + opt.Type + "]", opt.Description + spec})
+			table.Append([]string{"+" + opt.Code + "=[" + opt.Type + "]", opt.Description + spec})
 		}
 	}
 
@@ -70,7 +76,7 @@ func RenderShortCodes() error {
 	list.Sort()
 
 	if len(list) > 0 && len(sortedOptions) > 0 {
-		table.Append([]string{"", "", ""})
+		// table.Append([]string{"", ""})
 	}
 
 	for _, codeName := range list {
@@ -80,12 +86,17 @@ func RenderShortCodes() error {
 
 		code := shortCodes.Codes[codeName]
 
-		display := aurora.Bold(code.Name).String()
-		if code.Description != "" {
-			display = display + "\n" + code.Description
+		display := code.Name
+
+		if flagDefault == codeName {
+			display = display + " (" + aurora.Underline("default").String() + ")"
 		}
 
-		table.Append([]string{aurora.Bold(code.Code).String(), "", display})
+		if code.Description != "" {
+			display = display + "\n" + aurora.Faint(code.Description).String()
+		}
+
+		table.Append([]string{code.Code, display})
 
 		sortedOptions := sort.StringSlice{}
 
@@ -95,23 +106,27 @@ func RenderShortCodes() error {
 
 		sortedOptions.Sort()
 
-		for _, optCode := range sortedOptions {
-			opt := code.Options[optCode]
-			spec := ""
+		if sortedOptions.Len() > 0 {
+			// table.Append([]string{"", aurora.Underline("Options").String()})
 
-			if opt.Default != "" {
-				spec = spec + " (default: " + opt.Default + ")"
-			} else if opt.Required {
-				spec = spec + " (required)"
+			for _, optCode := range sortedOptions {
+				opt := code.Options[optCode]
+				spec := ""
+
+				if opt.Default != "" {
+					spec = spec + " (default: " + opt.Default + ")"
+				} else if opt.Required {
+					spec = spec + " (required)"
+				}
+
+				table.Append([]string{"", "    +" + opt.Code + "=[" + opt.Type + "] - " + opt.Description + spec})
 			}
-
-			table.Append([]string{"", "+" + opt.Code + "=[" + opt.Type + "]", opt.Description + spec})
 		}
 
-		table.Append([]string{"", "", ""})
 	}
 
 	table.Render()
+	fmt.Printf("\n")
 
 	return nil
 }

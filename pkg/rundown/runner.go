@@ -363,7 +363,12 @@ func (r *Runner) RunCodesWithoutValidation(docSpec *DocumentSpec) error {
 	if len(docSpec.ShortCodes) > 0 {
 
 		for _, code := range docSpec.ShortCodes {
-			section := shortCodes.Codes[code.Code].Section
+			codeDef := shortCodes.Codes[code.Code]
+			if codeDef == nil {
+				return &InvalidShortCodeError{ShortCode: code.Code}
+			}
+
+			section := codeDef.Section
 			section.ForceRootLevel()
 
 			for _, opt := range code.Options {

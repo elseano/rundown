@@ -63,8 +63,15 @@ func init() {
 	originalHelpFunc := rootCmd.HelpFunc()
 
 	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		if len(args) > 0 && args[0] != "" {
-			help(cmd, args)
+		// Populates flags so we can show the default command
+		// when we're asking for help from an shebang script.
+		rootCmd.ParseFlags(args)
+
+		pureArgs := cmd.Flags().Args()
+		if len(pureArgs) > 0 && pureArgs[0] != "" {
+			argFilename = pureArgs[0]
+
+			help(cmd, pureArgs)
 		} else {
 			originalHelpFunc(cmd, args)
 		}
@@ -72,7 +79,9 @@ func init() {
 }
 
 func help(cmd *cobra.Command, args []string) {
-	argFilename = args[0]
+	if argFilename == "" {
+		argFilename = args[0]
+	}
 
 	rd, err := rundown.LoadFile(argFilename)
 	if err != nil {
