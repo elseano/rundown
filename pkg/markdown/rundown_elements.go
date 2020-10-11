@@ -427,6 +427,8 @@ type Section struct {
 	Description list.List // Description is a list as we want to keep it inside the DOM.
 	Setups      list.List // Setups is a list to keep them in the DOM too.
 
+	lastDoc *ast.Document
+
 	Label        *string
 	FunctionName *string
 	Level        int
@@ -516,7 +518,7 @@ func (n *Section) Kind() ast.NodeKind {
 }
 
 func NewSectionForRoot() *Section {
-	return &Section{
+	section := &Section{
 		BaseBlock:    ast.BaseBlock{},
 		Label:        nil,
 		FunctionName: nil,
@@ -525,6 +527,8 @@ func NewSectionForRoot() *Section {
 		Handlers:     NewContainer("Handlers"),
 		Options:      NewContainer("Options"),
 	}
+
+	return section
 }
 
 // NewRundownBlock returns a new RundownBlock node.
@@ -551,7 +555,7 @@ func NewSectionFromHeading(heading *ast.Heading, source []byte) *Section {
 		functionName = rundown.Modifiers.GetValue(Parameter("func"))
 	}
 
-	return &Section{
+	section := &Section{
 		BaseBlock:    ast.BaseBlock{},
 		Label:        label,
 		FunctionName: functionName,
@@ -560,6 +564,8 @@ func NewSectionFromHeading(heading *ast.Heading, source []byte) *Section {
 		Handlers:     NewContainer("Handlers"),
 		Options:      NewContainer("Options"),
 	}
+
+	return section
 }
 
 func (n *Section) appendHandler(rundown RundownNode) {
@@ -620,6 +626,31 @@ func (n *Section) Append(child ast.Node) {
 	}
 
 	n.AppendChild(n, child)
+}
+
+func terminatesSectionDoc(node ast.Node) bool {
+	switch node.Kind() {
+	case KindSection:
+		return true
+	case KindExecutionBlock:
+		return true
+	default:
+		return false
+	}
+}
+
+func (n *Section) AppendChild(self, node ast.Node) {
+	if terminatesSectionDoc(node) {
+		n.BaseBlock.AppendChild(self, node)
+		n.lastDoc = nil
+	} else {
+		if n.lastDoc == nil {
+			n.lastDoc = ast.NewDocument()
+			n.BaseBlock.AppendChild(self, n.lastDoc)
+		}
+
+		n.lastDoc.AppendChild(n.lastDoc, node)
+	}
 }
 
 type Container struct {

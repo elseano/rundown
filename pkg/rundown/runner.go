@@ -210,8 +210,8 @@ func (r *Runner) SetLogger(isLogging bool) {
 	r.logger = log.New(debug, "", log.Ltime)
 }
 
-func (r *Runner) getEngine() (goldmark.Markdown, *util.WordWrapWriter, *Context) {
-	md := markdown.PrepareMarkdown()
+func (r *Runner) getEngineOld() (goldmark.Markdown, *util.WordWrapWriter, *Context) {
+	md := PrepareMarkdown()
 	renderer := md.Renderer()
 	ctx := NewContext()
 	ctx.Logger = r.logger
@@ -238,6 +238,20 @@ func (r *Runner) getEngine() (goldmark.Markdown, *util.WordWrapWriter, *Context)
 	})
 
 	return md, www, ctx
+}
+
+func (r *Runner) getEngine() (goldmark.Markdown, *Context) {
+	md, rd := NewRenderer()
+
+	ctx := rd.ctx
+	ctx.Logger = r.logger
+	ctx.CurrentFile = r.filename
+	if r.consoleWidth > 0 {
+		ctx.ConsoleWidth = r.consoleWidth
+	}
+	ctx.RawOut = r.out
+
+	return md, ctx
 }
 
 func (r *Runner) getAST(md goldmark.Markdown) (ast.Node, []byte) {
@@ -282,7 +296,7 @@ func NewDocumentShortCodes() *DocumentShortCodes {
 }
 
 func (r *Runner) GetShortCodes() *DocumentShortCodes {
-	md, _, _ := r.getEngine()
+	md, _ := r.getEngine()
 	doc, bytes := r.getAST(md)
 
 	return r.getShortCodes(doc, bytes)
@@ -344,7 +358,7 @@ func ParseShortCodeSpecs(specs []string) (*DocumentSpec, error) {
 }
 
 func (r *Runner) RunCodesWithoutValidation(docSpec *DocumentSpec) error {
-	md, www, ctx := r.getEngine()
+	md, ctx := r.getEngine()
 	doc, bytes := r.getAST(md)
 	shortCodes := r.getShortCodes(doc, bytes)
 
@@ -375,15 +389,15 @@ func (r *Runner) RunCodesWithoutValidation(docSpec *DocumentSpec) error {
 				ctx.SetEnv("OPT_"+strings.ToUpper(opt.Code), opt.Value)
 			}
 
-			err := md.Renderer().Render(www, bytes, section)
+			err := md.Renderer().Render(ctx.RawOut, bytes, section)
 
 			if err != nil {
 				if stopError, ok := err.(*StopError); ok && stopError.StopHandlers != nil && stopError.StopHandlers.ChildCount() > 0 {
 					// Add some space between last node and the output.
-					www.Write([]byte("\r\n"))
+					ctx.RawOut.Write([]byte("\r\n"))
 
 					ctx.SetError(stopError)
-					md.Renderer().Render(www, bytes, stopError.StopHandlers)
+					md.Renderer().Render(ctx.RawOut, bytes, stopError.StopHandlers)
 				}
 				return err
 			}
@@ -393,17 +407,21 @@ func (r *Runner) RunCodesWithoutValidation(docSpec *DocumentSpec) error {
 			}
 		}
 	} else {
-		err := md.Renderer().Render(www, bytes, doc)
+		// w := util.NewCleanNewlineWriter(ctx.RawOut)
+		err := md.Renderer().Render(ctx.RawOut, bytes, doc)
 
 		if err != nil {
-			if stopError, ok := err.(*StopError); ok && stopError.StopHandlers != nil && stopError.StopHandlers.ChildCount() > 0 {
-				// Add some space between last node and the output.
-				www.Write([]byte("\r\n"))
-
-				ctx.SetError(stopError)
-				md.Renderer().Render(www, bytes, stopError.StopHandlers)
-			}
 			return err
+		}
+
+		if ctx.CurrentError != nil {
+			if stopError, ok := ctx.CurrentError.(*StopError); ok && stopError.StopHandlers != nil && stopError.StopHandlers.ChildCount() > 0 {
+				// Add some space between last node and the output.
+				ctx.RawOut.Write([]byte("\r\n"))
+				md.Renderer().Render(ctx.RawOut, bytes, stopError.StopHandlers)
+			}
+
+			return ctx.CurrentError
 		}
 	}
 
@@ -411,7 +429,7 @@ func (r *Runner) RunCodesWithoutValidation(docSpec *DocumentSpec) error {
 }
 
 func (r *Runner) RunCodes(docSpec *DocumentSpec) error {
-	md, _, _ := r.getEngine()
+	md, _ := r.getEngine()
 	doc, bytes := r.getAST(md)
 	shortCodes := r.getShortCodes(doc, bytes)
 

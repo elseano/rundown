@@ -75,6 +75,7 @@ func init() {
 	rootCmd.AddCommand(emojiCmd)
 	rootCmd.AddCommand(checkCmd)
 	rootCmd.AddCommand(completionCmd)
+	rootCmd.AddCommand(viewCmd)
 
 	originalHelpFunc := rootCmd.HelpFunc()
 

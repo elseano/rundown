@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
-	"os"
 
-	"github.com/elseano/rundown/pkg/markdown"
-
+	"github.com/charmbracelet/glamour"
+	"github.com/elseano/rundown/pkg/util"
 	"github.com/spf13/cobra"
 )
 
@@ -27,8 +27,24 @@ var viewCmd = &cobra.Command{
 }
 
 func view(cmd *cobra.Command, args []string) {
-	md := markdown.PrepareMarkdown()
+	fmt.Printf("Reading %s\n", argFilename)
+	byteData, err := ioutil.ReadFile(argFilename)
+	if err != nil {
+		panic(err)
+	}
 
-	b, _ := ioutil.ReadFile(argFilename)
-	md.Convert(b, os.Stdout)
+	fmt.Printf("Read %d bytes\n", len(byteData))
+
+	r, _ := glamour.NewTermRenderer(
+		// detect background color and pick either the default dark or light theme
+		glamour.WithAutoStyle(),
+		// wrap output at specific width
+		glamour.WithWordWrap(util.GetConsoleWidth()),
+	)
+
+	out, err := r.Render(string(byteData))
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(out)
 }

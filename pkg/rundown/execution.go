@@ -117,11 +117,11 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 	var doneChannel = make(chan struct{})
 	var modifiers = executionBlock.Modifiers
 
-	indent := 0
+	indent := 2
 
-	if section, ok := executionBlock.Parent().(*markdown.Section); ok {
-		indent = section.Level
-	}
+	// if section, ok := executionBlock.Parent().(*markdown.Section); ok {
+	// 	indent = section.Level
+	// }
 
 	content := util.NodeLines(executionBlock, source)
 

@@ -3,7 +3,7 @@
 In Rundown, ShortCodes allow you to create subcommands within your markdown file. ShortCodes are special markup inside a heading:
 
 ``` markdown reveal norun
-# This is a heading [](label:my-shortcode)
+# This is a heading <r label=my-shortcode/>
 
 You can run me via `rundown shortcodes.md my-shortcode`
 ```
