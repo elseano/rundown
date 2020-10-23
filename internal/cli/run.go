@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/elseano/rundown/pkg/markdown"
 	"github.com/elseano/rundown/pkg/rundown"
 	"github.com/elseano/rundown/pkg/segments"
 	"github.com/logrusorgru/aurora"
@@ -33,7 +32,7 @@ func BuildLogger(debugging bool) *log.Logger {
 	return logger
 }
 
-var md = markdown.PrepareMarkdown()
+var md = rundown.PrepareMarkdown()
 
 func FileToSegments(filename string, logger *log.Logger) []segments.Segment {
 	logger.Printf("Loading file %s", filename)
@@ -192,7 +191,7 @@ func InspectRundown(c *cli.Context) {
 func InspectMarkdown(c *cli.Context) {
 	filename := c.Args().Get(0)
 
-	md := markdown.PrepareMarkdown()
+	md := rundown.PrepareMarkdown()
 
 	b, _ := ioutil.ReadFile(filename)
 

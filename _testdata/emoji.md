@@ -9,10 +9,11 @@ But not :notemoji: because it's invalid.
 -----
 
 Emoji Support
-Supports GitHub Emojis
 
-Beer 🍺, smile 😄, and of course 🚀.
+  Supports GitHub Emojis
 
-But not :notemoji: because it's invalid.
+  Beer 🍺, smile 😄, and of course 🚀.
+
+  But not :notemoji: because it's invalid.
 
 

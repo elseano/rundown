@@ -13,7 +13,11 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/charmbracelet/glamour/ansi"
+	"github.com/muesli/termenv"
+
 	"github.com/elseano/rundown/pkg/util"
+	"github.com/yuin/goldmark/renderer"
 )
 
 type Context struct {
@@ -28,6 +32,9 @@ type Context struct {
 	CurrentFile     string
 	RawOut          io.Writer
 	CurrentError    error
+	Renderer        renderer.Renderer
+	Style           *ansi.StyleConfig
+	Profile         termenv.Profile
 }
 
 func receiveLoop(filename string, messages chan<- string) {

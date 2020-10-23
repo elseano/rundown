@@ -8,3 +8,11 @@ To use this file, make sure you specify the `+opt-one` parameter.
 
 Ignored.
 
+-----
+
+Help using this file
+
+  To use this file, make sure you specify the  +opt-one  parameter.
+
+  
+Error: Document option opt-one error: Is required

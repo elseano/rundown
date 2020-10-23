@@ -119,7 +119,7 @@ func renderNodes(renderer renderer.Renderer, nodes []ast.Node, source []byte, ou
 func (c *BaseSegment) Execute(ctx *rundown.Context, renderer renderer.Renderer, lastSegment Segment, logger *log.Logger, out io.Writer) rundown.ExecutionResult {
 	// We can't change options on a renderer after it's rendered something
 	// so we always use a fresh renderer.
-	subRenderer := markdown.PrepareMarkdown().Renderer()
+	subRenderer := rundown.PrepareMarkdown().Renderer()
 
 	currentLevel := c.Level
 

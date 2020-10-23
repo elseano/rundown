@@ -5,7 +5,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/text"
 
 	"github.com/elseano/rundown/pkg/util"
@@ -16,10 +19,7 @@ import (
 func TestRundownInline(t *testing.T) {
 	contents := []byte("Normal <r>markdown</r> text")
 
-	markdown := PrepareMarkdown()
-	reader := text.NewReader(contents)
-
-	doc := markdown.Parser().Parse(reader)
+	doc := getAst(contents)
 
 	t.Log(util.DumpNode(doc, contents))
 
@@ -33,10 +33,7 @@ func TestRundownInline(t *testing.T) {
 func TestRundownBlock(t *testing.T) {
 	contents := []byte("<r some-attr some-val='val'>Rundown Block-like</r>")
 
-	markdown := PrepareMarkdown()
-	reader := text.NewReader(contents)
-
-	doc := markdown.Parser().Parse(reader)
+	doc := getAst(contents)
 
 	t.Log(util.DumpNode(doc, contents))
 
@@ -56,10 +53,7 @@ echo Hello
 ~~~
 	`)
 
-	markdown := PrepareMarkdown()
-	reader := text.NewReader(contents)
-
-	doc := markdown.Parser().Parse(reader)
+	doc := getAst(contents)
 
 	t.Log(util.DumpNode(doc, contents))
 
@@ -79,10 +73,7 @@ echo Hello
 ~~~
 	`)
 
-	markdown := PrepareMarkdown()
-	reader := text.NewReader(contents)
-
-	doc := markdown.Parser().Parse(reader)
+	doc := getAst(contents)
 
 	t.Log(util.DumpNode(doc, contents))
 
@@ -98,10 +89,7 @@ echo Hello
 ~~~
 	`)
 
-	markdown := PrepareMarkdown()
-	reader := text.NewReader(contents)
-
-	doc := markdown.Parser().Parse(reader)
+	doc := getAst(contents)
 
 	t.Log(util.DumpNode(doc, contents))
 
@@ -117,10 +105,7 @@ echo Hello
 ~~~
 	`)
 
-	markdown := PrepareMarkdown()
-	reader := text.NewReader(contents)
-
-	doc := markdown.Parser().Parse(reader)
+	doc := getAst(contents)
 
 	t.Log(util.DumpNode(doc, contents))
 
@@ -138,10 +123,7 @@ echo Hello
 ~~~
 	`)
 
-	markdown := PrepareMarkdown()
-	reader := text.NewReader(contents)
-
-	doc := markdown.Parser().Parse(reader)
+	doc := getAst(contents)
 
 	t.Log(util.DumpNode(doc, contents))
 
@@ -170,10 +152,8 @@ Blah
 
 	`)
 
-	markdown := PrepareMarkdown()
-	reader := text.NewReader(contents)
+	doc := getAst(contents)
 
-	doc := markdown.Parser().Parse(reader)
 	if doc.Parent() != nil {
 		doc = doc.Parent()
 	}
@@ -223,10 +203,7 @@ echo Blah
 ~~~
 	`)
 
-	markdown := PrepareMarkdown()
-	reader := text.NewReader(contents)
-
-	doc := markdown.Parser().Parse(reader)
+	doc := getAst(contents)
 	if doc.Parent() != nil {
 		doc = doc.Parent()
 	}
@@ -264,10 +241,7 @@ echo Hi
 
 	`)
 
-	markdown := PrepareMarkdown()
-	reader := text.NewReader(contents)
-
-	doc := markdown.Parser().Parse(reader)
+	doc := getAst(contents)
 	if doc.Parent() != nil {
 		doc = doc.Parent()
 	}
@@ -305,10 +279,7 @@ Three.
 Four.
 	`)
 
-	markdown := PrepareMarkdown()
-	reader := text.NewReader(contents)
-
-	doc := markdown.Parser().Parse(reader)
+	doc := getAst(contents)
 	if doc.Parent() != nil {
 		doc = doc.Parent()
 	}
@@ -397,4 +368,26 @@ func kindsForList(nodes list.List) []string {
 	}
 
 	return result
+}
+
+func getAst(contents []byte) ast.Node {
+
+	md := goldmark.New(
+		goldmark.WithExtensions(
+			extension.GFM,
+			InvisibleBlocks,
+			extension.Strikethrough,
+			RundownElements,
+			Emoji,
+		),
+		goldmark.WithParserOptions(
+			parser.WithAutoHeadingID(),
+		),
+	)
+
+	reader := text.NewReader(contents)
+
+	doc := md.Parser().Parse(reader)
+
+	return doc
 }

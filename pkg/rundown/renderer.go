@@ -1,14 +1,24 @@
 package rundown
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
+	"html"
+	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
+	icolor "image/color"
+
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/ansi"
+	"github.com/eliukblau/pixterm/pkg/ansimage"
 	"github.com/elseano/rundown/pkg/markdown"
+	rdutil "github.com/elseano/rundown/pkg/util"
+	"github.com/kyokomi/emoji"
 	"github.com/muesli/termenv"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -44,7 +54,9 @@ func init() {
 	hasDarkBkg = termenv.HasDarkBackground()
 }
 
-func NewRenderer() (goldmark.Markdown, *RundownRenderer) {
+func strPtr(blah string) *string { return &blah }
+
+func NewRenderer(ctx *Context) (goldmark.Markdown, *RundownRenderer) {
 	md := goldmark.New(
 		goldmark.WithExtensions(
 			extension.GFM,
@@ -59,31 +71,44 @@ func NewRenderer() (goldmark.Markdown, *RundownRenderer) {
 		),
 	)
 	ansiOptions := ansi.Options{
-		WordWrap:     80,
+		WordWrap:     ctx.ConsoleWidth,
 		ColorProfile: termenv.TrueColor,
 	}
 
 	if hasDarkBkg {
 		ansiOptions.Styles = glamour.DarkStyleConfig
+		ansiOptions.Styles.Document.Color = strPtr("255") // Increase contrast
 	} else {
 		ansiOptions.Styles = glamour.LightStyleConfig
+		ansiOptions.Styles.Document.Color = strPtr("232") // Increase contrast
 	}
 
 	ansiOptions.ColorProfile = termenv.ColorProfile()
 
 	ar := ansi.NewRenderer(ansiOptions)
-	rd := &RundownRenderer{ctx: NewContext(), ar: ar}
-	rd.ctx.RawOut = os.Stdout
-
-	md.SetRenderer(
-		renderer.NewRenderer(
-			renderer.WithNodeRenderers(
-				util.Prioritized(ar, 1000),
-				util.Prioritized(rd, 1),
-			),
+	rd := &RundownRenderer{ctx: ctx, ar: ar}
+	rd.ctx.Style = &ansiOptions.Styles
+	rd.ctx.Profile = ansiOptions.ColorProfile
+	rd.ctx.Renderer = renderer.NewRenderer(
+		renderer.WithNodeRenderers(
+			util.Prioritized(ar, 1000),
+			util.Prioritized(rd, 1),
 		),
 	)
+
+	ar.Register(markdown.KindRundownInline, NewRundownInlineBuilder(rd.ctx))
+	ar.Register(ast.KindString, NewStringBuilder(rd.ctx))
+
+	md.SetRenderer(rd.ctx.Renderer)
+
 	return md, rd
+}
+
+func RenderToString(contents string) string {
+	md, _ := NewRenderer(NewContext())
+	var buf bytes.Buffer
+	md.Convert([]byte(contents), &buf)
+	return buf.String()
 }
 
 type RundownRenderer struct {
@@ -102,6 +127,95 @@ func (d *DummyRegister) Register(k ast.NodeKind, fun renderer.NodeRendererFunc) 
 	}
 }
 
+type StringBuilder struct {
+	ansi.BaseElementBuilder
+	ctx *Context
+}
+
+func NewStringBuilder(ctx *Context) *StringBuilder {
+	return &StringBuilder{
+		BaseElementBuilder: ansi.BaseElementBuilder{},
+		ctx:                ctx,
+	}
+}
+
+func (b *StringBuilder) NewElement(node ast.Node, source []byte, ctx *ansi.RenderContext) *ansi.Element {
+	n := node.(*ast.String)
+	s := string(n.Value)
+
+	if n.Parent().Kind() == ast.KindEmphasis {
+		return nil
+	}
+
+	return &ansi.Element{
+		Renderer: &ansi.BaseElement{
+			Token: html.UnescapeString(s),
+			Style: ctx.Options.Styles.Text,
+		},
+	}
+
+}
+
+type RundownInlineBuilder struct {
+	ansi.BaseElementBuilder
+	ctx *Context
+}
+
+func NewRundownInlineBuilder(ctx *Context) *RundownInlineBuilder {
+	return &RundownInlineBuilder{
+		BaseElementBuilder: ansi.BaseElementBuilder{},
+		ctx:                ctx,
+	}
+}
+
+type SubElement struct {
+	ansi.BlockElement
+	ctx   *Context
+	First bool
+}
+
+func (s SubElement) Finish(w io.Writer, ctx ansi.RenderContext) error {
+	var buf bytes.Buffer
+	s.BlockElement.Finish(&buf, ctx)
+	// str, err := SubEnv(buf.String(), s.ctx)
+	w.Write([]byte("Blah"))
+
+	return nil
+}
+
+func (b *RundownInlineBuilder) NewElement(node ast.Node, source []byte, ctx *ansi.RenderContext) *ansi.Element {
+
+	e := ansi.BlockElement{
+		Block: &bytes.Buffer{},
+		Style: ctx.BlockStack.Current().Style,
+	}
+
+	ee := SubElement{
+		BlockElement: e,
+		ctx:          b.ctx,
+	}
+
+	return &ansi.Element{
+		Renderer: &ee.BlockElement,
+		Finisher: ee,
+	}
+}
+
+func (e *SubElement) Render(w io.Writer, ctx ansi.RenderContext) error {
+	bs := ctx.BlockStack
+
+	if !e.First {
+		_, _ = w.Write([]byte("\n"))
+	}
+	be := ansi.BlockElement{
+		Block: &bytes.Buffer{},
+		Style: bs.Current().Style,
+	}
+	bs.Push(be)
+
+	return nil
+}
+
 func (r *RundownRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	// Hacky, but need to capture document renderer.
 	d := &DummyRegister{}
@@ -116,8 +230,10 @@ func (r *RundownRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer)
 	reg.Register(markdown.KindSectionedDocument, r.renderSectionedDocument)
 
 	// inline
-	reg.Register(markdown.KindEmojiInline, r.renderEmoji)
+	reg.Register(markdown.KindEmojiInline, r.ar.RenderWrapper(r.renderEmoji))
 	reg.Register(markdown.KindRundownInline, r.renderRundownInline)
+	reg.Register(markdown.KindTextSubInline, r.ar.RenderNode)
+	reg.Register(ast.KindImage, r.renderImage)
 }
 
 func deleteForward(node ast.Node) {
@@ -143,9 +259,70 @@ func (r *RundownRenderer) renderDocument(w util.BufWriter, source []byte, node a
 	}
 }
 
+var urlMatch = regexp.MustCompile("^http(s?)://")
+
+func (r *RundownRenderer) renderImage(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if val, set := os.LookupEnv("COLORTERM"); !set || (val != "truecolor" && val != "24bit") {
+		// Only render images when we're sure we're in truecolor mode.
+		return r.ar.RenderNode(w, source, node, entering)
+	}
+
+	if !entering {
+		return ast.WalkContinue, nil
+	}
+
+	n := node.(*ast.Image)
+	var marginInt = 0
+	if r.ctx.Style.Document.Margin != nil {
+		marginInt = int(*r.ctx.Style.Document.Margin)
+	}
+
+	var image *ansimage.ANSImage
+	var maxWidth = r.ctx.ConsoleWidth - (marginInt * 2)
+
+	if urlMatch.Match(n.Destination) {
+		if i, err := ansimage.NewScaledFromURL(string(n.Destination), 40, maxWidth, icolor.Black, ansimage.ScaleModeFit, ansimage.NoDithering); err != nil {
+			_, _ = w.WriteString("Error: " + err.Error())
+		} else {
+			image = i
+		}
+	} else {
+		if i, err := ansimage.NewScaledFromFile(string(n.Destination), 40, maxWidth, icolor.Black, ansimage.ScaleModeFit, ansimage.NoDithering); err != nil {
+			_, _ = w.WriteString("Error: " + err.Error())
+		} else {
+			image = i
+		}
+	}
+
+	w.Flush() // Start with empty.
+
+	if image != nil {
+		marginLeft := strings.Repeat(" ", marginInt)
+		lines := strings.Split(image.Render(), "\n")
+		for _, line := range lines {
+			if line != "" {
+				w.WriteString(marginLeft + line + "\n")
+			}
+
+			// Must flush every line to avoid filling buffer.
+			// Otherwise WordWrapWriter gets confused by half-formed escape codes on buffer full.
+			w.Flush()
+		}
+	}
+
+	w.WriteString("\n")
+
+	return ast.WalkSkipChildren, nil
+
+}
 func (r *RundownRenderer) renderRundownBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	w.Flush()
 	if entering {
+		if node.FirstChild() != nil {
+			// Bugfix paragraph spacing.
+			node.InsertBefore(node, node.FirstChild(), ast.NewString([]byte{}))
+		}
+
 		if rundown, ok := node.(*markdown.RundownBlock); ok {
 			// We don't render function/shortcode option contents, thats for reading only.
 			if rundown.Modifiers.HasAny("ignore", "opt") {
@@ -201,10 +378,13 @@ func (r *RundownRenderer) renderRundownBlock(w util.BufWriter, source []byte, no
 			}
 
 			if rundown.GetModifiers().HasAny("invoke") {
-				source := rundown.GetModifiers().GetValue("from")
+				sourceFile := rundown.GetModifiers().GetValue("from")
 
-				if source == nil {
-					source = &r.ctx.CurrentFile
+				if sourceFile == nil {
+					sourceFile = &r.ctx.CurrentFile
+				} else {
+					absPath := filepath.Join(filepath.Dir(r.ctx.CurrentFile), *sourceFile)
+					sourceFile = &absPath
 				}
 
 				name := rundown.GetModifiers().GetValue("invoke")
@@ -212,7 +392,7 @@ func (r *RundownRenderer) renderRundownBlock(w util.BufWriter, source []byte, no
 					return ast.WalkStop, errors.New("Invoke requires a ShortCode value")
 				}
 
-				rd, err := LoadFile(*source)
+				rd, err := LoadFile(*sourceFile)
 				if err != nil {
 					return ast.WalkStop, err
 				}
@@ -259,7 +439,21 @@ func (r *RundownRenderer) renderRundownBlock(w util.BufWriter, source []byte, no
 						return ast.WalkSkipChildren, nil
 					}
 
-					return ast.WalkStop, errors.New("Cannot find " + *name + " in " + *source)
+					err := fmt.Sprintf("Cannot find %s in %s.", *name, *sourceFile)
+					fns := rd.GetShortCodes().Functions
+
+					if len(fns) > 0 {
+						fnNames := []string{}
+						for key := range fns {
+							fnNames = append(fnNames, key)
+						}
+
+						err = fmt.Sprintf("%s. Valid functions: %s", err, strings.Join(fnNames, ", "))
+					} else {
+						err = fmt.Sprintf("%s. File not found, or has no functions.", err)
+					}
+
+					return ast.WalkStop, errors.New(err)
 				}
 
 			}
@@ -285,7 +479,7 @@ func (r *RundownRenderer) renderExecutionBlock(w util.BufWriter, source []byte, 
 	// We write to RawOut here, as out will be the word wrap writer.
 	result := Execute(r.ctx, executionBlock, source, r.ctx.Logger, r.ctx.RawOut)
 	if _, ok := node.NextSibling().(*markdown.ExecutionBlock); !ok {
-		w.WriteString("\n")
+		// w.WriteString("\n")
 	}
 
 	switch result {
@@ -326,14 +520,70 @@ func (r *RundownRenderer) renderExecutionBlock(w util.BufWriter, source []byte, 
 
 func (r *RundownRenderer) renderSection(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	w.Flush()
+
 	return ast.WalkContinue, nil
 }
 
 func (r *RundownRenderer) renderEmoji(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if entering {
+		emojiNode := node.(*markdown.EmojiInline)
+		w.WriteString(strings.TrimSpace(emoji.Sprint(":" + emojiNode.EmojiCode + ":")))
+	}
+	return ast.WalkContinue, nil
+}
+
+func (r *RundownRenderer) renderTextSubInline(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	w.Write([]byte("X"))
+	return ast.WalkContinue, nil
+}
+
+func (r *RundownRenderer) renderFixedText(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	return ast.WalkContinue, nil
 }
 
 func (r *RundownRenderer) renderRundownInline(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
-	w.Flush()
+	rd := node.(*markdown.RundownInline)
+
+	if rd.Modifiers.Flags[markdown.Flag("sub-env")] && entering {
+		// Find all text nodes containing $ENV or ${ENV:-} replace with FixedText.
+		ast.Walk(node, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+			if text, ok := node.(*ast.Text); ok && entering {
+				str := rdutil.NodeLines(text, source)
+				newStr, err := SubEnv(str, r.ctx)
+
+				if err == nil {
+					if newStr != str {
+						text.Parent().ReplaceChild(text.Parent(), text, ast.NewString([]byte(newStr)))
+					}
+				} else {
+					text.Parent().InsertAfter(text.Parent(), text, ast.NewString([]byte(" (not set)")))
+				}
+			}
+
+			return ast.WalkContinue, nil
+		})
+
+	}
+
 	return ast.WalkContinue, nil
+}
+
+type FixedText struct {
+	ast.BaseInline
+	Contents string
+}
+
+var KindFixedText = ast.NewNodeKind("FixedText")
+
+func (t *FixedText) Kind() ast.NodeKind {
+	return KindFixedText
+}
+
+func (t *FixedText) Dump(source []byte, level int) {
+	fmt.Printf("%sFixedText: %q\n", strings.Repeat("    ", level), t.Contents)
+}
+
+func NewFixedText(text string) *FixedText {
+
+	return &FixedText{Contents: text}
 }

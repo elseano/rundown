@@ -123,6 +123,8 @@ func help(cmd *cobra.Command, args []string) {
 }
 
 func run(cmd *cobra.Command, args []string) int {
+	var callBack func()
+
 	rd, err := rundown.LoadFile(argFilename)
 	if err != nil {
 		panic(err)
@@ -142,19 +144,19 @@ func run(cmd *cobra.Command, args []string) int {
 		}
 
 		err = RenderShortCodes()
-		return handleError(cmd.OutOrStderr(), err)
+		return handleError(cmd.OutOrStderr(), err, callBack)
 
 	case flagAsk:
 		KillReadlineBell()
 
 		spec, err := AskShortCode()
 		if err != nil {
-			return handleError(cmd.OutOrStderr(), err)
+			return handleError(cmd.OutOrStderr(), err, callBack)
 		}
 
 		if spec != nil {
-			err = rd.RunCodes(&rundown.DocumentSpec{ShortCodes: []*rundown.ShortCodeSpec{spec}, Options: map[string]*rundown.ShortCodeOptionSpec{}})
-			return handleError(cmd.OutOrStderr(), err)
+			err, callBack = rd.RunCodes(&rundown.DocumentSpec{ShortCodes: []*rundown.ShortCodeSpec{spec}, Options: map[string]*rundown.ShortCodeOptionSpec{}})
+			return handleError(cmd.OutOrStderr(), err, callBack)
 		}
 
 	case flagAskRepeat:
@@ -163,15 +165,15 @@ func run(cmd *cobra.Command, args []string) int {
 		for {
 			spec, err := AskShortCode()
 			if err != nil {
-				return handleError(cmd.OutOrStderr(), err)
+				return handleError(cmd.OutOrStderr(), err, callBack)
 			}
 
 			if spec == nil {
 				break
 			}
 
-			err = rd.RunCodes(&rundown.DocumentSpec{ShortCodes: []*rundown.ShortCodeSpec{spec}, Options: map[string]*rundown.ShortCodeOptionSpec{}})
-			return handleError(cmd.OutOrStderr(), err)
+			err, callBack = rd.RunCodes(&rundown.DocumentSpec{ShortCodes: []*rundown.ShortCodeSpec{spec}, Options: map[string]*rundown.ShortCodeOptionSpec{}})
+			return handleError(cmd.OutOrStderr(), err, callBack)
 		}
 
 	default:
@@ -183,7 +185,7 @@ func run(cmd *cobra.Command, args []string) int {
 
 		codes, err := rundown.ParseShortCodeSpecs(specs)
 		if err == nil {
-			err = rd.RunCodes(codes)
+			err, callBack = rd.RunCodes(codes)
 		}
 
 		if err != nil {
@@ -197,7 +199,7 @@ func run(cmd *cobra.Command, args []string) int {
 			}
 		}
 
-		return handleError(cmd.OutOrStderr(), err)
+		return handleError(cmd.OutOrStderr(), err, callBack)
 	}
 
 	return 0

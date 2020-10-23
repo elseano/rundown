@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func AssertLines(t *testing.T, expected string, actual string) {
+func AssertLines(t *testing.T, expected string, actual string) bool {
 	expectedLines := strings.Split(expected, "\n")
 	actualLines := strings.Split(actual, "\n")
 
@@ -18,7 +18,7 @@ func AssertLines(t *testing.T, expected string, actual string) {
 			t.Fatalf("Expected %s, but got no line", expectedLines[i])
 		} else if strings.TrimSpace(expectedLines[i]) == "" && strings.TrimSpace(actualLines[i]) == "" {
 			continue
-		} else if !assert.Equal(t, expectedLines[i], actualLines[i], "Mismatch on line "+strconv.Itoa(i)) {
+		} else if !assert.Equal(t, strings.TrimRight(expectedLines[i], " "), strings.TrimRight(actualLines[i], " "), "Mismatch on line "+strconv.Itoa(i)) {
 			break
 		}
 	}
@@ -26,6 +26,8 @@ func AssertLines(t *testing.T, expected string, actual string) {
 	if len(expectedLines) != len(actualLines) {
 		t.Fatalf("Expected %d lines, but got %d lines", len(expectedLines), len(actualLines))
 	}
+
+	return t.Failed()
 }
 
 type TestWriter struct {
