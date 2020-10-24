@@ -11,6 +11,3 @@ var (
 	argFilename   string
 	argShortcodes = []string{}
 )
-
-var GitCommit string
-var Version string

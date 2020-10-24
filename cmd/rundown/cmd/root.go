@@ -55,13 +55,12 @@ func RootCmd() *cobra.Command {
 	return rootCmd
 }
 
-func Execute() error {
+func Execute(version string, gitCommit string) error {
+	rootCmd.Version = version + " (" + gitCommit + ")"
 	return rootCmd.Execute()
 }
 
 func init() {
-	rootCmd.Version = Version + " (" + GitCommit + ")"
-
 	rootCmd.Flags().BoolVarP(&flagCodes, "help", "h", false, "Displays help & shortcodes for the given file")
 	rootCmd.Flags().BoolVar(&flagDebug, "debug", false, "Write debugging into to debug.log")
 	rootCmd.Flags().BoolVarP(&flagAsk, "ask", "a", false, "Ask which shortcode to run")
