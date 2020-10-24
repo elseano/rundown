@@ -1,6 +1,7 @@
 package markdown
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -22,7 +23,7 @@ type EmojiInline struct {
 
 // Dump implements Node.Dump.
 func (n *EmojiInline) Dump(source []byte, level int) {
-	gast.DumpHelper(n, source, level, nil, nil)
+	fmt.Printf("%sEmoji: \"%s\"\n", strings.Repeat("    ", level), n.EmojiCode)
 }
 
 // KindEmojiInline is a NodeKind of the Emoji node.

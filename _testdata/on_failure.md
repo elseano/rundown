@@ -25,21 +25,20 @@ failed
 -----
 
 OnFailure Handling
-Test of the on-failure attribute.
 
-  Success Case
+  Test of the  on-failure  attribute.
+
+
+  ## Success Case
+
   ✔ Running (Complete)
 
-  Fail Case
+  ## Fail Case
+
   ✖ Running (Failed)
 
-  You should only see me during a failure.
 
-  Please install the command.
-
-
-
-❌ Error - exit status 127 in:
+Error - exit status 127 in:
 
   1: #!/usr/bin/env bash
   2: 
@@ -48,3 +47,8 @@ Test of the on-failure attribute.
   5: failed
 
 SCRIPT: line 5: failed: command not found
+
+
+You should only see me during a failure.
+
+Please install the command.

@@ -8,7 +8,7 @@ import (
 	"sort"
 
 	"github.com/elseano/rundown/pkg/rundown"
-	"github.com/logrusorgru/aurora"
+	"github.com/elseano/rundown/pkg/util"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -33,8 +33,37 @@ func RenderShortCodes() error {
 	table.SetRowLine(false)
 	table.SetHeaderLine(false)
 	table.SetBorder(false)
-	table.SetAutoWrapText(false)
-	table.SetAutoMergeCells(true)
+
+	width := util.GetConsoleWidth() - 10
+
+	codeWidth := 20
+	for _, code := range shortCodes.Codes {
+		codeLen := len(code.Code)
+		if flagDefault == code.Code {
+			codeLen = codeLen + len(" (default)")
+		}
+
+		if codeLen > codeWidth {
+			codeWidth = codeLen
+		}
+	}
+
+	if codeWidth > (width/2)-1 {
+		codeWidth = (width / 2) - 1
+	}
+
+	descWidth := width - codeWidth
+
+	if descWidth > 20 {
+		table.SetColMinWidth(0, codeWidth)
+		// table.SetColMinWidth(1, descWidth)
+		table.SetColWidth(descWidth)
+	}
+
+	table.SetAutoWrapText(true)
+	table.SetReflowDuringAutoWrap(true)
+
+	// table.SetColWidth(20)
 
 	// Document Options
 	sortedOptions := sort.StringSlice{}
@@ -46,7 +75,8 @@ func RenderShortCodes() error {
 	sortedOptions.Sort()
 
 	cleanFilename := filepath.Base(argFilename)
-	fmt.Printf(aurora.Underline("\nSupported options for %s\n\n").String(), cleanFilename)
+
+	fmt.Println(rundown.RenderToString(fmt.Sprintf("# Supported options for %s", cleanFilename)))
 
 	if sortedOptions.Len() > 0 {
 
@@ -93,7 +123,8 @@ func RenderShortCodes() error {
 		}
 
 		if flagDefault == codeName {
-			codeName = codeName + " (" + aurora.Underline("default").String() + ")"
+			// codeName = codeName + " (" + aurora.Underline("default").String() + ")"
+			codeName = codeName + " (default)"
 		}
 
 		table.Append([]string{codeName, display})

@@ -48,7 +48,7 @@ func checkExec(cmd *cobra.Command, args []string) {
 	table.SetBorder(false)
 	table.SetAutoWrapText(false)
 
-	md := markdown.PrepareMarkdown()
+	md := rundown.PrepareMarkdown()
 	b, _ := ioutil.ReadFile(argFilename)
 
 	reader := text.NewReader(b)

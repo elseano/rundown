@@ -18,7 +18,7 @@ go get -u github.com/mjibson/esc
 export VERSION=`cat .current-version`
 export GIT_COMMIT=$(git rev-list -1 HEAD)
 
-FLAGS="-X cmd.GitCommit=$GIT_COMMIT -X cmd.Version=$VERSION"
+FLAGS="-X main.GitCommit=$GIT_COMMIT -X main.Version=$VERSION"
 
 go build -ldflags="$FLAGS" -o rundown cmd/rundown/main.go
 ```
@@ -61,7 +61,7 @@ mkdir -p dist/linux-amd64/
 
 GIT_COMMIT=$(git rev-list -1 HEAD)
 
-FLAGS="-X cmd.GitCommit=$GIT_COMMIT -X cmd.Version=$VERSION"
+FLAGS="-X main.GitCommit=$GIT_COMMIT -X main.Version=$VERSION"
 
 # Building MacOS
 GOOS=darwin go build -ldflags="$FLAGS" -o dist/darwin-amd64/rundown cmd/rundown/main.go

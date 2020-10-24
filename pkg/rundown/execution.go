@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/charmbracelet/glamour/ansi"
 	rdexec "github.com/elseano/rundown/pkg/exec"
 	"github.com/elseano/rundown/pkg/markdown"
 	"github.com/elseano/rundown/pkg/util"
@@ -117,11 +118,11 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 	var doneChannel = make(chan struct{})
 	var modifiers = executionBlock.Modifiers
 
-	indent := 0
+	indent := 2
 
-	if section, ok := executionBlock.Parent().(*markdown.Section); ok {
-		indent = section.Level
-	}
+	// if section, ok := executionBlock.Parent().(*markdown.Section); ok {
+	// 	indent = section.Level
+	// }
 
 	content := util.NodeLines(executionBlock, source)
 
@@ -298,7 +299,9 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 
 			go func() {
 				waiter.Add(1)
-				endedWithoutNewline = util.ReadAndFormatOutput(stdoutReader, indent, aurora.Blue("‣ ").Bold().Faint().String(), spinner, bufio.NewWriter(output), logger, aurora.Faint(outputHeading).String())
+
+				prefix := ansi.Ssprintf(context.Profile, context.Style.Heading.StylePrimitive, "‣ ")
+				endedWithoutNewline = util.ReadAndFormatOutput(stdoutReader, indent, prefix, spinner, bufio.NewWriter(output), logger, aurora.Faint(outputHeading).String())
 				logger.Printf("endedWithoutNewline? %v\r\n", endedWithoutNewline)
 				waiter.Done()
 			}()
