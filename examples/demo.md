@@ -12,7 +12,7 @@ By default, rundown runs fenced code blocks.
 
 ``` bash reveal named
 # Doing some processing work...
-sleep 5
+sleep 1
 ```
 
 It also allows you to show the command's output, and receive input.
@@ -23,11 +23,13 @@ read -p "Whats your name? " NAME
 export NAME
 ```
 
-Environment variables which were `export`ed by a script are optionally available in subsequent scripts.
+Environment variables which were `exported` by a script are optionally available in subsequent scripts.
 
 ``` bash reveal stdout
 echo "Hello, $NAME"
 ```
+
+You can also refer to them in the Markdown text: <r sub-env>`$NAME`</r>.
 
 ## Shortcodes <r label=my-shortcode/>
 
@@ -37,7 +39,7 @@ In Rundown **shortcodes** enable you to skip directly to that heading, either vi
 
 ``` bash named
 # Waiting
-sleep 5
+sleep 1
 ```
 
 ## Formatting

@@ -46,40 +46,43 @@ Ok done.
 -----
 
 Stdout Tests
-Scripts can write to STDOUT. By default, this is hidden.
 
-✔ Running (Complete)
-
-We can reveal STDOUT easily.
-
-Output
-‣ You should see this
-✔ Running (Complete)
-
-STDOUT will be indented, and correctly formatted when showing progress:
-
-Output
-‣ World
-✔ Running (Complete)
-
-STDOUT is also smart enough to hide the spinner when waiting for input on the
-same line:
-
-Output
-‣ Enter something: 
-✔ Running (Complete)
-
-However, STDOUT will reveal the spinner if your input prompt is a blank line.
-
-To overcome that, use the nospin modifier.
-
-Output
-‣ Some prompt
-
-If you're running a named code segment, the output heading will be the name.
-
-This is the title
-‣ Hi there
-✔ This is the title (Complete)
-
-Ok done.
+  Scripts can write to STDOUT. By default, this is hidden.
+  
+  ✔ Running (Complete)
+  
+  We can reveal STDOUT easily.
+  
+  Output
+  ‣ You should see this
+  ✔ Running (Complete)
+  
+  STDOUT will be indented, and correctly formatted when showing progress:
+  
+  Output
+  ‣ World
+  ✔ Running (Complete)
+  
+  STDOUT is also smart enough to hide the spinner when waiting for input on 
+  the same line:
+  
+  Output
+  ‣ Enter something: 
+  ✔ Running (Complete)
+  
+  However, STDOUT will reveal the spinner if your input prompt is a blank 
+  line.
+  
+  To overcome that, use the  nospin  modifier.
+  
+  Output
+  ‣ Some prompt
+  
+  If you're running a  named  code segment, the output heading will be the 
+  name.
+  
+  This is the title
+  ‣ Hi there
+  ✔ This is the title (Complete)
+  
+  Ok done.

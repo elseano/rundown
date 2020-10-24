@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io/ioutil"
 
-	"github.com/elseano/rundown/pkg/markdown"
+	"github.com/elseano/rundown/pkg/rundown"
 	"github.com/yuin/goldmark/text"
 
 	"github.com/spf13/cobra"
@@ -27,7 +27,7 @@ var astCmd = &cobra.Command{
 }
 
 func ast(cmd *cobra.Command, args []string) {
-	md := markdown.PrepareMarkdown()
+	md := rundown.PrepareMarkdown()
 
 	b, _ := ioutil.ReadFile(argFilename)
 

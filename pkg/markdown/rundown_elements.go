@@ -24,19 +24,22 @@ import (
 type rundownElements struct {
 }
 
-// Strikethrough is an extension that allow you to use codeModifier expression like '~~text~~' .
 var RundownElements = &rundownElements{}
 
 func (e *rundownElements) Extend(m goldmark.Markdown) {
 	m.Parser().AddOptions(
 		parser.WithInlineParsers(
 			util.Prioritized(NewRundownInlineParser(), 2),
+			// util.Prioritized(NewTextSubParser(), 2),
 		),
 		parser.WithBlockParsers(
 			util.Prioritized(NewRundownBlockParser(), 2),
 		),
 		parser.WithASTTransformers(
 			util.Prioritized(NewRundownASTTransformer(), 1),
+		),
+		parser.WithParagraphTransformers(
+			util.Prioritized(NewRundownParaTransformer(), 1),
 		),
 	)
 }
@@ -285,6 +288,114 @@ func NewRundownBlock(modifiers *Modifiers) *RundownBlock {
 
 /*
  *
+ *   Text Substitution Inline
+ *
+ */
+
+type TextSubInline struct {
+	ast.BaseInline
+	Segment  text.Segment
+	contents []byte
+}
+
+// Dump implements Node.Dump.
+func (n *TextSubInline) Dump(source []byte, level int) {
+	fmt.Printf("%sTextSubstitution: \"%s\"\n", strings.Repeat("    ", level), strings.TrimRight(string(n.Text(source)), "\n"))
+}
+
+// KindRundownBlock is a NodeKind of the RundownBlock node.
+var KindTextSubInline = ast.NewNodeKind("TextSubInline")
+
+// Kind implements Node.Kind.
+func (n *TextSubInline) Kind() ast.NodeKind {
+	return KindTextSubInline
+}
+
+// NewRundownBlock returns a new RundownBlock node.
+func NewTextSubInline() *TextSubInline {
+	return &TextSubInline{
+		BaseInline: ast.BaseInline{},
+	}
+}
+
+func (n *TextSubInline) Text(source []byte) []byte {
+	if n.contents != nil {
+		return n.contents
+	}
+
+	return n.Segment.Value(source)
+}
+
+func (n *TextSubInline) Substitute(contents []byte) {
+	n.contents = contents
+}
+
+/*
+ *
+ * Text Sub Inline Parser
+ *
+ */
+
+type textSubDelimiterProcessor struct {
+}
+
+func (p *textSubDelimiterProcessor) IsDelimiter(b byte) bool {
+	return b == '$' || !bytes.ContainsAny([]byte{b}, "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
+}
+
+func (p *textSubDelimiterProcessor) CanOpenCloser(opener, closer *parser.Delimiter) bool {
+	return opener.Char == closer.Char
+}
+
+func (p *textSubDelimiterProcessor) OnMatch(consumes int) ast.Node {
+	return NewTextSubInline()
+}
+
+var defaultTextSubDelimiterProcessor = &textSubDelimiterProcessor{}
+
+type textSubParser struct {
+}
+
+var defaultTextSubParser = &textSubParser{}
+
+// NewEmphasisParser return a new InlineParser that parses emphasises.
+func NewTextSubParser() parser.InlineParser {
+	return defaultTextSubParser
+}
+
+func (s *textSubParser) Trigger() []byte {
+	return []byte{'$'}
+}
+
+func (s *textSubParser) Parse(parent ast.Node, block text.Reader, pc parser.Context) ast.Node {
+	line, segment := block.PeekLine()
+	end := 0
+
+	for i := 1; i < len(line); i++ {
+		c := line[i]
+
+		if (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c == '_') {
+			end = i + 1
+			continue
+		}
+
+		break
+	}
+
+	if end == 0 {
+		return nil
+	}
+
+	node := NewTextSubInline()
+	node.Segment = segment.WithStop(segment.Start + end)
+
+	block.Advance(end)
+
+	return node
+}
+
+/*
+ *
  *   RUNDOWN BLOCK PARSER
  *
  */
@@ -427,6 +538,8 @@ type Section struct {
 	Description list.List // Description is a list as we want to keep it inside the DOM.
 	Setups      list.List // Setups is a list to keep them in the DOM too.
 
+	lastDoc *ast.Document
+
 	Label        *string
 	FunctionName *string
 	Level        int
@@ -516,7 +629,7 @@ func (n *Section) Kind() ast.NodeKind {
 }
 
 func NewSectionForRoot() *Section {
-	return &Section{
+	section := &Section{
 		BaseBlock:    ast.BaseBlock{},
 		Label:        nil,
 		FunctionName: nil,
@@ -525,6 +638,8 @@ func NewSectionForRoot() *Section {
 		Handlers:     NewContainer("Handlers"),
 		Options:      NewContainer("Options"),
 	}
+
+	return section
 }
 
 // NewRundownBlock returns a new RundownBlock node.
@@ -551,7 +666,7 @@ func NewSectionFromHeading(heading *ast.Heading, source []byte) *Section {
 		functionName = rundown.Modifiers.GetValue(Parameter("func"))
 	}
 
-	return &Section{
+	section := &Section{
 		BaseBlock:    ast.BaseBlock{},
 		Label:        label,
 		FunctionName: functionName,
@@ -560,6 +675,8 @@ func NewSectionFromHeading(heading *ast.Heading, source []byte) *Section {
 		Handlers:     NewContainer("Handlers"),
 		Options:      NewContainer("Options"),
 	}
+
+	return section
 }
 
 func (n *Section) appendHandler(rundown RundownNode) {
@@ -622,6 +739,33 @@ func (n *Section) Append(child ast.Node) {
 	n.AppendChild(n, child)
 }
 
+func terminatesSectionDoc(node ast.Node) bool {
+	switch node.Kind() {
+	case KindSection:
+		return true
+	case KindExecutionBlock:
+		return true
+	default:
+		node, ok := node.(*RundownBlock)
+
+		return ok && node.Modifiers.HasAll("invoke")
+	}
+}
+
+func (n *Section) AppendChild(self, node ast.Node) {
+	if terminatesSectionDoc(node) {
+		n.BaseBlock.AppendChild(self, node)
+		n.lastDoc = nil
+	} else {
+		if n.lastDoc == nil {
+			n.lastDoc = ast.NewDocument()
+			n.BaseBlock.AppendChild(self, n.lastDoc)
+		}
+
+		n.lastDoc.AppendChild(n.lastDoc, node)
+	}
+}
+
 type Container struct {
 	ast.Document
 	Name string
@@ -662,7 +806,22 @@ type SectionedDocument struct {
 
 // Dump implements Node.Dump.
 func (n *SectionedDocument) Dump(source []byte, level int) {
-	ast.DumpHelper(n, source, level, nil, nil)
+	functions := []string{}
+	sections := []string{}
+
+	for _, s := range n.Sections {
+		if s.FunctionName != nil {
+			functions = append(functions, *s.FunctionName)
+		}
+		if s.Label != nil {
+			sections = append(sections, *s.Label)
+		}
+	}
+
+	ast.DumpHelper(n, source, level, map[string]string{
+		"Functions":  strings.Join(functions, ", "),
+		"ShortCodes": strings.Join(sections, ", "),
+	}, nil)
 }
 
 // KindRundownBlock is a NodeKind of the RundownBlock node.
@@ -694,6 +853,35 @@ func (n *SectionedDocument) AddSection(section *Section) {
  * - Builds ExecutionBlock nodes.
  *
  */
+
+type rundownParagraphTransformer struct {
+}
+
+func NewRundownParaTransformer() parser.ParagraphTransformer {
+	return &rundownParagraphTransformer{}
+}
+
+func (t *rundownParagraphTransformer) Transform(para *ast.Paragraph, reader text.Reader, pc parser.Context) {
+	ast.Walk(para, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+
+		if rd, ok := node.(*RundownInline); ok {
+			if val, ok := rd.Modifiers.Flags[Flag("sub-env")]; val && ok {
+				subEnv := NewTextSubInline()
+
+				for child := rd.FirstChild(); child != nil; child = child.NextSibling() {
+					subEnv.AppendChild(subEnv, child)
+				}
+
+				rd.AppendChild(rd, subEnv)
+			}
+		}
+
+		return ast.WalkContinue, nil
+	})
+}
 
 type rundownASTTransformer struct {
 }
@@ -740,8 +928,97 @@ func (a *rundownASTTransformer) fixConsecutiveTexts(doc *ast.Document, reader te
 	})
 }
 
+func (a *rundownASTTransformer) fixTrailingHeadingSpace(doc *ast.Document, reader text.Reader, pc parser.Context) {
+	ast.Walk(doc, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+		if rd, ok := node.(*RundownInline); ok && rd.Modifiers.HasAny("label", "func") {
+			_, hOk := node.Parent().(*ast.Heading)
+			t, tOk := node.PreviousSibling().(*ast.Text)
+
+			if hOk && tOk {
+				trimmed := t.Segment.TrimRightSpace(reader.Source())
+				t.Segment = trimmed
+			}
+		}
+		return ast.WalkContinue, nil
+	})
+}
+
+// func (a *rundownASTTransformer) injectCallSites(doc *ast.Document, reader text.Reader, pc parser.Context) {
+// 	ast.Walk(doc, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+// 		if rundown, ok := node.(*RundownInline); ok {
+
+// 			if rundown.GetModifiers().HasAny("invoke") {
+// 				source := rundown.GetModifiers().GetValue("from")
+
+// 				if source == nil {
+// 					source = &r.ctx.CurrentFile
+// 				}
+
+// 				name := rundown.GetModifiers().GetValue("invoke")
+// 				if name == nil {
+// 					return ast.WalkStop, errors.New("Invoke requires a ShortCode value")
+// 				}
+
+// 				rd, err := LoadFile(*source)
+// 				if err != nil {
+// 					return ast.WalkStop, err
+// 				}
+
+// 				if info := rd.GetShortCodes().Functions[*name]; info != nil {
+// 					section := info.Section
+
+// 					mods := markdown.NewModifiers()
+// 					mods.Flags[markdown.Flag("set-env")] = true
+
+// 					for k, v := range rundown.GetModifiers().Values {
+// 						if strings.HasPrefix(string(k), "opt-") {
+// 							mods.Values[k] = v
+// 						}
+// 					}
+
+// 					// Create a rundown block which sets the environment to the invoke options.
+// 					envNode := markdown.NewRundownBlock(mods)
+
+// 					node.Parent().InsertAfter(node.Parent(), node, section)
+
+// 					// Adjust the section contents to be relative to the current level.
+// 					parentSection := node.Parent()
+// 					for {
+// 						if _, ok := parentSection.(*markdown.Section); ok {
+// 							break
+// 						}
+
+// 						parentSection = parentSection.Parent()
+// 					}
+
+// 					section.ForceLevel(parentSection.(*markdown.Section).Level)
+
+// 					// Remove the heading when invoking functions, unless we specify we want to keep the heading
+// 					if keepHeading, specified := mods.Flags[markdown.Flag("keep-heading")]; keepHeading == false || !specified {
+// 						section.RemoveChild(section, section.FirstChild())
+// 					}
+
+// 					// Add the environment setting. FIXME - We should nest the Section inside this node to wrap the context.
+// 					section.InsertBefore(section, section.FirstChild(), envNode)
+// 				} else {
+// 					// ShortCode not found in file.
+// 					if flag, ok := rundown.GetModifiers().Flags["ignore-missing"]; flag && ok {
+// 						return ast.WalkSkipChildren, nil
+// 					}
+
+// 					return ast.WalkStop, errors.New("Cannot find " + *name + " in " + *source)
+// 				}
+
+// 			}
+// 		}
+
+// 		return ast.WalkContinue, nil
+// 	})
+// }
+
 func (a *rundownASTTransformer) Transform(doc *ast.Document, reader text.Reader, pc parser.Context) {
 	a.fixConsecutiveTexts(doc, reader, pc)
+	a.fixTrailingHeadingSpace(doc, reader, pc)
 	// Finds FencedCodeBlocks, and transforms their syntax line additions into RundownBlock elements
 	// which provides consistency later.
 
@@ -749,6 +1026,8 @@ func (a *rundownASTTransformer) Transform(doc *ast.Document, reader text.Reader,
 	// a RundownBlock tag.
 
 	// Also finds Paragraphs which have only one RundownInline as a child, and converts to RundownBlock.
+
+	// Also finds Headings which have labels/funcs and trims trailing space.
 
 	var startBlock *ast.HTMLBlock
 	var mods *Modifiers

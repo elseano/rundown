@@ -187,6 +187,12 @@ func FromSource(source string) (*Runner, error) {
 }
 
 func LoadFile(filename string) (*Runner, error) {
+	_, err := os.Stat(filename)
+
+	if err != nil {
+		return nil, err
+	}
+
 	return &Runner{filename: filename, out: os.Stdout, consoleWidth: -1}, nil
 }
 
@@ -210,8 +216,8 @@ func (r *Runner) SetLogger(isLogging bool) {
 	r.logger = log.New(debug, "", log.Ltime)
 }
 
-func (r *Runner) getEngine() (goldmark.Markdown, *util.WordWrapWriter, *Context) {
-	md := markdown.PrepareMarkdown()
+func (r *Runner) getEngineOld() (goldmark.Markdown, *util.WordWrapWriter, *Context) {
+	md := PrepareMarkdown()
 	renderer := md.Renderer()
 	ctx := NewContext()
 	ctx.Logger = r.logger
@@ -238,6 +244,20 @@ func (r *Runner) getEngine() (goldmark.Markdown, *util.WordWrapWriter, *Context)
 	})
 
 	return md, www, ctx
+}
+
+func (r *Runner) getEngine() (goldmark.Markdown, *Context) {
+	ctx := NewContext()
+	ctx.Logger = r.logger
+	ctx.CurrentFile = r.filename
+	if r.consoleWidth > 0 {
+		ctx.ConsoleWidth = r.consoleWidth
+	}
+	ctx.RawOut = r.out
+
+	md, _ := NewRenderer(ctx)
+
+	return md, ctx
 }
 
 func (r *Runner) getAST(md goldmark.Markdown) (ast.Node, []byte) {
@@ -282,7 +302,7 @@ func NewDocumentShortCodes() *DocumentShortCodes {
 }
 
 func (r *Runner) GetShortCodes() *DocumentShortCodes {
-	md, _, _ := r.getEngine()
+	md, _ := r.getEngine()
 	doc, bytes := r.getAST(md)
 
 	return r.getShortCodes(doc, bytes)
@@ -343,10 +363,11 @@ func ParseShortCodeSpecs(specs []string) (*DocumentSpec, error) {
 	return result, nil
 }
 
-func (r *Runner) RunCodesWithoutValidation(docSpec *DocumentSpec) error {
-	md, www, ctx := r.getEngine()
+func (r *Runner) RunCodesWithoutValidation(docSpec *DocumentSpec) (error, func()) {
+	md, ctx := r.getEngine()
 	doc, bytes := r.getAST(md)
 	shortCodes := r.getShortCodes(doc, bytes)
+	alreadyRun := map[string]bool{}
 
 	for _, opt := range shortCodes.Options {
 		optSpec, isSet := docSpec.Options[opt.Code]
@@ -365,7 +386,7 @@ func (r *Runner) RunCodesWithoutValidation(docSpec *DocumentSpec) error {
 		for _, code := range docSpec.ShortCodes {
 			codeDef := shortCodes.Codes[code.Code]
 			if codeDef == nil {
-				return &InvalidShortCodeError{ShortCode: code.Code}
+				return &InvalidShortCodeError{ShortCode: code.Code}, nil
 			}
 
 			section := codeDef.Section
@@ -375,17 +396,46 @@ func (r *Runner) RunCodesWithoutValidation(docSpec *DocumentSpec) error {
 				ctx.SetEnv("OPT_"+strings.ToUpper(opt.Code), opt.Value)
 			}
 
-			err := md.Renderer().Render(www, bytes, section)
+			parents := []*markdown.Section{}
+			for n := section.Parent(); n != nil; n = n.Parent() {
+				if s, ok := n.(*markdown.Section); ok {
+					parents = append(parents, s)
+				}
+			}
+
+			// Run parent section setups in reverse order, as we collected them by walking up the tree.
+			for index := len(parents) - 1; index >= 0; index-- {
+				for setup := parents[index].Setups.Front(); setup != nil; setup = setup.Next() {
+					setupE := setup.Value.(*markdown.ExecutionBlock)
+
+					if _, ok := alreadyRun[setupE.ID]; !ok {
+						err := md.Renderer().Render(ctx.RawOut, bytes, setupE)
+						alreadyRun[setupE.ID] = true
+
+						if err != nil {
+							return err, nil
+						}
+					}
+
+				}
+			}
+
+			err := md.Renderer().Render(ctx.RawOut, bytes, section)
+
+			if err == nil {
+				err = ctx.CurrentError
+			}
 
 			if err != nil {
 				if stopError, ok := err.(*StopError); ok && stopError.StopHandlers != nil && stopError.StopHandlers.ChildCount() > 0 {
 					// Add some space between last node and the output.
-					www.Write([]byte("\r\n"))
+					ctx.RawOut.Write([]byte("\r\n"))
 
 					ctx.SetError(stopError)
-					md.Renderer().Render(www, bytes, stopError.StopHandlers)
+					return err, func() { md.Renderer().Render(ctx.RawOut, bytes, stopError.StopHandlers) }
 				}
-				return err
+
+				return err, nil
 			}
 
 			for _, opt := range code.Options {
@@ -393,42 +443,48 @@ func (r *Runner) RunCodesWithoutValidation(docSpec *DocumentSpec) error {
 			}
 		}
 	} else {
-		err := md.Renderer().Render(www, bytes, doc)
+		// w := util.NewCleanNewlineWriter(ctx.RawOut)
+		err := md.Renderer().Render(ctx.RawOut, bytes, doc)
+
+		if err == nil {
+			err = ctx.CurrentError
+		}
 
 		if err != nil {
 			if stopError, ok := err.(*StopError); ok && stopError.StopHandlers != nil && stopError.StopHandlers.ChildCount() > 0 {
 				// Add some space between last node and the output.
-				www.Write([]byte("\r\n"))
+				ctx.RawOut.Write([]byte("\r\n"))
 
 				ctx.SetError(stopError)
-				md.Renderer().Render(www, bytes, stopError.StopHandlers)
+				return err, func() { md.Renderer().Render(ctx.RawOut, bytes, stopError.StopHandlers) }
 			}
-			return err
+
+			return err, nil
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
-func (r *Runner) RunCodes(docSpec *DocumentSpec) error {
-	md, _, _ := r.getEngine()
+func (r *Runner) RunCodes(docSpec *DocumentSpec) (error, func()) {
+	md, _ := r.getEngine()
 	doc, bytes := r.getAST(md)
 	shortCodes := r.getShortCodes(doc, bytes)
 
 	if len(shortCodes.Codes) == 0 && len(docSpec.ShortCodes) > 0 {
-		return &InvalidShortCodeError{ShortCode: docSpec.ShortCodes[0].Code}
+		return &InvalidShortCodeError{ShortCode: docSpec.ShortCodes[0].Code}, nil
 	}
 
 	if len(shortCodes.Options) == 0 && len(docSpec.Options) > 0 {
 		for key := range docSpec.Options {
-			return &InvalidOptionsError{OptionName: key, Message: "Option not defined"}
+			return &InvalidOptionsError{OptionName: key, Message: "Option not defined"}, nil
 		}
 	}
 
 	for optName := range docSpec.Options {
 		opt := shortCodes.Options[optName]
 		if opt == nil {
-			return &InvalidOptionsError{OptionName: optName, Message: "Option not defined"}
+			return &InvalidOptionsError{OptionName: optName, Message: "Option not defined"}, nil
 		}
 	}
 
@@ -436,7 +492,7 @@ func (r *Runner) RunCodes(docSpec *DocumentSpec) error {
 		_, isSet := docSpec.Options[opt.Code]
 
 		if opt.Required && opt.Default == "" && !isSet {
-			return &InvalidOptionsError{OptionName: opt.Code, Message: "Is required"}
+			return &InvalidOptionsError{OptionName: opt.Code, Message: "Is required"}, nil
 		}
 
 		if opt.Default != "" && !isSet {
@@ -447,12 +503,12 @@ func (r *Runner) RunCodes(docSpec *DocumentSpec) error {
 	for _, code := range docSpec.ShortCodes {
 		section := shortCodes.Codes[code.Code]
 		if section == nil {
-			return &InvalidShortCodeError{ShortCode: code.Code}
+			return &InvalidShortCodeError{ShortCode: code.Code}, nil
 		}
 
 		for _, opt := range code.Options {
 			if section.Options[opt.Code] == nil {
-				return &InvalidOptionsError{OptionName: opt.Code, ShortCode: code.Code, Message: "Option not defined"}
+				return &InvalidOptionsError{OptionName: opt.Code, ShortCode: code.Code, Message: "Option not defined"}, nil
 			}
 		}
 
@@ -460,7 +516,7 @@ func (r *Runner) RunCodes(docSpec *DocumentSpec) error {
 			_, isSet := code.Options[opt.Code]
 
 			if opt.Required && opt.Default == "" && !isSet {
-				return &InvalidOptionsError{OptionName: opt.Code, ShortCode: code.Code, Message: "Option is required"}
+				return &InvalidOptionsError{OptionName: opt.Code, ShortCode: code.Code, Message: "Option is required"}, nil
 			}
 
 			if opt.Default != "" && !isSet {

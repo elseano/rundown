@@ -1,0 +1,134 @@
+.\" generated with Ronn/v0.7.3
+.\" http://github.com/rtomayko/ronn/tree/0.7.3
+.
+.TH "RUNDOWN" "1" "October 2020" "" ""
+.
+.SH "NAME"
+\fBrundown\fR
+.
+.P
+rundown(1) \-\- Execute markdown files
+.
+.SH "SYNOPSIS"
+\fBrundown\fR [\fIcommand\fR] \fIFILENAME\fR [\fIshortcode\fR\.\.\.] [\fIflags\fR\.\.\.]
+.
+.SH "DESCRIPTION"
+Rundown is a terminal application which turns Markdown into executable code, rendering the contents into the console as it progresses\.
+.
+.P
+As Rundown emphasises keeping the markdown still readable as a document, it\'s a great way to produce executable documentation\. Some of the usecases rundown suits are:
+.
+.IP "\(bu" 4
+Automated setup guides
+.
+.IP "\(bu" 4
+Tutorials
+.
+.IP "\(bu" 4
+Code building scripts
+.
+.IP "\(bu" 4
+Simple programs
+.
+.IP "" 0
+.
+.P
+Rundown will run markdown perfectly fine\. As your rundown files get more complex, you\'ll want to start using the rundown extensions\. Rundown\'s extensions are transparent additions to the markdown format which aren\'t rendered by standard markdown renderers (i\.e\. Github, etc), meaning a reader won\'t even notice the additions\.
+.
+.P
+For more details on the rundown format, see rundown(7)\.
+.
+.SH "COMMANDS"
+Commands are optional\. If you don\'t specify a command, rundown defaults to executing the file\.
+.
+.TP
+\fBast\fR
+Inspect the Rundown AST\. Handy for finding bugs in your rundown file\.
+.
+.TP
+\fBemoji\fR
+Search for Emoji codes\.
+.
+.TP
+\fBcheck\fR
+Check the Rundown file for errors\.
+.
+.SH "OPTIONS"
+.
+.IP "\(bu" 4
+\fB\-\-debug\fR, \fB\-\-debug\fR=\fIdebug_file\fR: Log rundown activities into a file named \fBdebug\.log\fR or the specified \fIdebug_file\fR\.
+.
+.IP "\(bu" 4
+\fB\-\-default\fR=\fIshortcode\fR Shebang option which specifies the default shortcode to run if none specified\.
+.
+.IP "\(bu" 4
+\fB\-\-ask\fR: Select the heading to run\. By default, rundown will execute a file top to bottom, this changes the execution to a specific heading and it\'s child headings\.
+.
+.IP "\(bu" 4
+\fB\-\-ask\-repeat\fR: Like \-\-ask, but runs in an ask\-do loop until Quit is selected\.
+.
+.IP "\(bu" 4
+\fB\-\-help\fR: When added after a file has been specified, will render the available shortcodes and help documentation for the given file\.
+.
+.IP "" 0
+.
+.SH "EXAMPLES"
+Run a Rundown file:
+.
+.IP "" 4
+.
+.nf
+
+rundown somefile\.md
+.
+.fi
+.
+.IP "" 0
+.
+.P
+Display help and the menu for a given file:
+.
+.IP "" 4
+.
+.nf
+
+rundown somefile\.md \-\-help
+.
+.fi
+.
+.IP "" 0
+.
+.P
+Run a ShortCode with options:
+.
+.IP "" 4
+.
+.nf
+
+rundown somefile\.md do:action +name="Wonderful" +dest="/etc"
+.
+.fi
+.
+.IP "" 0
+.
+.P
+An executable rundown file which provides a default ShortCode, and Help\.
+.
+.IP "" 4
+.
+.nf
+
+#!/usr/bin/env rundown \-\-default run
+
+# Help using this file <r label="rundown:help"/>
+
+This is some help description on how to use this file\.
+
+# Perform Action <r label="run"/>
+
+Now performing some action\.
+.
+.fi
+.
+.IP "" 0
+

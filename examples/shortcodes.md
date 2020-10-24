@@ -97,7 +97,8 @@ Supported options for README.md
 
 And the shortcode would be invoked like this:
 
+~~~ markdown reveal norun
 ``` bash
 rundown README.md wait-complete +name="Cool Bro"
 ```
-
+~~~

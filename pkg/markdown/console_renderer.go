@@ -1,7 +1,6 @@
 package markdown
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"io/ioutil"
@@ -455,8 +454,8 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 }
 
 func (r *Renderer) renderRundownInline(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
-	var buf bytes.Buffer
-	var w2 = bufio.NewWriter(&buf)
+	// var buf bytes.Buffer
+	// var w2 = bufio.NewWriter(&buf)
 
 	if !node.HasChildren() {
 		return ast.WalkSkipChildren, nil
@@ -464,34 +463,34 @@ func (r *Renderer) renderRundownInline(w util.BufWriter, source []byte, node ast
 
 	if entering {
 
-		renderer := PrepareMarkdown().Renderer()
-		// TODO - Copy all config and apply it to the renderer.
+		// renderer := PrepareMarkdown().Renderer()
+		// // TODO - Copy all config and apply it to the renderer.
 
-		rundown := node.(*RundownInline)
+		// rundown := node.(*RundownInline)
 
-		if rundown.Modifiers.Flags[Flag("ignore")] == true {
-			return ast.WalkSkipChildren, nil
-		}
+		// if rundown.Modifiers.Flags[Flag("ignore")] == true {
+		// 	return ast.WalkSkipChildren, nil
+		// }
 
-		for child := node.FirstChild(); child != nil; child = child.NextSibling() {
-			renderer.Render(w2, source, child)
-		}
+		// for child := node.FirstChild(); child != nil; child = child.NextSibling() {
+		// 	renderer.Render(w2, source, child)
+		// }
 
-		if r.Config.RundownHandler != nil {
-			_, err := r.Config.RundownHandler.OnRundownNode(node, entering)
-			if err != nil {
-				return ast.WalkStop, err
-			}
+		// if r.Config.RundownHandler != nil {
+		// 	_, err := r.Config.RundownHandler.OnRundownNode(node, entering)
+		// 	if err != nil {
+		// 		return ast.WalkStop, err
+		// 	}
 
-			s := string(buf.Bytes())
-			result, err := r.Config.RundownHandler.Mutate([]byte(s), node)
-			if err != nil {
-				return ast.WalkStop, err
-			}
-			w.Write(result)
-		} else {
-			w.Write(buf.Bytes())
-		}
+		// 	s := string(buf.Bytes())
+		// 	result, err := r.Config.RundownHandler.Mutate([]byte(s), node)
+		// 	if err != nil {
+		// 		return ast.WalkStop, err
+		// 	}
+		// 	w.Write(result)
+		// } else {
+		// 	w.Write(buf.Bytes())
+		// }
 	} else {
 		if r.Config.RundownHandler != nil {
 			_, err := r.Config.RundownHandler.OnRundownNode(node, entering)
