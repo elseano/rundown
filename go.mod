@@ -2,7 +2,8 @@ module github.com/elseano/rundown
 
 go 1.15
 
-replace github.com/charmbracelet/glamour => /Users/elseano/src/glamour
+// Custom fork of Glamour supports rendering custom markdown nodes.
+replace github.com/charmbracelet/glamour => github.com/elseano/glamour v0.2.1-0.20201024230852-96f145011f20
 
 require (
 	// github.com/alecthomas/chroma v0.8.0
@@ -38,7 +39,7 @@ require (
 	github.com/yuin/goldmark v1.2.1
 	github.com/yuin/goldmark-highlighting v0.0.0-20200307114337-60d527fdb691
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
-	golang.org/x/tools v0.0.0-20201021214918-23787c007979
+	golang.org/x/tools v0.0.0-20201023174141-c8cfbd0f21e6
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.2.2
