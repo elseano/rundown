@@ -267,6 +267,15 @@ func (r *RundownRenderer) renderImage(w util.BufWriter, source []byte, node ast.
 		return r.ar.RenderNode(w, source, node, entering)
 	}
 
+	// Rendering images must be requested, as it tends to be very low-fi.
+	if rd, ok := node.Parent().PreviousSibling().(markdown.RundownNode); ok {
+		if !rd.GetModifiers().HasAll("render-image") {
+			return r.ar.RenderNode(w, source, node, entering)
+		}
+	} else {
+		return r.ar.RenderNode(w, source, node, entering)
+	}
+
 	if !entering {
 		return ast.WalkContinue, nil
 	}
@@ -282,35 +291,27 @@ func (r *RundownRenderer) renderImage(w util.BufWriter, source []byte, node ast.
 
 	if urlMatch.Match(n.Destination) {
 		if i, err := ansimage.NewScaledFromURL(string(n.Destination), 40, maxWidth, icolor.Black, ansimage.ScaleModeFit, ansimage.NoDithering); err != nil {
-			_, _ = w.WriteString("Error: " + err.Error())
+			return r.ar.RenderNode(w, source, node, entering)
 		} else {
 			image = i
 		}
 	} else {
-		if i, err := ansimage.NewScaledFromFile(string(n.Destination), 40, maxWidth, icolor.Black, ansimage.ScaleModeFit, ansimage.NoDithering); err != nil {
-			_, _ = w.WriteString("Error: " + err.Error())
+		abs, _ := filepath.Abs(r.ctx.CurrentFile)
+		dir := filepath.Dir(abs)
+		target := filepath.Join(dir, string(n.Destination))
+
+		if i, err := ansimage.NewScaledFromFile(target, 40, maxWidth, icolor.Black, ansimage.ScaleModeFit, ansimage.NoDithering); err != nil {
+			return r.ar.RenderNode(w, source, node, entering)
 		} else {
 			image = i
 		}
 	}
 
-	w.Flush() // Start with empty.
-
 	if image != nil {
-		marginLeft := strings.Repeat(" ", marginInt)
-		lines := strings.Split(image.Render(), "\n")
-		for _, line := range lines {
-			if line != "" {
-				w.WriteString(marginLeft + line + "\n")
-			}
-
-			// Must flush every line to avoid filling buffer.
-			// Otherwise WordWrapWriter gets confused by half-formed escape codes on buffer full.
-			w.Flush()
-		}
+		stringNode := ast.NewString([]byte(image.Render()))
+		parent := node.Parent()
+		parent.InsertAfter(parent, node, stringNode)
 	}
-
-	w.WriteString("\n")
 
 	return ast.WalkSkipChildren, nil
 

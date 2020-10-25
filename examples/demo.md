@@ -1,6 +1,6 @@
 # Rundown Demonstration File
 
-![Markdown](https://www.markdownguide.org/assets/images/markdown-guide-og.jpg)
+![Rundown](./logo.png)
 
 Rundown is a CLI tool which turns markdown files into simple programs and scripts.
 
