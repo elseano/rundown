@@ -33,7 +33,7 @@ You can also refer to them in the Markdown text: <r sub-env>`$NAME`</r>.
 
 ## Shortcodes <r label=my-shortcode/>
 
-This heading has a **shortcode**, which you can see next to the heading itself.
+This heading has a **shortcode**, which you can't see in the rendering output, but you can view via adding the `--help` flag.
 
 In Rundown **shortcodes** enable you to skip directly to that heading, either via additional command line options, or by asking rundown to present a menu.
 
@@ -63,4 +63,5 @@ class Someclass < Object
 end
 ```
 
-What are you waiting for? Give Rundown a try today, and make the terminal pretty again!
+## Try it!
+

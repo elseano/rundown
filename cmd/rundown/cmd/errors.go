@@ -23,6 +23,7 @@ func handleError(dest io.Writer, err error, cb func()) int {
 		if cb != nil {
 			fmt.Fprintf(dest, "\n")
 			cb()
+			fmt.Fprintf(dest, "\n")
 		}
 	}()
 

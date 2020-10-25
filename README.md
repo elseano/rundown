@@ -73,6 +73,16 @@ Rundown's own build file is a good example of what you can accomplish with Rundo
 
 A full list of the modifiers and examples can be found in the [Modifiers Example](./examples/mods.md) markdown file.
 
+## Handling Errors
+
+When using `bash`, fenced code blocks run with `set -euo pipefail`, so most errors will fail the running script. For other interpreters and shells, a non-zero exit code is considered a failure.
+
+When there's no special failure handling, all failures will cause Rundown to exit and provide an error trace.
+
+![Failure](./_images/failing.png)
+
+Take a look at the [Failure exampes](./examples/failure.md).
+
 ## Shortcodes <r label=shortcodes>
 
 Headings can have "shortcodes" attached to them, which allows that heading (and all child headings) to be executed specifically. Specifying a shortcode can be done either before the heading, or inside the heading itself.

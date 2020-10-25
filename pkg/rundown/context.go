@@ -85,7 +85,7 @@ func NewContext() *Context {
 		Env:             map[string]string{"RUNDOWN": tmpFile.Name()},
 		ForcedLevelZero: false,
 		Repeat:          false,
-		ConsoleWidth:    util.IntMin(util.GetConsoleWidth(), 120),
+		ConsoleWidth:    util.IntMin(util.GetConsoleWidth(), 120) - 2, // Right side margin of 2 chars.
 		Messages:        messages,
 		TempDir:         tmpDir,
 	}
