@@ -1,4 +1,4 @@
-# Rundown
+# Rundown <r label="rundown:help"/>
 
 Rundown is a terminal application which turns Markdown into executable code, rendering the contents into the console as it progresses.
 
@@ -14,6 +14,8 @@ Some of the usecases rundown suits are:
 As we use Rundown, we're finding plenty of other ways you can use it!
 
 ![Rundown Demo](./_images/demo.gif)
+
+<r stop-ok/>
 
 ## Feature Highlights
 

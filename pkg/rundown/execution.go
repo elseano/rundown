@@ -117,6 +117,7 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 	var rpcDoneCommand = "RD-DDDX"
 	var doneChannel = make(chan struct{})
 	var modifiers = executionBlock.Modifiers
+	var contentSwitchback = ""
 
 	indent := 2
 
@@ -185,6 +186,13 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 		executable = prog
 	}
 
+	if strings.Contains(executable, "$FILE") {
+		context.SetEnv("FILE", saveContentsToTemp(context, content, "source"))
+		contentSwitchback = content
+		content = executable
+		executable = "bash"
+	}
+
 	contents := "#!/usr/bin/env " + executable + "\n\n"
 
 	if executable == "bash" {
@@ -247,6 +255,9 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 	}
 
 	cmd := exec.Command(filename)
+
+	// logger.Printf("Execution Command: %v\n", cmd.
+
 	cmd.Env = os.Environ()
 
 	for key, value := range context.Env {
@@ -254,6 +265,10 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 	}
 
 	logger.Printf("Script:\r\n%s\r\nEnv:%v\r\n", contents, cmd.Env)
+
+	if contentSwitchback != "" {
+		contents = contentSwitchback
+	}
 
 	if modifiers.Flags[NoRunFlag] != true {
 		process := rdexec.NewProcess(cmd)
