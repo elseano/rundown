@@ -1,8 +1,9 @@
 # Rundown <r label="rundown:help"/>
 
-Rundown is a terminal application which turns Markdown into executable code, rendering the contents into the console as it progresses.
+Rundown provides automation to Markdown. In the simplest case, this allows you to render Markdown documentation in the console, executing code blocks as Rundown progresses. It also provides more advanced useage documented below. 
 
-As Rundown emphasises keeping the markdown still readable as a document, it's a great way to produce executable documentation. 
+Rundown's philosophy is that executable documentation is always better, but it shouldn't get in the way of just reading the document itself. 
+
 Some of the usecases rundown suits are:
 
 * Automated setup guides
@@ -11,17 +12,15 @@ Some of the usecases rundown suits are:
 * Simple programs
 * Operational support scripts
 
-As we use Rundown, we're finding plenty of other ways you can use it!
-
 ![Rundown Demo](./_images/demo.gif)
 
 <r stop-ok/>
 
 ## Feature Highlights
 
-Rundown will run markdown perfectly fine. As your rundown files get more complex, you'll want to start using the rundown extensions. Rundown's extensions are transparent additions to the markdown format which aren't rendered by standard markdown renderers (i.e. Github, etc), meaning a reader won't even notice the additions. 
+Rundown will run unmodified markdown perfectly fine. As your rundown files get more complex, you'll want to start using the rundown automation tags. These tags are transparent additions to the markdown format which aren't rendered by standards compliant markdown renderers (i.e. Github, etc). See [Renderer Support](./docs/renderer_support.md) for more information.
 
-This file is a rundown file for example!
+[Read the Full documentation](./docs/automation_tags.md), or checkout the examples linked below.
 
 Some of the additions Rundown brings are:
 
@@ -171,3 +170,4 @@ A function can then be invoked using the `invoke` attribute on the rundown tag. 
 ```
 
 More examples can be found in the [Functions Example](./examples/functions.md) markdown file.
+
