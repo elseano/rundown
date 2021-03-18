@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/elseano/rundown/pkg/rundown"
 	"github.com/elseano/rundown/pkg/util"
@@ -35,19 +36,23 @@ var rootCmd = &cobra.Command{
 		exitCode := run(cmd, args)
 		os.Exit(exitCode)
 	},
+	ValidArgs: []string{},
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		cleanArgs := cmd.Flags().Args()
-
-		if len(cleanArgs) == 0 {
-			if _, err := os.Stat(toComplete); err != nil {
-				return nil, cobra.ShellCompDirectiveDefault
-			}
+		if len(args) == 0 {
+			return []string{"md"}, cobra.ShellCompDirectiveFilterFileExt
 		}
 
+		cleanArgs := cmd.Flags().Args()
 		cleanArgs = append(cleanArgs, toComplete)
 		argFilename = cleanArgs[0]
 
-		return performCompletion(cleanArgs), cobra.ShellCompDirectiveNoFileComp
+		completions := performCompletion(cleanArgs)
+
+		if strings.Index(toComplete, "+") == 0 {
+			return completions, cobra.ShellCompDirectiveNoSpace
+		} else {
+			return completions, cobra.ShellCompDirectiveNoFileComp
+		}
 	},
 }
 
@@ -67,8 +72,6 @@ func init() {
 	rootCmd.Flags().BoolVar(&flagAskRepeat, "ask-repeat", false, "Continually ask which shortcode to run")
 	rootCmd.Flags().StringVar(&flagDefault, "default", "", "Default shortcode to run if none specified")
 	rootCmd.Flags().IntVar(&flagCols, "cols", util.IntMin(util.GetConsoleWidth(), 120), "Number of columns in display")
-
-	rootCmd.MarkZshCompPositionalArgumentFile(1)
 
 	rootCmd.AddCommand(astCmd)
 	rootCmd.AddCommand(emojiCmd)

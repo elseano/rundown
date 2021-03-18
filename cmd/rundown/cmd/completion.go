@@ -121,7 +121,7 @@ func currentShortcode(args []string) string {
 	current := ""
 
 	for _, a := range args {
-		if a[0] != '+' {
+		if len(a) > 0 && a[0] != '+' {
 			current = a
 		}
 	}
@@ -131,7 +131,7 @@ func currentShortcode(args []string) string {
 
 func canSpecifyDocOpts(args []string) bool {
 	for _, a := range args {
-		if a[0] != '+' {
+		if len(a) > 0 && a[0] != '+' {
 			return false
 		}
 	}
