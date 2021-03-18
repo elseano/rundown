@@ -142,7 +142,7 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 	}
 
 	if modifiers.HasAny("named", "spinner") && !modifiers.Flags[NoSpinFlag] {
-		logger.Println("Block is NAMED")
+		logger.Println("Block has a custom spinner title")
 
 		if modifiers.Flags[NamedFlag] {
 			firstLine := strings.Split(strings.TrimSpace(content), "\n")[0]
@@ -150,12 +150,13 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 			matches := matcher.FindStringSubmatch(firstLine)
 
 			if len(matches) > 1 {
-				logger.Printf("Name is %s", matches[1])
+				logger.Printf("Spinner title extracted from block")
 				spinnerName = matches[1]
 			} else {
-				logger.Println("No name detected")
+				logger.Println("No title detected")
 			}
 		} else if name, ok := modifiers.Values[markdown.Parameter("spinner")]; ok {
+			logger.Printf("Spinner title defined")
 			spinnerName = name
 		}
 	}

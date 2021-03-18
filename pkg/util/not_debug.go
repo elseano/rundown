@@ -2,9 +2,7 @@
 
 package util
 
-import (
-	// "fmt"
-)
+// "fmt"
 
 func Debugf(s string, i ...interface{}) {
 }

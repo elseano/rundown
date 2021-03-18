@@ -41,7 +41,7 @@ const (
 	TokenEmpty
 )
 
-var formattingMatch = regexp.MustCompile("(\x1b\\[[0-9\\;]*m)|(\x1b\\[[0-9]*[A-Za-ln-z]|[\r\n]+)|(\\s+)")
+var formattingMatch = regexp.MustCompile("(\x1b\\[[0-9\\;]*m)|(\x1b\\[[0-9]*[A-Za-ln-z]|[\r\n])|([ \t]+)")
 
 func NextToken(input string) (token TokenResult, data string, rest string) {
 	if input == "" {
@@ -189,17 +189,23 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 
 					break
 				case TokenColour:
+					Debugf("Token is Colour code\n")
 					fallthrough
 				case TokenWhitespace:
+					Debugf("Token is whitespace\n")
 					if lineData.CurrentlyIndented {
+						Debugf("We've written on this line. Writing %#v\n", lineData.FormattingStash+data)
 						fmt.Fprint(&toWrite, lineData.FormattingStash+data)
 						lineData.FormattingStash = ""
 					} else {
+						Debugf("It's a clean line. Stashing %#v\n", lineData.FormattingStash+data)
 						lineData.FormattingStash = lineData.FormattingStash + data
 					}
 
 					break
 				case TokenDisplayStream:
+					Debugf("Token is display stream\n")
+
 					if !lineData.CurrentlyIndented {
 						Debugf("Line %d not indented, indenting line with %q and formatting %q\n", currentLine, indentStr, lineData.FormattingStash)
 						fmt.Fprintf(&toWrite, "%s%s", indentStr, lineData.FormattingStash)
