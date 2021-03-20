@@ -21,7 +21,7 @@ var astCmd = &cobra.Command{
 		return nil
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		argFilename = args[0]
+		rundownFile = findMarkdownFile(flagFilename)
 	},
 	Run: ast,
 }
@@ -29,7 +29,7 @@ var astCmd = &cobra.Command{
 func ast(cmd *cobra.Command, args []string) {
 	md := rundown.PrepareMarkdown()
 
-	b, _ := ioutil.ReadFile(argFilename)
+	b, _ := ioutil.ReadFile(rundownFile)
 
 	reader := text.NewReader(b)
 

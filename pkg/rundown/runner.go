@@ -281,6 +281,12 @@ func (r *Runner) getAST(md goldmark.Markdown) (ast.Node, []byte) {
 	return doc, byteData
 }
 
+func (r *Runner) GetAST() ast.Node {
+	md, _ := r.getEngine()
+	doc, _ := r.getAST(md)
+	return doc
+}
+
 func (d *DocumentShortCodes) Append(info *ShortCodeInfo) {
 	if info.Code != "" {
 		d.Codes[info.Code] = info

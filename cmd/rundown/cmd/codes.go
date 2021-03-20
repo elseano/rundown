@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 
 	"github.com/elseano/rundown/pkg/rundown"
@@ -13,7 +12,7 @@ import (
 )
 
 func RenderShortCodes() error {
-	rd, err := rundown.LoadFile(argFilename)
+	rd, err := rundown.LoadFile(rundownFile)
 	if err != nil {
 		panic(err)
 	}
@@ -74,9 +73,7 @@ func RenderShortCodes() error {
 
 	sortedOptions.Sort()
 
-	cleanFilename := filepath.Base(argFilename)
-
-	fmt.Println(rundown.RenderToString(fmt.Sprintf("# Supported options for %s", cleanFilename)))
+	fmt.Printf("\nSupported shortcodes:\n\n")
 
 	if sortedOptions.Len() > 0 {
 

@@ -30,7 +30,7 @@ var checkCmd = &cobra.Command{
 		return nil
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		argFilename = args[0]
+		rundownFile = findMarkdownFile(flagFilename)
 	},
 	Run: checkExec,
 }
@@ -49,7 +49,7 @@ func checkExec(cmd *cobra.Command, args []string) {
 	table.SetAutoWrapText(false)
 
 	md := rundown.PrepareMarkdown()
-	b, _ := ioutil.ReadFile(argFilename)
+	b, _ := ioutil.ReadFile(rundownFile)
 
 	reader := text.NewReader(b)
 

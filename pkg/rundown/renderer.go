@@ -16,9 +16,12 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/ansi"
 	"github.com/eliukblau/pixterm/pkg/ansimage"
+	rdexec "github.com/elseano/rundown/pkg/exec"
 	"github.com/elseano/rundown/pkg/markdown"
 	rdutil "github.com/elseano/rundown/pkg/util"
+
 	"github.com/kyokomi/emoji"
+	"github.com/manifoldco/promptui"
 	"github.com/muesli/termenv"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -316,6 +319,26 @@ func (r *RundownRenderer) renderImage(w util.BufWriter, source []byte, node ast.
 	return ast.WalkSkipChildren, nil
 
 }
+
+func searchParent(node ast.Node) ast.Node {
+	parentSection := node.Parent()
+	for {
+		if _, ok := parentSection.(*markdown.Section); ok {
+			break
+		}
+
+		parentSection = parentSection.Parent()
+	}
+
+	return parentSection
+}
+
+type Prompt struct {
+	Prompt    string
+	Indicator string
+	Indent    string
+}
+
 func (r *RundownRenderer) renderRundownBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	w.Flush()
 	if entering {
@@ -325,6 +348,69 @@ func (r *RundownRenderer) renderRundownBlock(w util.BufWriter, source []byte, no
 		}
 
 		if rundown, ok := node.(*markdown.RundownBlock); ok {
+
+			if rundown.GetModifiers().HasAll("opt", "prompt") {
+				parentSection := searchParent(node)
+
+				// queryGood := fmt.Sprintf("%s%s %s: ", strings.Repeat("  ", parentSection.(*markdown.Section).Level), ansi.Ssprintf(r.ctx.Profile, r.ctx.Style.LinkText, "‣ "), *rundown.GetModifiers().GetValue("prompt"))
+				queryGood := "{{ .Indent }}{{ .Indicator | green }} {{ .Prompt }}: "
+				queryBad := "{{ .Indent }}{{ .Indicator | red }} {{ .Prompt }}: "
+				envName := "OPT_" + strings.ToUpper(*rundown.GetModifiers().GetValue("opt"))
+
+				if envOverride := rundown.GetModifiers().GetValue("as"); envOverride != nil {
+					envName = *envOverride
+				}
+
+				required := func(input string) error {
+					if input == "" {
+						return errors.New("required")
+					}
+					return nil
+				}
+
+				if _, ok := r.ctx.Env[envName]; !ok {
+					mask := false
+
+					if promptType := rundown.GetModifiers().GetValue("type"); promptType != nil && *promptType == "password" {
+						mask = true
+					}
+
+					reader := rdexec.NewStdinReader()
+					stdin := reader.Claim()
+					defer stdin.Close()
+
+					prompt := promptui.Prompt{
+						Label: &Prompt{
+							Indent:    strings.Repeat("  ", parentSection.(*markdown.Section).Level),
+							Prompt:    *rundown.GetModifiers().GetValue("prompt"),
+							Indicator: "‣",
+						},
+						Stdin:       stdin,
+						Validate:    required,
+						HideEntered: mask,
+						Templates: &promptui.PromptTemplates{
+							Valid:           queryGood,
+							Invalid:         queryBad,
+							Prompt:          queryGood,
+							Success:         queryGood,
+							ValidationError: queryBad,
+						},
+					}
+
+					if mask {
+						prompt.Mask = '*'
+					}
+
+					result, err := prompt.Run()
+
+					if err != nil {
+						return ast.WalkStop, err
+					}
+
+					r.ctx.SetEnv(envName, result)
+				}
+			}
+
 			// We don't render function/shortcode option contents, thats for reading only.
 			if rundown.Modifiers.HasAny("ignore", "opt") {
 				return ast.WalkSkipChildren, nil
@@ -416,14 +502,7 @@ func (r *RundownRenderer) renderRundownBlock(w util.BufWriter, source []byte, no
 					node.Parent().InsertAfter(node.Parent(), node, section)
 
 					// Adjust the section contents to be relative to the current level.
-					parentSection := node.Parent()
-					for {
-						if _, ok := parentSection.(*markdown.Section); ok {
-							break
-						}
-
-						parentSection = parentSection.Parent()
-					}
+					parentSection := searchParent(node)
 
 					section.ForceLevel(parentSection.(*markdown.Section).Level)
 
@@ -545,24 +624,32 @@ func (r *RundownRenderer) renderFixedText(w util.BufWriter, source []byte, node 
 func (r *RundownRenderer) renderRundownInline(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	rd := node.(*markdown.RundownInline)
 
-	if rd.Modifiers.Flags[markdown.Flag("sub-env")] && entering {
-		// Find all text nodes containing $ENV or ${ENV:-} replace with FixedText.
-		ast.Walk(node, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
-			if text, ok := node.(*ast.Text); ok && entering {
-				str := rdutil.NodeLines(text, source)
-				newStr, err := SubEnv(str, r.ctx)
+	if entering {
 
-				if err == nil {
-					if newStr != str {
-						text.Parent().ReplaceChild(text.Parent(), text, ast.NewString([]byte(newStr)))
+		if rd.Modifiers.Flags[markdown.Flag("ignore")] {
+			return ast.WalkSkipChildren, nil
+		}
+
+		if rd.Modifiers.Flags[markdown.Flag("sub-env")] {
+			// Find all text nodes containing $ENV or ${ENV:-} replace with FixedText.
+			ast.Walk(node, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+				if text, ok := node.(*ast.Text); ok && entering {
+					str := rdutil.NodeLines(text, source)
+					newStr, err := SubEnv(str, r.ctx)
+
+					if err == nil {
+						if newStr != str {
+							text.Parent().ReplaceChild(text.Parent(), text, ast.NewString([]byte(newStr)))
+						}
+					} else {
+						text.Parent().InsertAfter(text.Parent(), text, ast.NewString([]byte(" (not set)")))
 					}
-				} else {
-					text.Parent().InsertAfter(text.Parent(), text, ast.NewString([]byte(" (not set)")))
 				}
-			}
 
-			return ast.WalkContinue, nil
-		})
+				return ast.WalkContinue, nil
+			})
+
+		}
 
 	}
 

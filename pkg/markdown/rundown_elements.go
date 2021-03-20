@@ -685,6 +685,10 @@ func (n *Section) appendHandler(rundown RundownNode) {
 
 func (n *Section) appendOption(rundown RundownNode) {
 	n.Options.AppendChild(n.Options, rundown)
+
+	if rundown.GetModifiers().HasAny("prompt") {
+		n.AppendChild(n, rundown)
+	}
 }
 
 func (n *Section) appendDesc(rundown RundownNode) {
@@ -748,7 +752,7 @@ func terminatesSectionDoc(node ast.Node) bool {
 	default:
 		node, ok := node.(*RundownBlock)
 
-		return ok && node.Modifiers.HasAll("invoke")
+		return ok && (node.Modifiers.HasAll("invoke") || node.Modifiers.HasAll("opt", "prompt"))
 	}
 }
 

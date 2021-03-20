@@ -62,11 +62,7 @@ $ yourprogram completion fish > ~/.config/fish/completions/yourprogram.fish
 func performCompletion(args []string) []string {
 	var result = []string{}
 
-	if args[0] == argFilename {
-		args = args[1:]
-	}
-
-	rd, err := rundown.LoadFile(argFilename)
+	rd, err := rundown.LoadFile(rundownFile)
 	if err != nil {
 		panic(err)
 	}

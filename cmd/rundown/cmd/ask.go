@@ -20,7 +20,7 @@ type shortcodeDisplayItem struct {
 
 func AskShortCode() (*rundown.ShortCodeSpec, error) {
 
-	rd, err := rundown.LoadFile(argFilename)
+	rd, err := rundown.LoadFile(rundownFile)
 	if err != nil {
 		panic(err)
 	}

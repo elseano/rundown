@@ -21,14 +21,14 @@ var viewCmd = &cobra.Command{
 		return nil
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		argFilename = args[0]
+		rundownFile = findMarkdownFile(flagFilename)
 	},
 	Run: view,
 }
 
 func view(cmd *cobra.Command, args []string) {
-	fmt.Printf("Reading %s\n", argFilename)
-	byteData, err := ioutil.ReadFile(argFilename)
+	fmt.Printf("Reading %s\n", rundownFile)
+	byteData, err := ioutil.ReadFile(rundownFile)
 	if err != nil {
 		panic(err)
 	}
