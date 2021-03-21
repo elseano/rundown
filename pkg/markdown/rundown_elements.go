@@ -687,7 +687,8 @@ func (n *Section) appendOption(rundown RundownNode) {
 	n.Options.AppendChild(n.Options, rundown)
 
 	if rundown.GetModifiers().HasAny("prompt") {
-		n.AppendChild(n, rundown)
+		rundownCopy := NewRundownBlock(rundown.GetModifiers())
+		n.AppendChild(n, rundownCopy)
 	}
 }
 

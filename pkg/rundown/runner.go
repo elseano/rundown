@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"regexp"
 
 	"github.com/elseano/rundown/pkg/markdown"
 	"github.com/elseano/rundown/pkg/util"
@@ -68,6 +69,7 @@ type ShortCodeOption struct {
 	Type        string
 	Default     string
 	Required    bool
+	Prompt		bool
 	Description string
 }
 
@@ -161,6 +163,7 @@ func BuildOptionInfo(rdOpt markdown.RundownNode) *ShortCodeOption {
 		Code:        strings.TrimSpace(mods.Values[markdown.Parameter("opt")]),
 		Type:        strings.TrimSpace(mods.Values[markdown.Parameter("type")]),
 		Required:    mods.Flags[markdown.Flag("required")],
+		Prompt: mods.Values[markdown.Parameter("prompt")] != "",
 		Description: strings.TrimSpace(mods.Values[markdown.Parameter("desc")]),
 		Default:     strings.TrimSpace(mods.Values[markdown.Parameter("default")]),
 	}
@@ -260,8 +263,29 @@ func (r *Runner) getEngine() (goldmark.Markdown, *Context) {
 	return md, ctx
 }
 
+func (r *Runner) getByteData(filename string) ([]byte, error) {
+	fmt.Printf("Loading file %s\n", filename)
+
+	// Loads the file, and injects all the import sites.
+	finder := regexp.MustCompile(`<r\s+import=["'](.*)["']\s*/>`)
+
+	byteData, err := ioutil.ReadFile(filename)
+
+	if (err != nil) {
+		return nil, err
+	}
+	
+	return finder.ReplaceAllFunc(byteData, func(input []byte) []byte {
+		matches := finder.FindAllSubmatch(input, -1)
+		subFilename := string(matches[0][1])
+
+		data, _ := r.getByteData(subFilename)
+		return data
+	}), nil
+}
+
 func (r *Runner) getAST(md goldmark.Markdown) (ast.Node, []byte) {
-	byteData, _ := ioutil.ReadFile(r.filename)
+	byteData, _ := r.getByteData(r.filename)
 
 	// Trim shebang
 	if bytes.HasPrefix(byteData, []byte("#!")) {
@@ -521,7 +545,7 @@ func (r *Runner) RunCodes(docSpec *DocumentSpec) (error, func()) {
 		for _, opt := range section.Options {
 			_, isSet := code.Options[opt.Code]
 
-			if opt.Required && opt.Default == "" && !isSet {
+			if opt.Required && opt.Default == "" && !isSet && !opt.Prompt {
 				return &InvalidOptionsError{OptionName: opt.Code, ShortCode: code.Code, Message: "Option is required"}, nil
 			}
 

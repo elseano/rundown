@@ -124,23 +124,24 @@ func runSequential(t *testing.T, filename string) (string, string) {
 	var buffer bytes.Buffer
 
 	root := RootCmd()
-	root.SetArgs([]string{tf.Name()})
+	// root.SetArgs([]string{tf.Name()})
 	root.SetOut(&buffer)
 	root.SetErr(&buffer)
-	root.PreRun(root, []string{tf.Name()})
-	root.ParseFlags([]string{"--cols", "80"})
+	root.PreRun(root, []string{})
+	root.ParseFlags([]string{"--cols", "80", "-f", tf.Name()})
 
 	rd, err := rundown.LoadFile(tf.Name())
 	codes := rd.GetShortCodes()
 
 	fmt.Printf("Codes: %#v", codes.Codes)
+	fmt.Printf("RUNDOWN\n")
 
 	if codes.Codes["direct"] != nil {
 		argShortcodes = []string{"direct"}
-		run(root, []string{tf.Name()})
+		run(root, []string{})
 	} else {
 		argShortcodes = []string{}
-		run(root, []string{tf.Name()})
+		run(root, []string{})
 	}
 
 	fixed := strings.TrimSpace(util.CollapseReturns(util.RemoveColors(buffer.String())))

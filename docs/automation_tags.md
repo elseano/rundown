@@ -285,11 +285,10 @@ Forms:
 * `<r desc>...</r>`
 * `<r desc="..."/>`
 
-Provides a description for your section, i.e. quick help.
-
-The description is presented alongside the section's label when using the `--help` flag.
+Provides a description for whatever heading the content is under, or for the document if it's before the first heading. The description is presented alongside the section's label when using the `--help` flag.
 
 Using the first form makes the description also available to readers (will be rendered by web browsers), while the second form only shows the description when using `--help`.
+
 
 ### Providing Section Options (Parameters)
 
@@ -300,6 +299,29 @@ Forms:
 Defines a option for your section, allowing sections to take arguments when they're invoked. These options are displayed alongside the section when using `--help`.
 
 The provided option's value (or the default value if none provided) is available throughout the Section in the environment variable `$OPT_<NAME>`.
+
+#### Valid types
+
+* `string` - A free-form string.
+* `int` - A number.
+* `enum|opt1|opt2|...` - Must be a string `opt1` or `opt2`.
+* `password` - Masked password input.
+
+#### Renaming the environment variable
+
+The alternative form:
+
+* `<r opt="name" as="VAR" .../>`
+
+Will instruct the option to put it's value into the environment variable `$VAR`.
+
+#### Prompting for input
+
+The alternate form:
+
+* `<r opt="name" prompt="Enter password"/>`
+
+Will pause rundown execution at the point where the option is defined, and ask the user for input of the prompted argument, _if_ the environment variable (or the `as` variable) isn't set.
 
 ### Prerequisite Blocks
 
@@ -344,6 +366,17 @@ Forms:
 
 If the subsequent code block exists with a zero exit code, then skip to the next heading. Otherwise, continue sequentially.
 
+### Importing contents of another document
+
+Rundown will by default attempt to run `RUNDOWN.md` falling back to `README.md`, unless you specify a filename to run.
+
+If your markdown files are getting very long, you can extract out the automation part into another file, or files, and import them into the primary file, keeping things clean.
+
+Forms:
+
+* `<r import="scripts/another_file.md"/>`
+
+The import path is always relative to the executing rundown file. The contents of `scripts/another_file.md` will be inserted into the current file at the point of import.
 
 ### Tying it all together
 
