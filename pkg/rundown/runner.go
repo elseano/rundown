@@ -264,8 +264,6 @@ func (r *Runner) getEngine() (goldmark.Markdown, *Context) {
 }
 
 func (r *Runner) getByteData(filename string) ([]byte, error) {
-	fmt.Printf("Loading file %s\n", filename)
-
 	// Loads the file, and injects all the import sites.
 	finder := regexp.MustCompile(`<r\s+import=["'](.*)["']\s*/>`)
 
