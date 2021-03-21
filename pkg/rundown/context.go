@@ -81,8 +81,17 @@ func NewContext() *Context {
 
 	go receiveLoop(tmpFile.Name(), messages)
 
+	currentEnv := map[string]string{}
+
+	for _, envEntry := range os.Environ() {
+		env := strings.SplitN(envEntry, "=", 2)
+		currentEnv[env[0]] = env[1]
+	}
+
+	currentEnv["RUNDOWN"] = tmpFile.Name()
+
 	return &Context{
-		Env:             map[string]string{"RUNDOWN": tmpFile.Name()},
+		Env:             currentEnv,
 		ForcedLevelZero: false,
 		Repeat:          false,
 		ConsoleWidth:    util.IntMin(util.GetConsoleWidth(), 120) - 2, // Right side margin of 2 chars.
