@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"regexp"
+	"path"
 
 	"github.com/elseano/rundown/pkg/markdown"
 	"github.com/elseano/rundown/pkg/util"
@@ -263,23 +264,39 @@ func (r *Runner) getEngine() (goldmark.Markdown, *Context) {
 	return md, ctx
 }
 
+
 func (r *Runner) getByteData(filename string) ([]byte, error) {
 	// Loads the file, and injects all the import sites.
 	finder := regexp.MustCompile(`<r\s+import=["'](.*)["']\s*/>`)
-
-	byteData, err := ioutil.ReadFile(filename)
+	byteData, err := getByteDataRelative("", filename)
 
 	if (err != nil) {
 		return nil, err
 	}
-	
-	return finder.ReplaceAllFunc(byteData, func(input []byte) []byte {
-		matches := finder.FindAllSubmatch(input, -1)
-		subFilename := string(matches[0][1])
 
-		data, _ := r.getByteData(subFilename)
-		return data
-	}), nil
+	for {
+
+		if matches := finder.FindSubmatchIndex(byteData); matches != nil {
+			importFilename := string(byteData[matches[2]:matches[3]])
+			localData, err := getByteDataRelative(filename, importFilename)
+
+			if (err != nil) {
+				return nil, err
+			}
+
+			byteData = bytes.Replace(byteData, byteData[matches[0]:matches[1]], localData, 1)
+		} else {
+			break
+		}
+	}
+
+	return byteData, nil
+}
+
+func getByteDataRelative(rootFilename string, filename string) ([]byte, error) {
+	actualFilename := path.Join(path.Dir(rootFilename), filename)
+
+	return ioutil.ReadFile(actualFilename)
 }
 
 func (r *Runner) getAST(md goldmark.Markdown) (ast.Node, []byte) {
