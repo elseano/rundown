@@ -135,7 +135,8 @@ func help(cmd *cobra.Command, args []string) {
 
 	fmt.Printf("\nHelp for %s\n\n", cleanFilename)
 
-	doc := rd.GetAST().(*markdown.SectionedDocument)
+	d, _ := rd.GetAST()
+	doc := d.(*markdown.SectionedDocument)
 	for desc := doc.Sections[0].Description.Front(); desc != nil; desc = desc.Next() {
 		if text := desc.Value.(*markdown.RundownBlock).GetModifiers().GetValue("desc"); text != nil {
 			fmt.Printf("  %s\n", *text)
@@ -222,13 +223,16 @@ func run(cmd *cobra.Command, args []string) int {
 		}
 
 		if err != nil {
+			util.Debugf("ERROR %#v\n", err)
 			if errors.Is(err, rundown.InvocationError) {
 				codes, err2 := rundown.ParseShortCodeSpecs([]string{"rundown:help"})
 				if err2 == nil {
 					rd.RunCodesWithoutValidation(codes)
 				}
 
+				util.Debugf("Rendering shortcodes for %s\n", rd.Filename())
 				err2 = RenderShortCodes()
+				util.Debugf("ERROR %#v\n", err2)
 			}
 		}
 

@@ -8,9 +8,9 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"strings"
+	"path/filepath"
 	"regexp"
-	"path"
+	"strings"
 
 	"github.com/elseano/rundown/pkg/markdown"
 	"github.com/elseano/rundown/pkg/util"
@@ -70,7 +70,7 @@ type ShortCodeOption struct {
 	Type        string
 	Default     string
 	Required    bool
-	Prompt		bool
+	Prompt      bool
 	Description string
 }
 
@@ -164,7 +164,7 @@ func BuildOptionInfo(rdOpt markdown.RundownNode) *ShortCodeOption {
 		Code:        strings.TrimSpace(mods.Values[markdown.Parameter("opt")]),
 		Type:        strings.TrimSpace(mods.Values[markdown.Parameter("type")]),
 		Required:    mods.Flags[markdown.Flag("required")],
-		Prompt: mods.Values[markdown.Parameter("prompt")] != "",
+		Prompt:      mods.Values[markdown.Parameter("prompt")] != "",
 		Description: strings.TrimSpace(mods.Values[markdown.Parameter("desc")]),
 		Default:     strings.TrimSpace(mods.Values[markdown.Parameter("default")]),
 	}
@@ -198,6 +198,10 @@ func LoadFile(filename string) (*Runner, error) {
 	}
 
 	return &Runner{filename: filename, out: os.Stdout, consoleWidth: -1}, nil
+}
+
+func (r *Runner) Filename() string {
+	return r.filename
 }
 
 func (r *Runner) SetOutput(out io.Writer) {
@@ -264,13 +268,13 @@ func (r *Runner) getEngine() (goldmark.Markdown, *Context) {
 	return md, ctx
 }
 
-
 func (r *Runner) getByteData(filename string) ([]byte, error) {
 	// Loads the file, and injects all the import sites.
 	finder := regexp.MustCompile(`<r\s+import=["'](.*)["']\s*/>`)
 	byteData, err := getByteDataRelative("", filename)
 
-	if (err != nil) {
+	if err != nil {
+		util.Debugf("Error loading root file %#v\n", err)
 		return nil, err
 	}
 
@@ -280,7 +284,8 @@ func (r *Runner) getByteData(filename string) ([]byte, error) {
 			importFilename := string(byteData[matches[2]:matches[3]])
 			localData, err := getByteDataRelative(filename, importFilename)
 
-			if (err != nil) {
+			if err != nil {
+				util.Debugf("Error loading imported file %#v\n", err)
 				return nil, err
 			}
 
@@ -294,7 +299,19 @@ func (r *Runner) getByteData(filename string) ([]byte, error) {
 }
 
 func getByteDataRelative(rootFilename string, filename string) ([]byte, error) {
-	actualFilename := path.Join(path.Dir(rootFilename), filename)
+	if filepath.IsAbs(filename) {
+		util.Debugf("Loading %s\n", filename)
+		return ioutil.ReadFile(filename)
+	}
+
+	abs, err := filepath.Abs(rootFilename)
+	if err != nil {
+		return nil, err
+	}
+
+	actualFilename := filepath.Join(filepath.Dir(abs), filename)
+
+	util.Debugf("Loading %s\n", actualFilename)
 
 	return ioutil.ReadFile(actualFilename)
 }
@@ -320,10 +337,10 @@ func (r *Runner) getAST(md goldmark.Markdown) (ast.Node, []byte) {
 	return doc, byteData
 }
 
-func (r *Runner) GetAST() ast.Node {
+func (r *Runner) GetAST() (ast.Node, []byte) {
 	md, _ := r.getEngine()
-	doc, _ := r.getAST(md)
-	return doc
+	doc, source := r.getAST(md)
+	return doc, source
 }
 
 func (d *DocumentShortCodes) Append(info *ShortCodeInfo) {

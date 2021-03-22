@@ -12,6 +12,7 @@ import (
 )
 
 func RenderShortCodes() error {
+	util.Debugf("Rendering shortcodes for %s\n", rundownFile)
 	rd, err := rundown.LoadFile(rundownFile)
 	if err != nil {
 		panic(err)

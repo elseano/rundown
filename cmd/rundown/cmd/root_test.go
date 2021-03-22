@@ -3,10 +3,10 @@ package cmd
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -23,32 +23,26 @@ func TestFullRender(t *testing.T) {
 	root, err := filepath.Abs("../../../_testdata/")
 
 	if assert.Nil(t, err) {
-		filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-			ok := true
-
-			if !info.IsDir() && filepath.Ext(path) == ".md" {
-				filename := filepath.Base(path)
-				ok = t.Run(filename, func(t *testing.T) {
-					expected, actual := runSequential(t, path)
+		files, err := ioutil.ReadDir(root)
+		assert.Nil(t, err)
+		for _, file := range files {
+			if strings.HasSuffix(file.Name(), ".md") {
+				t.Run(file.Name(), func(t *testing.T) {
+					expected, actual := runSequential(t, path.Join(root, file.Name()))
 					testutil.AssertLines(t, expected, actual)
 				})
 			}
 
-			if !ok {
-				return errors.New("Stop")
-			}
-
-			return nil
-		})
+		}
 	}
 }
 
-func TestSimpleRundown(t *testing.T) {
-	fp, _ := filepath.Abs("../../../_testdata/subenv.md")
-	expected, actual := runSequential(t, fp)
+// func TestSimpleRundown(t *testing.T) {
+// 	fp, _ := filepath.Abs("../../../_testdata/subenv.md")
+// 	expected, actual := runSequential(t, fp)
 
-	testutil.AssertLines(t, expected, actual)
-}
+// 	testutil.AssertLines(t, expected, actual)
+// }
 
 // func TestSpacingRundown(t *testing.T) {
 // 	expected, actual := runSequential(t, "_testdata/spacing.md")
@@ -112,29 +106,41 @@ func TestSimpleRundown(t *testing.T) {
 
 // Blah
 func runSequential(t *testing.T, filename string) (string, string) {
+	util.Debugf("NEW RUN!\n\n")
 	source, expected := loadFile(filename)
 
-	tf, err := ioutil.TempFile("", "")
+	tf, err := ioutil.TempFile(path.Dir(filename), "tmp-"+path.Base(filename)+"-*")
+	tempFilename := tf.Name()
 	assert.Nil(t, err)
+	defer os.Remove(tempFilename)
 
 	tf.WriteString(source)
 	tf.Close()
-	defer os.Remove(tf.Name())
+	util.Debugf("Source file is %s\n", tf.Name())
+	// util.Debugf("Source contents is %s\n", source)
 
 	var buffer bytes.Buffer
 
 	root := RootCmd()
-	// root.SetArgs([]string{tf.Name()})
 	root.SetOut(&buffer)
 	root.SetErr(&buffer)
 	root.PreRun(root, []string{})
 	root.ParseFlags([]string{"--cols", "80", "-f", tf.Name()})
 
 	rd, err := rundown.LoadFile(tf.Name())
+	util.Debugf("Loading: %s: %#v\n", tf.Name(), err)
+	assert.Nil(t, err)
 	codes := rd.GetShortCodes()
 
-	fmt.Printf("Codes: %#v", codes.Codes)
-	fmt.Printf("RUNDOWN\n")
+	fmt.Printf("Load err: %#v\n", err)
+	fmt.Printf("Codes: %#v\n", codes.Codes)
+
+	// ast, sourceb := rd.GetAST()
+	// util.Debugf("Things %#v\n", sourceb)
+	// ast.Dump(sourceb, 0)
+
+	rundownFile = tf.Name()
+	util.Debugf("Rundown File = %s\n", rundownFile)
 
 	if codes.Codes["direct"] != nil {
 		argShortcodes = []string{"direct"}

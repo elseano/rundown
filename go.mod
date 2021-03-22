@@ -11,7 +11,8 @@ require (
 	github.com/charmbracelet/glamour v0.2.0
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 	github.com/eliukblau/pixterm v1.3.1
-	github.com/fatih/color v1.7.0
+	github.com/fatih/color v1.10.0
+	github.com/goccy/go-yaml v1.8.9 // indirect
 	github.com/kr/pty v1.1.1
 	github.com/kyokomi/emoji v2.2.4+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible

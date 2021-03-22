@@ -341,6 +341,7 @@ type Prompt struct {
 
 func (r *RundownRenderer) renderRundownBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	w.Flush()
+	rdutil.Debugf("Got a rundown block\n")
 	if entering {
 		if node.FirstChild() != nil {
 			// Bugfix paragraph spacing.
@@ -631,6 +632,7 @@ func (r *RundownRenderer) renderRundownInline(w util.BufWriter, source []byte, n
 		}
 
 		if rd.Modifiers.Flags[markdown.Flag("sub-env")] {
+			rdutil.Debugf("Got sub-env inline element.\n")
 			// Find all text nodes containing $ENV or ${ENV:-} replace with FixedText.
 			ast.Walk(node, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
 				if text, ok := node.(*ast.Text); ok && entering {
