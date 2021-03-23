@@ -189,6 +189,8 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 
 	if strings.Contains(executable, "$FILE") {
 		context.SetEnv("FILE", saveContentsToTemp(context, content, "source"))
+		util.Debugf("Moving script into secondary file\n")
+
 		contentSwitchback = content
 		content = executable
 		executable = "bash"
@@ -218,6 +220,8 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 	if _, err := tmpFile.Write([]byte(contents)); err != nil {
 		panic(err)
 	}
+
+	util.Debugf("Script is:\n\n%s\n\n", contents)
 
 	os.Chmod(filename, 0700)
 	tmpFile.Close()
@@ -265,7 +269,7 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 		cmd.Env = append(cmd.Env, key+"="+value)
 	}
 
-	logger.Printf("Script:\r\n%s\r\nEnv:%v\r\n", contents, cmd.Env)
+	util.Debugf("Script:\r\n%s\r\nEnv:%v\r\n", contents, cmd.Env)
 
 	if contentSwitchback != "" {
 		contents = contentSwitchback

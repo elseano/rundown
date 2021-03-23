@@ -19,12 +19,15 @@ require (
 	github.com/lunixbochs/vtclean v1.0.0 // indirect
 	github.com/manifoldco/promptui v0.8.0
 	github.com/mattn/go-colorable v0.1.8 // indirect
+	github.com/mjibson/esc v0.2.0 // indirect
 	github.com/muesli/termenv v0.7.2
 	github.com/olekukonko/tablewriter v0.0.4
 	github.com/spf13/cobra v1.1.3
 	github.com/stretchr/testify v1.4.0
 	github.com/yuin/goldmark v1.2.1
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
+	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/net v0.0.0-20201021035429-f5854403a974 // indirect
 	golang.org/x/sys v0.0.0-20210320140829-1e4c9ba3b0c4 // indirect
+	golang.org/x/tools v0.1.0 // indirect
 )

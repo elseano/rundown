@@ -350,6 +350,13 @@ func (r *RundownRenderer) renderRundownBlock(w util.BufWriter, source []byte, no
 
 		if rundown, ok := node.(*markdown.RundownBlock); ok {
 
+			if setEnv, ok := rundown.GetModifiers().Flags[markdown.Flag("set-env")]; setEnv && ok {
+				for k, val := range rundown.GetModifiers().Values {
+					envName := strings.ReplaceAll(strings.ToUpper(string(k)), "-", "_")
+					r.ctx.SetEnv(envName, val)
+				}
+			}
+
 			if rundown.GetModifiers().HasAll("opt", "prompt") {
 				parentSection := searchParent(node)
 
@@ -362,14 +369,50 @@ func (r *RundownRenderer) renderRundownBlock(w util.BufWriter, source []byte, no
 					envName = *envOverride
 				}
 
-				required := func(input string) error {
-					if input == "" {
+				rdutil.Debugf("Input ENV: %s\n", envName)
+
+				isRequired := false
+				optType := "string"
+				optDefault := rundown.GetModifiers().GetValue("default")
+
+				if required := rundown.GetModifiers().GetFlag("required"); required != nil {
+					isRequired = *required
+				}
+
+				if typ := rundown.GetModifiers().GetValue("type"); typ != nil {
+					optType = *typ
+				}
+
+				rdutil.Debugf("Input Required=%#v Type=%#v\n", isRequired, optType)
+
+				validator := func(input string) error {
+					if input == "" && isRequired {
 						return errors.New("required")
 					}
+
+					if optType == "file-exists" && !rdutil.FileExists(input) {
+						return errors.New("file doesn't exist")
+					}
+
 					return nil
 				}
 
-				if _, ok := r.ctx.Env[envName]; !ok {
+				currentValue := ""
+				currentValueOk := true
+
+				if envValue, ok := r.ctx.Env[envName]; !ok {
+					currentValue = envValue
+				}
+
+				if currentValue == "" && optDefault != nil {
+					currentValue = *optDefault
+				}
+
+				currentValueOk = validator(currentValue) == nil
+
+				rdutil.Debugf("Input CurrentValue=%#v Ok?=%#v\n", currentValue, currentValueOk)
+
+				if (currentValue == "" || !currentValueOk) && isRequired {
 					mask := false
 
 					if promptType := rundown.GetModifiers().GetValue("type"); promptType != nil && *promptType == "password" {
@@ -386,9 +429,11 @@ func (r *RundownRenderer) renderRundownBlock(w util.BufWriter, source []byte, no
 							Prompt:    *rundown.GetModifiers().GetValue("prompt"),
 							Indicator: "‣",
 						},
+						Default:     currentValue,
 						Stdin:       stdin,
-						Validate:    required,
+						Validate:    validator,
 						HideEntered: mask,
+						AllowEdit:   true,
 						Templates: &promptui.PromptTemplates{
 							Valid:           queryGood,
 							Invalid:         queryBad,
@@ -409,6 +454,8 @@ func (r *RundownRenderer) renderRundownBlock(w util.BufWriter, source []byte, no
 					}
 
 					r.ctx.SetEnv(envName, result)
+				} else if optDefault != nil {
+					r.ctx.SetEnv(envName, *optDefault)
 				}
 			}
 
@@ -439,13 +486,6 @@ func (r *RundownRenderer) renderRundownBlock(w util.BufWriter, source []byte, no
 				r.ctx.SetError(&StopError{Result: result})
 
 				return ast.WalkContinue, nil
-			}
-
-			if setEnv, ok := rundown.GetModifiers().Flags[markdown.Flag("set-env")]; setEnv && ok {
-				for k, val := range rundown.GetModifiers().Values {
-					envName := strings.ReplaceAll(strings.ToUpper(string(k)), "-", "_")
-					r.ctx.SetEnv(envName, val)
-				}
 			}
 
 			if rundown.Modifiers.HasAny("on-failure") {
