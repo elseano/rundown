@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -35,20 +36,11 @@ var rootCmd = &cobra.Command{
 
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		if flagAst {
-			ast(cmd, args)
-		} else {
-			exitCode := run(cmd, args)
-			os.Exit(exitCode)
-		}
+		exitCode := run(cmd, args)
+		os.Exit(exitCode)
 	},
 	ValidArgs: []string{},
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-
-		// if len(args) == 0 {
-		// 	return []string{"md"}, cobra.ShellCompDirectiveFilterFileExt
-		// }
-
 		cleanArgs := cmd.Flags().Args()
 		cleanArgs = append(cleanArgs, toComplete)
 
@@ -65,10 +57,37 @@ var rootCmd = &cobra.Command{
 }
 
 func findMarkdownFile(file string) string {
-	if len(file) == 0 {
-		return "README.md"
-	} else {
+	dir, err := os.Getwd()
+
+	if len(file) != 0 {
 		return file
+	}
+
+	if err != nil {
+		util.Debugf("Err: %#v\n", err)
+		if util.FileExists("RUNDOWN.md") {
+			return "RUNDOWN.md"
+		} else {
+			return "README.md"
+		}
+	}
+
+	// Search the CWD and parent paths until the root path for RUNDOWN.md/README.md
+	for {
+		for _, fn := range []string{"RUNDOWN.md", "README.md"} {
+			path := path.Join(dir, fn)
+			util.Debugf("Searching: %s\n", path)
+
+			if util.FileExists(path) {
+				return path
+			}
+		}
+
+		if dir == "/" {
+			return "README.md" // Will fail out later.
+		}
+
+		dir = path.Dir(dir)
 	}
 }
 
@@ -83,7 +102,6 @@ func Execute(version string, gitCommit string) error {
 }
 
 func init() {
-	rootCmd.Flags().BoolVarP(&flagCodes, "help", "h", false, "Displays help & shortcodes for the given file")
 	rootCmd.Flags().BoolVar(&flagDebug, "debug", false, "Write debugging into to debug.log")
 	rootCmd.Flags().BoolVarP(&flagAsk, "ask", "a", false, "Ask which shortcode to run")
 	rootCmd.Flags().BoolVar(&flagAskRepeat, "ask-repeat", false, "Continually ask which shortcode to run")
@@ -94,13 +112,6 @@ func init() {
 	rootCmd.Flags().BoolVarP(&flagCheckOnly, "check", "c", false, "Check file is valid for Rundown")
 	rootCmd.Flags().BoolVarP(&flagAst, "ast", "i", false, "Inspect the Rundown AST")
 	rootCmd.Flags().StringVar(&flagCompletions, "completions", "", "Render shell completions for given shell (bash, zsh, fish, powershell)")
-
-	// TODO - Move these into flags.
-	// rootCmd.AddCommand(astCmd)
-	// rootCmd.AddCommand(emojiCmd)
-	// rootCmd.AddCommand(checkCmd)
-	// rootCmd.AddCommand(completionCmd)
-	// rootCmd.AddCommand(viewCmd)
 
 	originalHelpFunc := rootCmd.HelpFunc()
 
@@ -168,7 +179,22 @@ func run(cmd *cobra.Command, args []string) int {
 	rd.SetOutput(cmd.OutOrStdout())
 	rd.SetConsoleWidth(flagCols)
 
+	KillReadlineBell()
+
 	switch {
+
+	case flagAst:
+
+		return runAst(rundownFile)
+
+	case flagCheckOnly:
+
+		return runCheck(rundownFile)
+
+	case flagCompletions != "":
+
+		runCompletions(flagCompletions, cmd)
+		return 0
 
 	case flagCodes:
 
@@ -181,8 +207,6 @@ func run(cmd *cobra.Command, args []string) int {
 		return handleError(cmd.OutOrStderr(), err, callBack)
 
 	case flagAsk:
-		KillReadlineBell()
-
 		spec, err := AskShortCode()
 		if err != nil {
 			return handleError(cmd.OutOrStderr(), err, callBack)
@@ -194,8 +218,6 @@ func run(cmd *cobra.Command, args []string) int {
 		}
 
 	case flagAskRepeat:
-		KillReadlineBell()
-
 		for {
 			spec, err := AskShortCode()
 			if err != nil {
@@ -207,7 +229,7 @@ func run(cmd *cobra.Command, args []string) int {
 			}
 
 			err, callBack = rd.RunCodes(&rundown.DocumentSpec{ShortCodes: []*rundown.ShortCodeSpec{spec}, Options: map[string]*rundown.ShortCodeOptionSpec{}})
-			return handleError(cmd.OutOrStderr(), err, callBack)
+			handleError(cmd.OutOrStderr(), err, callBack)
 		}
 
 	default:

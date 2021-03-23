@@ -59,6 +59,19 @@ $ yourprogram completion fish > ~/.config/fish/completions/yourprogram.fish
 	},
 }
 
+func runCompletions(shell string, root *cobra.Command) {
+	switch shell {
+	case "bash":
+		root.GenBashCompletion(os.Stdout)
+	case "zsh":
+		root.GenZshCompletion(os.Stdout)
+	case "fish":
+		root.GenFishCompletion(os.Stdout, true)
+	case "powershell":
+		root.GenPowerShellCompletion(os.Stdout)
+	}
+}
+
 func performCompletion(args []string) []string {
 	var result = []string{}
 

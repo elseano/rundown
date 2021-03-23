@@ -224,36 +224,6 @@ func (r *Runner) SetLogger(isLogging bool) {
 	r.logger = log.New(debug, "", log.Ltime)
 }
 
-func (r *Runner) getEngineOld() (goldmark.Markdown, *util.WordWrapWriter, *Context) {
-	md := PrepareMarkdown()
-	renderer := md.Renderer()
-	ctx := NewContext()
-	ctx.Logger = r.logger
-	ctx.CurrentFile = r.filename
-	if r.consoleWidth > 0 {
-		ctx.ConsoleWidth = r.consoleWidth
-	}
-	ctx.RawOut = r.out
-
-	currentLevel := 0
-
-	renderer.AddOptions(markdown.WithRundownHandler(NewRundownHandler(ctx)))
-	renderer.AddOptions(markdown.WithConsoleWidth(ctx.ConsoleWidth))
-	renderer.AddOptions(markdown.WithLevelChange(func(indent int) {
-		currentLevel = indent
-	}))
-	renderer.AddOptions(markdown.WithLevel(currentLevel))
-
-	www := util.NewWordWrapWriter(r.out, ctx.ConsoleWidth)
-
-	www.SetAfterWrap(func(out io.Writer) int {
-		n, _ := out.Write(bytes.Repeat([]byte("  "), currentLevel-1))
-		return n
-	})
-
-	return md, www, ctx
-}
-
 func (r *Runner) getEngine() (goldmark.Markdown, *Context) {
 	ctx := NewContext()
 	ctx.Logger = r.logger

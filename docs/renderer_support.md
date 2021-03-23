@@ -25,4 +25,6 @@ Rundown also supports a comment style automation tag of them form `<!--~ tag tag
 | GitHub | OK | OK |
 | GitLab | OK | Shown |
 | BitBucket | Shown | Shown |
+| CodeCommit | Not Tested | Not Tested |
+| Beanstalk | Not Tested | Not Tested |
 

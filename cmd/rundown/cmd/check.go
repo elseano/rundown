@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"io/ioutil"
 	"os"
 
@@ -16,26 +15,9 @@ import (
 	"github.com/yuin/goldmark/text"
 
 	"github.com/olekukonko/tablewriter"
-	"github.com/spf13/cobra"
 )
 
-var checkCmd = &cobra.Command{
-	Use:   "check [FILENAME]",
-	Short: "Checks the Rundown file for errors",
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			return errors.New("Must specify at least a filename")
-		}
-
-		return nil
-	},
-	PreRun: func(cmd *cobra.Command, args []string) {
-		rundownFile = findMarkdownFile(flagFilename)
-	},
-	Run: checkExec,
-}
-
-func checkExec(cmd *cobra.Command, args []string) {
+func runCheck(filename string) int {
 
 	table := tablewriter.NewWriter(os.Stdout)
 
@@ -49,7 +31,7 @@ func checkExec(cmd *cobra.Command, args []string) {
 	table.SetAutoWrapText(false)
 
 	md := rundown.PrepareMarkdown()
-	b, _ := ioutil.ReadFile(rundownFile)
+	b, _ := ioutil.ReadFile(filename)
 
 	reader := text.NewReader(b)
 
@@ -97,4 +79,10 @@ func checkExec(cmd *cobra.Command, args []string) {
 	})
 
 	table.Render()
+
+	if table.NumLines() > 0 {
+		return -1
+	}
+
+	return 0
 }

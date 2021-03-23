@@ -163,6 +163,18 @@ func main() {
 ```
 ~~~
 
+A really handy way of using this is when you need do some preprocessing of your script. For example, here we're using sed to replace `Filename.txt` with the contents of an environment variable.
+
+~~~ markdown
+<r opt="file" as="INPUT_FILE" prompt="Input file" type="file-exists" desc="The input file to chmod" required />
+
+<r with="sed 's|Filename.txt|$INPUT_FILE|g' $FILE | bash"/>
+
+``` bash
+chmod 400 Filename.txt
+```
+~~~
+
 ### Save Content
 
 Forms:
