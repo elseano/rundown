@@ -2,6 +2,13 @@
 
 Rundown provides automation to Markdown. In the simplest case, this allows you to render Markdown documentation in the console, executing code blocks as Rundown progresses. It also provides more advanced useage documented below. 
 
+<r norun reveal/>
+
+``` bash
+brew install elseano/taps/rundown
+```
+
+
 Rundown's philosophy is that executable documentation is always better, but it shouldn't get in the way of just reading the document itself. 
 
 Some of the usecases rundown suits are:
@@ -18,7 +25,7 @@ Some of the usecases rundown suits are:
 
 ## Feature Highlights
 
-Rundown will run unmodified markdown perfectly fine. As your rundown files get more complex, you'll want to start using the rundown automation tags. These tags are transparent additions to the markdown format which aren't rendered by standards compliant markdown renderers (i.e. Github, etc). See [Renderer Support](./docs/renderer_support.md) for more information.
+Rundown will run unmodified markdown perfectly fine. As your rundown files get more complex, you'll want to start using the [rundown automation tags](./docs/automation_tags.md). These tags are transparent additions to the markdown format which aren't rendered by standards compliant markdown renderers (i.e. Github, etc). See [Renderer Support](./docs/renderer_support.md) for more information.
 
 [Read the Full documentation](./docs/automation_tags.md), or checkout the examples linked below.
 
@@ -34,7 +41,7 @@ Some of the additions Rundown brings are:
 * Rundown files can be designed to execute top to bottom, or present a menu to execute only a single part.
 * Fast - rundown is written in Go, and works on Linux and Mac. Windows support via WSL probably works.
 
-## Rundown Examples <r label=examples/>
+## Rundown Examples
 
 At it's core, Rundown turns markdown's fenced code blocks into executable code. Indented code blocks are left as-is, as illustrated by this example.
 
@@ -84,7 +91,7 @@ When there's no special failure handling, all failures will cause Rundown to exi
 
 Take a look at the [Failure exampes](./examples/failure.md).
 
-## Shortcodes <r label=shortcodes>
+## Shortcodes
 
 Headings can have "shortcodes" attached to them, which allows that heading (and all child headings) to be executed specifically. Specifying a shortcode can be done either before the heading, or inside the heading itself.
 
@@ -92,7 +99,7 @@ Headings can have "shortcodes" attached to them, which allows that heading (and 
 ## Shortcodes <r label=shortcodes/>
 ```
 
-That heading can then be run via `rundown README.md shortcodes`. Bash/Fish/ZSH completition is available for shortcodes, as well as a shortcode subcommand which lists available shortcodes within a document.
+That heading can then be run via `rundown shortcodes`. Bash/Fish/ZSH completion is available for shortcodes, as well running `rundown --help` which will list shortcodes and their options.
 
 Related to shortcodes is the `setup` flag. It's common to write instructions where every level 2 heading runs under the assumption that something from the parent heading has been done. The setup flag on a code block means that any shortcodes on child headings should also run the parent code blocks with the `setup` flag present.
 
@@ -112,14 +119,14 @@ For example:
     go build -o rundown
     ```
 
-When you execute `rundown README.md compile`, rundown will first execute the parent heading's ("Build Project") `setup` code blocks.
+When you execute `rundown compile`, rundown will first execute the parent heading's ("Build Project") `setup` code blocks.
 
 ### Options
 
 Shortcodes support options, which are variables you can pass into your rundown scripts. Passing options into Rundown is done via the command line:
 
 ``` bash norun reveal
-rundown README.md shortcode +option="Value"
+rundown shortcode +option="Value"
 ```
 
 Options always come after the shortcode, must be prefixed with a `+` symbol, and must be of the format key=value. Option tags are ignored unless they specify `opt`, `type` and `desc`.
@@ -140,7 +147,7 @@ rundown README.md build +arch=linux
 
 More examples can be found in the [Shortcodes Example](./examples/shortcodes.md) markdown file.
 
-## Functions <r label=functions/>
+## Functions (Experimental)
 
 While Shortcodes allow users to jump to certain points of your document, **Functions** allow authors to pull in functionality from elsewhere in the document, or even another document entirely.
 
