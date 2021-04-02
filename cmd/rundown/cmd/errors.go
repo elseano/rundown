@@ -10,15 +10,15 @@ import (
 	"github.com/logrusorgru/aurora"
 )
 
-const (
-	ErrorCodeInternal   = 127 // Something failed with Rundown internally.
-	ErrorInvocation     = 3   // Invalid shortcode or options provided.
-	ErrorCodeUnexpected = 2   // A script failed and we weren't expecting it.
-	ErrorCodeExpected   = 1   // Stop-Fail requested.
-	ErrorCodeSuccess    = 0   // Stop-Ok or normal script termination.
+var (
+	ErrorInternal   = errors.New("Internal rundown error")
+	ErrorInvocation = errors.New("Invalid section provided")
+	ErrorArg        = errors.New("Invalid section options provided")
+	ErrorStopFail   = errors.New("Rundown file signalled failure")
+	ErrorScript     = errors.New("Codeblock failed")
 )
 
-func handleError(dest io.Writer, err error, cb func()) int {
+func handleError(dest io.Writer, err error, cb func()) error {
 	defer func() {
 		if cb != nil {
 			fmt.Fprintf(dest, "\n")
@@ -28,7 +28,7 @@ func handleError(dest io.Writer, err error, cb func()) int {
 	}()
 
 	if err == nil {
-		return ErrorCodeSuccess
+		return nil
 	}
 
 	if stopError, ok := err.(*rundown.StopError); ok {
@@ -50,7 +50,7 @@ func handleError(dest io.Writer, err error, cb func()) int {
 				fmt.Fprintf(dest, "\n")
 
 				fmt.Fprintf(dest, stopError.Result.Output)
-				return ErrorCodeUnexpected
+				return ErrorScript
 
 			} else if stopError.Result.Message != "" {
 				fmt.Fprintf(dest, "\n%s - %s", aurora.Red("Failure"), stopError.Result.Message)
@@ -59,10 +59,10 @@ func handleError(dest io.Writer, err error, cb func()) int {
 				fmt.Fprintf(dest, "\n%s\n\n", aurora.Red("Failure"))
 			}
 
-			return ErrorCodeExpected
+			return ErrorStopFail
 		}
 
-		return ErrorCodeSuccess // Stop requested.
+		return nil // Stop requested.
 	}
 
 	fmt.Fprintf(dest, "\n%s: %s\n\n", aurora.Red("Error"), err)
@@ -71,5 +71,5 @@ func handleError(dest io.Writer, err error, cb func()) int {
 		return ErrorInvocation
 	}
 
-	return ErrorCodeInternal
+	return ErrorInternal
 }

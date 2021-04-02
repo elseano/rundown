@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 
 	"github.com/elseano/rundown/pkg/rundown"
 	"github.com/elseano/rundown/pkg/util"
+	"github.com/spf13/cobra"
 
 	"github.com/kyokomi/emoji"
 
@@ -17,7 +19,29 @@ import (
 	"github.com/olekukonko/tablewriter"
 )
 
+var checkCmd = &cobra.Command{
+	Use:   "check [filename]",
+	Short: "Checks the rundown file for any errors",
+
+	Run: func(cmd *cobra.Command, args []string) {
+		os.Exit(runCheck(args[0]))
+	},
+
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			return errors.New("Must supply a filename.")
+		}
+
+		return nil
+	},
+}
+
 func runCheck(filename string) int {
+
+	if !util.FileExists(filename) {
+		print("File not found.\n")
+		return -1
+	}
 
 	table := tablewriter.NewWriter(os.Stdout)
 

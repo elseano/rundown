@@ -132,13 +132,21 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 	if save, ok := modifiers.Values[SaveParameter]; ok {
 		content := util.NodeLines(executionBlock, source)
 
-		if modifiers.Flags[EnvAwareFlag] == true {
+		util.Debugf("Saving code block as a file instead of running it.\n")
+
+		if modifiers.Flags[EnvAwareFlag] {
+			util.Debugf("Content is to be treated as env-aware.\n")
 			content, _ = SubEnv(content, context)
 		}
 		path := saveContentsToTemp(context, content, save)
 		varName := strings.Split(save, ".")[0]
 		context.SetEnv(strings.ToUpper(varName), path)
 		modifiers.Flags[NoRunFlag] = true
+		modifiers.Flags[NoSpinFlag] = true
+
+		util.Debugf("%s=%s\n", varName, path)
+
+		return SuccessfulExecution
 	}
 
 	if modifiers.HasAny("named", "spinner") && !modifiers.Flags[NoSpinFlag] {

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 
@@ -9,22 +8,6 @@ import (
 	"github.com/elseano/rundown/pkg/util"
 	"github.com/spf13/cobra"
 )
-
-var viewCmd = &cobra.Command{
-	Use:   "view [FILENAME]",
-	Short: "Renders a markdown file to the console, without running it.",
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			return errors.New("Must specify at least the filename")
-		}
-
-		return nil
-	},
-	PreRun: func(cmd *cobra.Command, args []string) {
-		rundownFile = findMarkdownFile(flagFilename)
-	},
-	Run: view,
-}
 
 func view(cmd *cobra.Command, args []string) {
 	fmt.Printf("Reading %s\n", rundownFile)
