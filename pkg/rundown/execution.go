@@ -127,7 +127,7 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 
 	content := util.NodeLines(executionBlock, source)
 
-	logger.Printf("Block mods: %s\n", modifiers)
+	util.Debugf("Block mods: %s\n", modifiers)
 
 	if save, ok := modifiers.Values[SaveParameter]; ok {
 		content := util.NodeLines(executionBlock, source)

@@ -29,7 +29,7 @@ func TestRunFile(t *testing.T) {
 		files, err := ioutil.ReadDir(root)
 		assert.Nil(t, err)
 		for _, file := range files {
-			if strings.HasSuffix(file.Name(), ".md") {
+			if strings.HasSuffix(file.Name(), ".md") && !strings.HasPrefix(file.Name(), "custom-") {
 				t.Run(file.Name(), func(t *testing.T) {
 					expected, actual := runSequential(t, path.Join(root, file.Name()))
 					testutil.AssertLines(t, expected, actual)
@@ -38,6 +38,46 @@ func TestRunFile(t *testing.T) {
 
 		}
 	}
+}
+
+func TestRunFileCustomOptions(t *testing.T) {
+	file, err := filepath.Abs("../../../_testdata/custom-opt-parse.md")
+	if err != nil {
+		t.Error(err)
+	}
+
+	expected, actual := runSequential(t, file, "options", "+name=Blah")
+	testutil.AssertLines(t, expected, actual)
+}
+
+func TestRunFileCustomInvalidOptions(t *testing.T) {
+	file, err := filepath.Abs("../../../_testdata/custom-opt-parse.md")
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, actual := runSequential(t, file, "options", "+incorrect=Blah")
+	testutil.AssertLines(t, "Error: Option 'options+incorrect' is not supported", actual)
+}
+
+func TestRunFileCustomOptionsEnum(t *testing.T) {
+	file, err := filepath.Abs("../../../_testdata/custom-opt-parse.md")
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, actual := runSequential(t, file, "options:enum", "+thing=yep")
+	testutil.AssertLines(t, "Enum\n\n  Result: yep", actual)
+}
+
+func TestRunFileCustomInvalidOptionsEnum(t *testing.T) {
+	file, err := filepath.Abs("../../../_testdata/custom-opt-parse.md")
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, actual := runSequential(t, file, "options:enum", "+thing=nope")
+	testutil.AssertLines(t, "Error: Option 'options:enum+thing' must be one of: yep, nah", actual)
 }
 
 // Handy test of a single file for debugging
@@ -52,7 +92,7 @@ func TestDebug(t *testing.T) {
 	testutil.AssertLines(t, expected, actual)
 }
 
-func runSequential(t *testing.T, filename string) (string, string) {
+func runSequential(t *testing.T, filename string, extraArgs ...string) (string, string) {
 	source, expected := loadFile(filename)
 
 	tf, err := ioutil.TempFile(path.Dir(filename), "tmp-"+path.Base(filename)+"-*")
@@ -84,10 +124,10 @@ func runSequential(t *testing.T, filename string) (string, string) {
 
 	if _, ok := codes.Codes["direct"]; ok {
 		t.Logf("Rundown file has a direct section. Running that instead.\n")
-		root.SetArgs([]string{"--cols", "80", "-f", tf.Name(), "direct"})
+		root.SetArgs(append([]string{"--cols", "80", "-f", tf.Name(), "direct"}, extraArgs...))
 	} else {
 		t.Logf("Rundown file contains no direct section, running whole file.\n")
-		root.SetArgs([]string{"--cols", "80", "-f", tf.Name()})
+		root.SetArgs(append([]string{"--cols", "80", "-f", tf.Name()}, extraArgs...))
 	}
 
 	root.Execute()

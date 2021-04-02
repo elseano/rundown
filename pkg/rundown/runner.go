@@ -29,9 +29,9 @@ type InvalidOptionsError struct {
 
 func (e *InvalidOptionsError) Error() string {
 	if e.ShortCode != "" {
-		return fmt.Sprintf("ShortCode %s option %s error: %s", e.ShortCode, e.OptionName, e.Message)
+		return fmt.Sprintf("Option '%s+%s' %s", e.ShortCode, e.OptionName, e.Message)
 	} else {
-		return fmt.Sprintf("Document option %s error: %s", e.OptionName, e.Message)
+		return fmt.Sprintf("'Document+%s' %s", e.OptionName, e.Message)
 	}
 }
 
@@ -369,7 +369,7 @@ func ParseShortCodeSpecs(specs []string) (*DocumentSpec, error) {
 	for _, spec := range specs {
 		if parts := strings.SplitN(spec, "=", 2); strings.HasPrefix(spec, "+") {
 			if len(parts) == 1 {
-				return nil, &InvalidOptionsError{OptionName: parts[0], Message: "Value is required"}
+				return nil, &InvalidOptionsError{OptionName: parts[0], Message: "is required"}
 			}
 
 			opt := &ShortCodeOptionSpec{
@@ -503,58 +503,10 @@ func (r *Runner) RunCodes(docSpec *DocumentSpec) (error, func()) {
 	doc, bytes := r.getAST(md)
 	shortCodes := r.getShortCodes(doc, bytes)
 
-	if len(shortCodes.Codes) == 0 && len(docSpec.ShortCodes) > 0 {
-		return &InvalidShortCodeError{ShortCode: docSpec.ShortCodes[0].Code}, nil
-	}
+	err := ValidateOptions(docSpec, shortCodes)
 
-	if len(shortCodes.Options) == 0 && len(docSpec.Options) > 0 {
-		for key := range docSpec.Options {
-			return &InvalidOptionsError{OptionName: key, Message: "Option not defined"}, nil
-		}
-	}
-
-	for optName := range docSpec.Options {
-		opt := shortCodes.Options[optName]
-		if opt == nil {
-			return &InvalidOptionsError{OptionName: optName, Message: "Option not defined"}, nil
-		}
-	}
-
-	for _, opt := range shortCodes.Options {
-		_, isSet := docSpec.Options[opt.Code]
-
-		if opt.Required && opt.Default == "" && !isSet {
-			return &InvalidOptionsError{OptionName: opt.Code, Message: "Is required"}, nil
-		}
-
-		if opt.Default != "" && !isSet {
-			docSpec.Options[opt.Code] = &ShortCodeOptionSpec{Code: opt.Code, Value: opt.Default}
-		}
-	}
-
-	for _, code := range docSpec.ShortCodes {
-		section := shortCodes.Codes[code.Code]
-		if section == nil {
-			return &InvalidShortCodeError{ShortCode: code.Code}, nil
-		}
-
-		for _, opt := range code.Options {
-			if section.Options[opt.Code] == nil {
-				return &InvalidOptionsError{OptionName: opt.Code, ShortCode: code.Code, Message: "Option not defined"}, nil
-			}
-		}
-
-		for _, opt := range section.Options {
-			_, isSet := code.Options[opt.Code]
-
-			if opt.Required && opt.Default == "" && !isSet && !opt.Prompt {
-				return &InvalidOptionsError{OptionName: opt.Code, ShortCode: code.Code, Message: "Option is required"}, nil
-			}
-
-			if opt.Default != "" && !isSet {
-				code.Options[opt.Code] = &ShortCodeOptionSpec{Code: opt.Code, Value: opt.Default}
-			}
-		}
+	if err != nil {
+		return err, nil
 	}
 
 	return r.RunCodesWithoutValidation(docSpec)

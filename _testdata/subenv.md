@@ -6,8 +6,24 @@ Hello <r sub-env>**$BLAH**</r>.
 
 And hi to <r sub-env>$MISSING</r>.
 
+And we can sub-env inside code blocks:
+
+<r norun reveal sub-env/>
+
+``` http
+GET http://localhost:3000/$BLAH HTTP/1.1
+```
+
+Done. 
+
 -----
 
 Hello one.
 
   And hi to $MISSING (not set).
+
+  And we can sub-env inside code blocks:
+
+    GET http://localhost:3000/$BLAH HTTP/1.1
+  
+  Done.
