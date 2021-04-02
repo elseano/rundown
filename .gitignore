@@ -8,7 +8,6 @@ dist/
 
 TODO.md
 debug.md
-rundown
 
 pkg/exec/langspec.go
 pkg/exec/languages.go
