@@ -1,0 +1,2 @@
+# When the tests run these files, they're extracted into a file named tmp-*
+tmp*
