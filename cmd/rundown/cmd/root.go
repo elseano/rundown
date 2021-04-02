@@ -31,6 +31,8 @@ func NewRootCmd() *cobra.Command {
 		PreRun: func(cmd *cobra.Command, args []string) {
 			rundownFile = shared.RundownFile(flagFilename)
 
+			util.Debugf("RundownFile = %s\n", rundownFile)
+
 			if len(rundownFile) == 0 {
 				if len(flagFilename) == 0 {
 					println("Could not find RUNDOWN.md or README.md in current or parent directories.")

@@ -238,6 +238,11 @@ func (a *rundownASTTransformer) Transform(doc *ast.Document, reader text.Reader,
 				// If the FCB isn't set to reveal, delete it.
 				if fencedMods.Flags[Flag("reveal")] != true {
 					fcb.Parent().RemoveChild(fcb.Parent(), fcb)
+				} else if fencedMods.Flags["sub-env"] {
+					// If it's a sub-env, wrap it so we can process the text on render.
+					rb := NewRundownBlock(fencedMods)
+					fcb.Parent().ReplaceChild(fcb.Parent(), fcb, rb)
+					rb.AppendChild(rb, fcb)
 				}
 
 			}
