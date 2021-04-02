@@ -31,7 +31,7 @@ func (e *InvalidOptionsError) Error() string {
 	if e.ShortCode != "" {
 		return fmt.Sprintf("Option '%s+%s' %s", e.ShortCode, e.OptionName, e.Message)
 	} else {
-		return fmt.Sprintf("'Document+%s' %s", e.OptionName, e.Message)
+		return fmt.Sprintf("'+%s' %s", e.OptionName, e.Message)
 	}
 }
 

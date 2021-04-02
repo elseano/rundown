@@ -15,4 +15,4 @@ Help using this file
   To use this file, make sure you specify the  +opt-one  parameter.
 
   
-Error: 'Document+opt-one' is required
+Error: '+opt-one' is required
