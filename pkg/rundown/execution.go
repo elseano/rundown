@@ -395,11 +395,18 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 					fl = f
 				}
 
+				output := ""
+
+				// If we're already showing STDOUT, don't bother showing it on faliure.
+				if !modifiers.Flags[StdoutFlag] {
+					output = strings.ReplaceAll(captureBuffer.String(), filename, "SCRIPT")
+				}
+
 				return ExecutionResult{
 					Message:   we.String(),
 					Kind:      "Error",
 					Source:    contents,
-					Output:    strings.ReplaceAll(captureBuffer.String(), filename, "SCRIPT"),
+					Output:    output,
 					FocusLine: fl,
 					IsError:   true,
 				}
