@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -272,6 +273,11 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 	// logger.Printf("Execution Command: %v\n", cmd.
 
 	cmd.Env = os.Environ()
+	abs, err := filepath.Abs(context.CurrentFile)
+
+	if err == nil && !modifiers.Flags["cwd"] {
+		cmd.Dir = filepath.Dir(abs)
+	}
 
 	for key, value := range context.Env {
 		cmd.Env = append(cmd.Env, key+"="+value)
