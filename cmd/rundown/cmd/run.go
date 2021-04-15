@@ -2,11 +2,45 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/elseano/rundown/pkg/rundown"
 	"github.com/elseano/rundown/pkg/util"
 	"github.com/spf13/cobra"
 )
+
+func buildDocSpec(command string, runner *rundown.Runner, cmd *cobra.Command, args []string) (*rundown.DocumentSpec, error) {
+	docShortCodes := runner.GetShortCodes()
+	commandCode := docShortCodes.Codes[command]
+
+	if commandCode == nil {
+		return nil, fmt.Errorf("invalid section %s", command)
+	}
+
+	commandSpec := &rundown.ShortCodeSpec{
+		Code:    commandCode.Code,
+		Options: map[string]*rundown.ShortCodeOptionSpec{},
+	}
+
+	docSpec := &rundown.DocumentSpec{
+		ShortCodes: []*rundown.ShortCodeSpec{commandSpec},
+		Options:    map[string]*rundown.ShortCodeOptionSpec{},
+	}
+
+	for k, _ := range commandCode.Options {
+		if f := cmd.Flag(k); f != nil {
+			commandSpec.Options[k] = &rundown.ShortCodeOptionSpec{Code: k, Value: f.Value.String()}
+		}
+	}
+
+	for k, _ := range docShortCodes.Options {
+		if f := cmd.Flag(k); f != nil {
+			docSpec.Options[k] = &rundown.ShortCodeOptionSpec{Code: k, Value: f.Value.String()}
+		}
+	}
+
+	return docSpec, nil
+}
 
 func run(cmd *cobra.Command, args []string) error {
 	var callBack func()
