@@ -70,7 +70,7 @@ func buildDocSpec(command string, runner *rundown.Runner, cmd *cobra.Command, ar
 		}
 	}
 
-	fmt.Printf("DocSpec generated %s\n", docSpec)
+	// fmt.Printf("DocSpec generated %s\n", docSpec)
 
 	return docSpec, nil
 }

@@ -138,7 +138,7 @@ func NewDocRootCmd(args []string) *cobra.Command {
 			RunE: func(cmd *cobra.Command, args []string) error {
 				docSpec, err := buildDocSpec(shortCode.Code, rd, cmd, args)
 
-				fmt.Printf("Build docSpec %s\n", docSpec)
+				// fmt.Printf("Build docSpec %s\n", docSpec)
 
 				if err == nil {
 					err, callback := rd.RunCodes(docSpec)
