@@ -90,7 +90,7 @@ func RenderShortCodes() error {
 				spec = spec + " (required)"
 			}
 
-			table.Append([]string{"+" + opt.Code + "=[" + opt.Type + "]", opt.Description + spec})
+			table.Append([]string{"--" + opt.Code + "=[" + opt.Type + "]", opt.Description + spec})
 		}
 	}
 
@@ -148,7 +148,7 @@ func RenderShortCodes() error {
 					spec = spec + " (required)"
 				}
 
-				table.Append([]string{"  +" + opt.Code + "=[" + opt.Type + "]", "  " + opt.Description + spec})
+				table.Append([]string{"  --" + opt.Code + "=[" + opt.Type + "]", "  " + opt.Description + spec})
 			}
 		}
 

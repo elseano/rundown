@@ -130,9 +130,15 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 
 	util.Debugf("Block mods: %s\n", modifiers)
 
-	if save, ok := modifiers.Values[SaveParameter]; ok {
-		content := util.NodeLines(executionBlock, source)
+	if replacement, ok := modifiers.Values["replace"]; ok {
+		replSet := strings.SplitN(replacement, "=", 2)
+		from := replSet[0]
+		to := replSet[1]
 
+		content = strings.ReplaceAll(content, from, to)
+	}
+
+	if save, ok := modifiers.Values[SaveParameter]; ok {
 		util.Debugf("Saving code block as a file instead of running it.\n")
 
 		if modifiers.Flags[EnvAwareFlag] {
@@ -401,11 +407,17 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 					fl = f
 				}
 
+				output := strings.ReplaceAll(captureBuffer.String(), filename, "SCRIPT")
+
+				if modifiers.Flags["stdout"] {
+					output = ""
+				}
+
 				return ExecutionResult{
 					Message:   we.String(),
 					Kind:      "Error",
 					Source:    contents,
-					Output:    strings.ReplaceAll(captureBuffer.String(), filename, "SCRIPT"),
+					Output:    output,
 					FocusLine: fl,
 					IsError:   true,
 				}

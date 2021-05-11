@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/elseano/rundown/pkg/rundown"
 	"github.com/elseano/rundown/pkg/util"
@@ -11,6 +12,7 @@ import (
 
 func buildDocSpec(command string, runner *rundown.Runner, cmd *cobra.Command, args []string) (*rundown.DocumentSpec, error) {
 	docShortCodes := runner.GetShortCodes()
+
 	commandCode := docShortCodes.Codes[command]
 
 	if commandCode == nil {
@@ -27,10 +29,39 @@ func buildDocSpec(command string, runner *rundown.Runner, cmd *cobra.Command, ar
 		Options:    map[string]*rundown.ShortCodeOptionSpec{},
 	}
 
-	for k, _ := range commandCode.Options {
-		if f := cmd.Flag(k); f != nil {
+	maxPos := 0
+	var globOpt *rundown.ShortCodeOption
+
+	for k, opt := range commandCode.Options {
+		if opt.IsPositional {
+			if opt.Position == -1 {
+				globOpt = opt
+				continue
+			}
+
+			if opt.Position > maxPos {
+				maxPos = opt.Position
+			}
+
+			if len(args) > opt.Position && opt.Position >= 0 {
+				commandSpec.Options[k] = &rundown.ShortCodeOptionSpec{Code: k, Value: args[opt.Position]}
+			} else {
+				return nil, fmt.Errorf("expected [%s] in position %d", strings.ToUpper(k), opt.Position)
+			}
+		} else if f := cmd.Flag(k); f != nil {
 			commandSpec.Options[k] = &rundown.ShortCodeOptionSpec{Code: k, Value: f.Value.String()}
 		}
+	}
+
+	if len(args) > maxPos {
+		globSpec := &rundown.ShortCodeOptionSpec{Code: globOpt.Code, Value: ""}
+
+		for _, arg := range args[maxPos+1:] {
+			globSpec.Value = fmt.Sprintf("%s \"%s\"", globSpec.Value, arg)
+		}
+
+		globSpec.Value = strings.Trim(globSpec.Value, " ")
+		commandSpec.Options[globSpec.Code] = globSpec
 	}
 
 	for k, _ := range docShortCodes.Options {
@@ -38,6 +69,8 @@ func buildDocSpec(command string, runner *rundown.Runner, cmd *cobra.Command, ar
 			docSpec.Options[k] = &rundown.ShortCodeOptionSpec{Code: k, Value: f.Value.String()}
 		}
 	}
+
+	fmt.Printf("DocSpec generated %s\n", docSpec)
 
 	return docSpec, nil
 }

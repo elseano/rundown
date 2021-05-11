@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/elseano/rundown/pkg/markdown"
@@ -66,12 +67,14 @@ type DocumentShortCodes struct {
 }
 
 type ShortCodeOption struct {
-	Code        string
-	Type        string
-	Default     string
-	Required    bool
-	Prompt      bool
-	Description string
+	Code         string
+	Type         string
+	Default      string
+	Required     bool
+	Prompt       bool
+	Description  string
+	IsPositional bool
+	Position     int
 }
 
 type ShortCodeInfo struct {
@@ -83,9 +86,49 @@ type ShortCodeInfo struct {
 	Section      *markdown.Section
 }
 
+func (d *DocumentShortCodes) String() string {
+	s := ""
+
+	s += fmt.Sprintf("Document:\n")
+
+	for _, opt := range d.Options {
+		s += fmt.Sprintf("  %s %s default: %s\n", opt.Code, opt.Type, opt.Default)
+	}
+
+	for _, sec := range d.Codes {
+		s += fmt.Sprintf("Section %s:\n", sec.Code)
+
+		for _, opt := range sec.Options {
+			s += fmt.Sprintf("  %s %s default: %s\n", opt.Code, opt.Type, opt.Default)
+		}
+	}
+
+	return s
+}
+
 type DocumentSpec struct {
 	ShortCodes []*ShortCodeSpec
 	Options    map[string]*ShortCodeOptionSpec
+}
+
+func (d *DocumentSpec) String() string {
+	s := ""
+
+	s += fmt.Sprintf("Document:\n")
+
+	for _, opt := range d.Options {
+		s += fmt.Sprintf("  %s: %s\n", opt.Code, opt.Value)
+	}
+
+	for _, sec := range d.ShortCodes {
+		s += fmt.Sprintf("Section %s:\n", sec.Code)
+
+		for _, opt := range sec.Options {
+			s += fmt.Sprintf("  %s: %s\n", opt.Code, opt.Value)
+		}
+	}
+
+	return s
 }
 
 type ShortCodeSpec struct {
@@ -160,13 +203,34 @@ func BuildOptionInfo(rdOpt markdown.RundownNode) *ShortCodeOption {
 		return nil
 	}
 
+	code := strings.TrimSpace(mods.Values[markdown.Parameter("opt")])
+	pos := ""
+	isPos := false
+	posInt := 0
+
+	if (code[0] >= '0' && code[0] <= '9') || code[0] == '*' {
+		sp := strings.SplitN(code, ":", 2)
+		code = sp[1]
+		pos = sp[0]
+	}
+
+	if pos == "*" {
+		isPos = true
+		posInt = -1
+	} else if pos != "" {
+		isPos = true
+		posInt, _ = strconv.Atoi(pos)
+	}
+
 	option := &ShortCodeOption{
-		Code:        strings.TrimSpace(mods.Values[markdown.Parameter("opt")]),
-		Type:        strings.TrimSpace(mods.Values[markdown.Parameter("type")]),
-		Required:    mods.Flags[markdown.Flag("required")],
-		Prompt:      mods.Values[markdown.Parameter("prompt")] != "",
-		Description: strings.TrimSpace(mods.Values[markdown.Parameter("desc")]),
-		Default:     strings.TrimSpace(mods.Values[markdown.Parameter("default")]),
+		Code:         code,
+		Type:         strings.TrimSpace(mods.Values[markdown.Parameter("type")]),
+		Required:     mods.Flags[markdown.Flag("required")],
+		Prompt:       mods.Values[markdown.Parameter("prompt")] != "",
+		Description:  strings.TrimSpace(mods.Values[markdown.Parameter("desc")]),
+		Default:      strings.TrimSpace(mods.Values[markdown.Parameter("default")]),
+		IsPositional: isPos,
+		Position:     posInt,
 	}
 
 	return option
@@ -367,7 +431,7 @@ func ParseShortCodeSpecs(specs []string) (*DocumentSpec, error) {
 	)
 
 	for _, spec := range specs {
-		if parts := strings.SplitN(spec, "=", 2); strings.HasPrefix(spec, "+") {
+		if parts := strings.SplitN(spec, "=", 2); strings.HasPrefix(spec, "--") {
 			if len(parts) == 1 {
 				return nil, &InvalidOptionsError{OptionName: parts[0], Message: "is required"}
 			}

@@ -13,7 +13,19 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-/** EXTENSION **/
+/** EXTENSION
+ *
+ * Rundown Code Modifier Blocks
+ *
+ * Adds support for the two alternate forms of modifiers:
+ *
+ * [](nospin)
+ *
+ * and
+ *
+ * <!--~ nospin -->
+ *
+**/
 
 type codeModifiers struct {
 }

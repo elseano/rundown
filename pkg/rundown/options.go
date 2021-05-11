@@ -100,6 +100,8 @@ func validateOptionValue(specs map[string]*ShortCodeOptionSpec, opt *ShortCodeOp
 
 func ValidateOptions(docSpec *DocumentSpec, shortCodes *DocumentShortCodes) error {
 
+	fmt.Printf("Validating %s\n", docSpec)
+
 	if len(shortCodes.Codes) == 0 && len(docSpec.ShortCodes) > 0 {
 		return &InvalidShortCodeError{ShortCode: docSpec.ShortCodes[0].Code}
 	}

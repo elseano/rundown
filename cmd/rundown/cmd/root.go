@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,25 +20,85 @@ func Execute(version string, gitCommit string) error {
 	return cmd.Execute()
 }
 
+var positionalArgs = []*rundown.ShortCodeOption{}
+
+func validatePositional(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return []string{}, cobra.ShellCompDirectiveDefault
+}
+
+func addArgs(cmd *cobra.Command, options map[string]*rundown.ShortCodeOption) {
+	argsCount := 0
+
+	argLines := ""
+	maxOptLength := 0
+
+	for _, opt := range options {
+		if opt.IsPositional {
+			if len(opt.Code) > maxOptLength {
+				maxOptLength = len(opt.Code)
+			}
+		}
+	}
+
+	fmtString := fmt.Sprintf("%%s\n  %%-%ds   %%s", maxOptLength)
+
+	for _, opt := range options {
+		if opt.IsPositional {
+			argsCount++
+
+			positionalArgs = append(positionalArgs, opt)
+
+			argLines = fmt.Sprintf(fmtString, argLines, opt.Code, opt.Description)
+
+			if opt.Position == -1 {
+				cmd.Use = fmt.Sprintf("%s <%s>...", cmd.Use, opt.Code)
+			} else {
+				cmd.Use = fmt.Sprintf("%s <%s>", cmd.Use, opt.Code)
+			}
+		}
+	}
+
+	cmd.ValidArgsFunction = validatePositional
+	cmd.Use = fmt.Sprintf("%s\n%s", cmd.Use, argLines)
+
+	if argsCount == -1 {
+		cmd.Args = cobra.ArbitraryArgs
+	} else {
+		cmd.Args = cobra.OnlyValidArgs
+	}
+}
+
 func addFlags(cmd *cobra.Command, options map[string]*rundown.ShortCodeOption) {
 	for _, opt := range options {
-		switch opt.Type {
-		case "string":
-			cmd.Flags().String(opt.Code, opt.Default, opt.Description)
-		case "file-exists":
-			cmd.Flags().String(opt.Code, opt.Default, opt.Description)
-			cmd.MarkFlagFilename(opt.Code)
-		case "file-not-exists":
-			cmd.Flags().String(opt.Code, opt.Default, opt.Description)
-		case "bool":
-			cmd.Flags().Bool(opt.Code, false, opt.Description)
-		case "int":
-			cmd.Flags().Int32(opt.Code, -1, opt.Description)
-		default:
-			cmd.Flags().String(opt.Code, opt.Default, opt.Description)
+		var description = opt.Description
+		var isRequired = opt.Required && opt.Default == ""
+		var willAsk = !flagNonInteractive && opt.Prompt
+
+		if isRequired {
+			description = fmt.Sprintf("%s [REQUIRED]", description)
 		}
 
-		// cmd.MarkFlagRequired(opt.Code)
+		if !opt.IsPositional {
+			switch opt.Type {
+			case "string":
+				cmd.Flags().String(opt.Code, opt.Default, description)
+			case "file-exists":
+				cmd.Flags().String(opt.Code, opt.Default, description)
+				cmd.MarkFlagFilename(opt.Code)
+			case "file-not-exists":
+				cmd.Flags().String(opt.Code, opt.Default, description)
+			case "bool":
+				cmd.Flags().Bool(opt.Code, false, description)
+			case "int":
+				cmd.Flags().Int32(opt.Code, -1, description)
+			default:
+				cmd.Flags().String(opt.Code, opt.Default, description)
+			}
+
+			if isRequired && !willAsk {
+				cmd.MarkFlagRequired(opt.Code)
+			}
+		}
 	}
 }
 
@@ -46,10 +107,12 @@ func NewDocRootCmd(args []string) *cobra.Command {
 	docRoot.ParseFlags(args)
 
 	rundownFile = shared.RundownFile(flagFilename)
+	cwd, _ := os.Getwd()
+	relRundownFile, _ := filepath.Rel(cwd, rundownFile)
 
 	rd, err := rundown.LoadFile(rundownFile)
 	if err != nil {
-		panic(err)
+		return docRoot // If we can't find a file, just return the rundown command itself.
 	}
 
 	rd.SetLogger(flagDebug)
@@ -58,7 +121,8 @@ func NewDocRootCmd(args []string) *cobra.Command {
 
 	addFlags(docRoot, shortCodes.Options)
 
-	for _, shortCode := range shortCodes.Codes {
+	for _, sc := range shortCodes.Codes {
+		shortCode := sc
 		reqOpts := []string{}
 
 		for _, opt := range shortCode.Options {
@@ -68,23 +132,33 @@ func NewDocRootCmd(args []string) *cobra.Command {
 		}
 
 		codeCommand := &cobra.Command{
-			Use:   fmt.Sprintf("%s %s", shortCode.Code, strings.Join(reqOpts, " ")),
+			Use:   fmt.Sprintf("%s [flags]", shortCode.Code),
 			Short: shortCode.Name,
-			Long:  shortCode.Description,
+			Long:  fmt.Sprintf("%s is a command within %s.\n\n%s", shortCode.Code, relRundownFile, shortCode.Description),
 			RunE: func(cmd *cobra.Command, args []string) error {
 				docSpec, err := buildDocSpec(shortCode.Code, rd, cmd, args)
 
-				fmt.Printf("Build docSpec %#v\n", docSpec)
+				fmt.Printf("Build docSpec %s\n", docSpec)
 
 				if err == nil {
-					err, _ := rd.RunCodes(docSpec)
-					return err
+					err, callback := rd.RunCodes(docSpec)
+
+					if err != nil {
+						util.Debugf("ERROR %#v\n", err)
+
+						if errors.Is(err, rundown.InvocationError) {
+							cmd.HelpFunc()(cmd, args)
+						}
+					}
+
+					return handleError(cmd.OutOrStderr(), err, callback)
 				}
 
 				return err
 			},
 		}
 
+		addArgs(codeCommand, shortCode.Options)
 		addFlags(codeCommand, shortCode.Options)
 		addFlags(codeCommand, shortCodes.Options) // Add doc options
 
@@ -108,10 +182,10 @@ func NewDocRootCmd(args []string) *cobra.Command {
 
 func NewRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
-		Use:           "rundown [flags] [command] [flags]...",
+		Use:           "rundown [command] [flags]...",
 		Short:         "Execute a markdown file",
 		Long:          `Rundown turns Markdown files into console scripts.`,
-		SilenceUsage:  false,
+		SilenceUsage:  true,
 		SilenceErrors: false,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			rundownFile = shared.RundownFile(flagFilename)
@@ -125,7 +199,7 @@ func NewRootCmd() *cobra.Command {
 					println("Could not read file ", flagFilename)
 				}
 
-				os.Exit(-1)
+				os.Exit(1)
 			}
 
 			if len(args) > 0 {
@@ -140,56 +214,18 @@ func NewRootCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd, args)
 		},
-		ValidArgs: []string{},
-		// ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		// 	cleanArgs := cmd.Flags().Args()
-		// 	cleanArgs = append(cleanArgs, toComplete)
-
-		// 	rundownFile = shared.RundownFile(flagFilename)
-
-		// 	completions := performCompletion(cleanArgs)
-
-		// 	if strings.Index(toComplete, "+") == 0 {
-		// 		return completions, cobra.ShellCompDirectiveNoSpace
-		// 	} else {
-		// 		return completions, cobra.ShellCompDirectiveNoFileComp
-		// 	}
-		// },
 	}
 
-	// rootCmd.Flags().BoolVar(&flagDebug, "debug", false, "Write debugging into to debug.log")
-	// rootCmd.Flags().BoolVarP(&flagAsk, "", "a", false, "Ask which shortcode to run")
-	// rootCmd.Flags().BoolVar(&flagAskRepeat, "ask-repeat", false, "Continually ask which shortcode to run")
-	// rootCmd.Flags().StringVar(&flagDefault, "default", "", "Default shortcode to run if none specified")
-	rootCmd.Flags().IntVar(&flagCols, "cols", util.IntMin(util.GetConsoleWidth(), 120), "Number of columns in display")
-	rootCmd.Flags().StringVarP(&flagFilename, "file", "f", "", "File to run (defaults to RUNDOWN.md then README.md)")
-	rootCmd.Flags().BoolVarP(&flagViewOnly, "display", "d", false, "Render without executing scripts")
-	rootCmd.Flags().StringVar(&flagCompletions, "completions", "", "Render shell completions for given shell (bash, zsh, fish, powershell)")
+	rootCmd.PersistentFlags().IntVar(&flagCols, "cols", util.IntMin(util.GetConsoleWidth(), 120), "Number of columns in display")
+	rootCmd.PersistentFlags().StringVarP(&flagFilename, "file", "f", "", "File to run (defaults to RUNDOWN.md then README.md)")
+	rootCmd.PersistentFlags().BoolVarP(&flagViewOnly, "display", "d", false, "Render without executing scripts")
+	rootCmd.PersistentFlags().StringVar(&flagCompletions, "completions", "", "Render shell completions for given shell (bash, zsh, fish, powershell)")
 
 	rootCmd.Flag("cols").Hidden = true
 	rootCmd.Flag("display").Hidden = true
 	rootCmd.Flag("completions").Hidden = true
 
-	// originalHelpFunc := rootCmd.HelpFunc()
-
-	// rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-	// 	// Populates flags so we can show the default command
-	// 	// when we're asking for help from an shebang script.
-	// 	rootCmd.ParseFlags(args)
-
-	// 	pureArgs := cmd.Flags().Args()
-	// 	originalHelpFunc(cmd, args)
-
-	// 	// Set rundown file, as root's PreRun doesn't get run for help.
-	// 	rundownFile = shared.RundownFile(flagFilename)
-
-	// 	if rundownFile != "" {
-	// 		help(cmd, pureArgs)
-	// 	}
-	// })
-
 	return rootCmd
-
 }
 
 func init() {
