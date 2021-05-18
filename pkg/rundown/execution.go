@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"math"
 	"os"
 	"os/exec"
@@ -20,11 +19,14 @@ import (
 	"github.com/charmbracelet/glamour/ansi"
 	rdexec "github.com/elseano/rundown/pkg/exec"
 	"github.com/elseano/rundown/pkg/markdown"
+	"github.com/elseano/rundown/pkg/spinner"
 	"github.com/elseano/rundown/pkg/util"
 	"github.com/logrusorgru/aurora"
+
+	golog "log"
 )
 
-func rpcLoop(messages chan string, spinner util.Spinner, context *Context, logger *log.Logger, rpcDoneChan chan struct{}, rpcDoneCommand string) {
+func rpcLoop(messages chan string, spinner spinner.Spinner, context *Context, logger *golog.Logger, rpcDoneChan chan struct{}, rpcDoneCommand string) {
 	for {
 		var incoming = <-messages
 		var splitLine = strings.SplitN(incoming, " ", 2)
@@ -112,8 +114,8 @@ func saveContentsToTemp(context *Context, contents string, filenamePreference st
 *   abort - Implies named and stdout. Displays a named execution failure, and exits without showing the script.
  */
 
-func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source []byte, logger *log.Logger, out io.Writer) ExecutionResult {
-	var spinner util.Spinner = util.NewDummySpinner()
+func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source []byte, logger *golog.Logger, out io.Writer) ExecutionResult {
+	var theSpinner spinner.Spinner = spinner.NewDummySpinner()
 	var spinnerName = "Running"
 	var rpcDoneCommand = "RD-DDDX"
 	var doneChannel = make(chan struct{})
@@ -178,12 +180,12 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 
 	if modifiers.Flags[NoSpinFlag] != true {
 		logger.Printf("Block requires spinner at indent: %d, title: %s", int(math.Max(0, float64(indent-1))), spinnerName)
-		spinner = util.NewSpinner(int(math.Max(0, float64(indent-1))), spinnerName, out)
+		theSpinner = spinner.NewSpinner(int(math.Max(0, float64(indent-1))), spinnerName, out)
 	}
 
-	spinner.Start()
+	theSpinner.Start()
 
-	go rpcLoop(context.Messages, spinner, context, logger, doneChannel, rpcDoneCommand)
+	go rpcLoop(context.Messages, theSpinner, context, logger, doneChannel, rpcDoneCommand)
 
 	var tmpFile *os.File
 	var err interface{}
@@ -300,7 +302,7 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 
 		stdout, err := process.Start()
 		if err != nil {
-			spinner.Error("Error")
+			theSpinner.Error("Error")
 			return ExecutionResult{Message: fmt.Sprintf("%v", err), Kind: "Error", Source: contents, IsError: true}
 		}
 
@@ -309,14 +311,14 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 		var output io.Writer = nil
 		var waiter sync.WaitGroup
 
-		if modifiers.Flags[StdoutFlag] {
+		if modifiers.Flags[StdoutFlag] { // Reimpld
 			if _, ok := executionBlock.PreviousSibling().(*markdown.ExecutionBlock); ok {
 				out.Write([]byte("\r\n"))
 			}
 
 			stdoutReader, stdoutWriter, err := os.Pipe()
 			if err != nil {
-				spinner.Error("Error")
+				theSpinner.Error("Error")
 				return ExecutionResult{Message: fmt.Sprintf("%v", err), Kind: "Error", Source: contents, IsError: true}
 			}
 
@@ -341,7 +343,7 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 				waiter.Add(1)
 
 				prefix := ansi.Ssprintf(context.Profile, context.Style.Heading.StylePrimitive, "‣ ")
-				endedWithoutNewline = util.ReadAndFormatOutput(stdoutReader, indent, prefix, spinner, bufio.NewWriter(output), logger, aurora.Faint(outputHeading).String())
+				endedWithoutNewline = util.ReadAndFormatOutput(stdoutReader, indent, prefix, theSpinner, bufio.NewWriter(output), logger, aurora.Faint(outputHeading).String())
 				logger.Printf("endedWithoutNewline? %v\r\n", endedWithoutNewline)
 				waiter.Done()
 			}()
@@ -369,28 +371,28 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 		<-doneChannel
 
 		if modifiers.Flags[StopOkFlag] {
-			spinner.Success("Complete")
+			theSpinner.Success("Complete")
 		} else if modifiers.Flags[StopFailFlag] {
-			spinner.Error("Failed")
+			theSpinner.Error("Failed")
 		} else {
 			if ex, ok := waitErr.(*exec.ExitError); ok {
 				logger.Printf("Error condition detected. Err: %v, SOF: %v, SOS: %v\n", ex, modifiers.Flags[SkipOnFailureFlag], modifiers.Flags[SkipOnSuccessFlag])
 				if modifiers.Flags[SkipOnFailureFlag] {
-					spinner.Skip("Passed")
+					theSpinner.Skip("Passed")
 				} else if modifiers.Flags[SkipOnSuccessFlag] {
-					spinner.Success("Required")
+					theSpinner.Success("Required")
 				} else if modifiers.Flags[IgnoreFailureFlag] {
-					spinner.Error("Ignoring Failure")
+					theSpinner.Error("Ignoring Failure")
 				} else {
-					spinner.Error("Failed")
+					theSpinner.Error("Failed")
 				}
 			} else {
 				if modifiers.Flags[SkipOnSuccessFlag] {
-					spinner.Skip("Passed")
+					theSpinner.Skip("Passed")
 				} else if modifiers.Flags[SkipOnFailureFlag] {
-					spinner.Success("Required")
+					theSpinner.Success("Required")
 				} else {
-					spinner.Success("Complete")
+					theSpinner.Success("Complete")
 				}
 			}
 		}

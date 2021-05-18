@@ -20,8 +20,10 @@ require (
 	github.com/manifoldco/promptui v0.8.0
 	github.com/muesli/termenv v0.7.2
 	github.com/olekukonko/tablewriter v0.0.4
+	github.com/rs/zerolog v1.22.0 // indirect
 	github.com/spf13/cobra v1.1.3
 	github.com/stretchr/testify v1.4.0
+	github.com/thecodeteam/goodbye v0.0.0-20170927022442-a83968bda2d3 // indirect
 	github.com/yuin/goldmark v1.2.1
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
 	golang.org/x/net v0.0.0-20201021035429-f5854403a974 // indirect

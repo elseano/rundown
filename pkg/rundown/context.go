@@ -37,7 +37,7 @@ type Context struct {
 	Profile         termenv.Profile
 }
 
-func receiveLoop(filename string, messages chan<- string) {
+func ReceiveLoop(filename string, messages chan<- string) {
 
 	os.Remove(filename)
 	err := syscall.Mkfifo(filename, 0666)
@@ -79,7 +79,7 @@ func NewContext() *Context {
 	}
 	tmpFile.Close()
 
-	go receiveLoop(tmpFile.Name(), messages)
+	go ReceiveLoop(tmpFile.Name(), messages)
 
 	currentEnv := map[string]string{}
 

@@ -35,8 +35,12 @@ type TestWriter struct {
 }
 
 func (tw TestWriter) Write(p []byte) (n int, err error) {
-	tw.t.Log(string(p))
+	tw.t.Logf(string(p))
 	return len(p), nil
+}
+
+func NewTestWriter(t *testing.T) TestWriter {
+	return TestWriter{t}
 }
 
 func NewTestLogger(t *testing.T) *log.Logger {

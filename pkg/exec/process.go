@@ -1,6 +1,7 @@
 package exec
 
 import (
+	"context"
 	"io"
 	"os"
 	"os/exec"
@@ -9,11 +10,14 @@ import (
 	"syscall"
 
 	"github.com/kr/pty"
+	"github.com/thecodeteam/goodbye"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
 var stdinChannel = make(chan []byte, 500)
 var stdinMutex sync.Mutex
+var undoRawRegisterd sync.Once
+var currentUndoRaw func()
 
 // Reading directly from STDIN when executing multiple processes
 // creates issues, as STDIN read is blocking and you can't cancel it.
@@ -118,11 +122,15 @@ func (p *Process) setRawMode() func() {
 	if err != nil {
 		// Don't care.
 	}
+
 	return func() {
 		if oldState != nil {
 			terminal.Restore(int(os.Stdin.Fd()), oldState)
 		}
+
+		currentUndoRaw = nil
 	}
+
 }
 
 func NewProcess(cmd *exec.Cmd) *Process {
@@ -134,7 +142,21 @@ func (p *Process) Start() (*io.PipeReader, error) {
 	stdinR := p.stdin.Claim()
 	stdoutR, stdoutW := io.Pipe()
 
+	// Reset TTY back if it's not set.
+	if currentUndoRaw != nil {
+		currentUndoRaw()
+	}
+
 	p.undoRaw = p.setRawMode()
+	currentUndoRaw = p.undoRaw
+
+	undoRawRegisterd.Do(func() {
+		goodbye.Register(func(ctx context.Context, s os.Signal) {
+			if currentUndoRaw != nil {
+				currentUndoRaw()
+			}
+		})
+	})
 
 	var err error
 	if p.pty, err = pty.Start(p.cmd); err != nil {

@@ -1,4 +1,4 @@
-package util
+package spinner
 
 import (
 	"io"
@@ -7,7 +7,7 @@ import (
 
 	// spx "github.com/tj/go-spin"
 	// spx "github.com/briandowns/spinner"
-	"github.com/elseano/rundown/pkg/spinner"
+	"github.com/elseano/rundown/pkg/bus"
 	"github.com/logrusorgru/aurora"
 )
 
@@ -28,14 +28,19 @@ type Spinner interface {
 	HideAndExecute(f func())
 }
 
+type ChangeTitleEvent struct {
+	bus.Event
+	Title string
+}
+
 type RundownSpinner struct {
-	s       *spinner.ActualSpinner
+	s       *ActualSpinner
 	indent  int
 	message string
 }
 
 func NewSpinner(indent int, message string, out io.Writer) Spinner {
-	s := spinner.NewActualSpinner(spinner.CharSets[21], 100*time.Millisecond, spinner.WithWriter(out))
+	s := NewActualSpinner(CharSets[21], 100*time.Millisecond, WithWriter(out))
 	s.Suffix = " " + message
 	s.Prefix = strings.Repeat("  ", indent)
 
