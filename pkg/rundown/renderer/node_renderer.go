@@ -7,6 +7,7 @@ import (
 	"github.com/elseano/rundown/pkg/exec/modifiers"
 	"github.com/elseano/rundown/pkg/rundown/ast"
 	"github.com/elseano/rundown/pkg/rundown/text"
+	rutil "github.com/elseano/rundown/pkg/util"
 	goldast "github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/util"
@@ -25,10 +26,14 @@ func (r *RundownNodeRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegiste
 
 func (r *RundownNodeRenderer) renderExecutionBlock(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {
 	if entering {
-		return goldast.WalkSkipChildren, nil
+		return goldast.WalkContinue, nil
 	}
 
 	executionBlock := node.(*ast.ExecutionBlock)
+
+	if !executionBlock.Execute {
+		return goldast.WalkContinue, nil
+	}
 
 	contentReader := text.NewNodeReaderFromSource(executionBlock.CodeBlock, source)
 
@@ -46,6 +51,13 @@ func (r *RundownNodeRenderer) renderExecutionBlock(w util.BufWriter, source []by
 		intent.AddModifier(modifiers.NewStdout())
 	}
 
+	rutil.Logger.Debug().Msgf("Spinner mode %d", executionBlock.SpinnerMode)
+
+	switch executionBlock.SpinnerMode {
+	case ast.SpinnerModeVisible:
+		intent.AddModifier(modifiers.NewSpinnerConstant(executionBlock.SpinnerName))
+	}
+
 	result, err := intent.Execute()
 
 	if err != nil {
@@ -54,5 +66,5 @@ func (r *RundownNodeRenderer) renderExecutionBlock(w util.BufWriter, source []by
 
 	w.Write(result.Output)
 
-	return goldast.WalkSkipChildren, nil
+	return goldast.WalkContinue, nil
 }

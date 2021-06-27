@@ -40,7 +40,7 @@ type RundownSpinner struct {
 }
 
 func NewSpinner(indent int, message string, out io.Writer) Spinner {
-	s := NewActualSpinner(CharSets[21], 100*time.Millisecond, WithWriter(out))
+	s := NewActualSpinner(CharSets[21], 100*time.Millisecond, WithWriter(out), WithColor("fgHiCyan"))
 	s.Suffix = " " + message
 	s.Prefix = strings.Repeat("  ", indent)
 

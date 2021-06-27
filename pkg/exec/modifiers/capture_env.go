@@ -36,7 +36,7 @@ func (m *EnvironmentCapture) PrepareScripts(scripts *scripts.ScriptManager) {
 	}
 }
 
-func (m *EnvironmentCapture) GetResult() []ModifierResult {
+func (m *EnvironmentCapture) GetResult(int) []ModifierResult {
 	bus.Unsubscribe(m)
 
 	if m.capturedTimes > 1 {

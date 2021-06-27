@@ -9,15 +9,30 @@ import (
 )
 
 // SubEnv Processor replaces all mentions of $ENV_VAR with a EnvironmentSubstitution node.
-type SubEnvProcessor struct{}
+type SubEnvProcessor struct {
+	openingTag *RundownHtmlTag
+}
 
 var EnvMatcher = regexp.MustCompile(`(\$[A-Z0-9_]+)`)
 
-func (p *SubEnvProcessor) Begin()         {}
-func (p *SubEnvProcessor) End(*Treatment) {}
+func (p *SubEnvProcessor) Begin(openingTag *RundownHtmlTag) {
+	p.openingTag = openingTag
+}
 
-func (p *SubEnvProcessor) Process(node goldast.Node, reader goldtext.Reader, treatments *Treatment) {
+func (p *SubEnvProcessor) End(node goldast.Node, openingTag *RundownHtmlTag, treatments *Treatment) bool {
+	if p.openingTag != openingTag {
+		return false
+	}
+
+	return true
+}
+
+func (p *SubEnvProcessor) Process(node goldast.Node, reader goldtext.Reader, treatments *Treatment) bool {
 	switch node := node.(type) {
+	// case *goldast.Emphasis:
+	// 	for child := node.FirstChild(); child != nil; child = child.NextSibling() {
+	// 		p.Process(child, reader, treatments)
+	// 	}
 	case *goldast.Text:
 		contents := node.Text(reader.Source())
 
@@ -49,5 +64,7 @@ func (p *SubEnvProcessor) Process(node goldast.Node, reader goldtext.Reader, tre
 		}
 
 	}
+
+	return false
 
 }

@@ -106,7 +106,7 @@ func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
 		ExitCode: exitCode,
 	}
 
-	results := i.modifiers.GetResult()
+	results := i.modifiers.GetResult(exitCode)
 
 	for _, result := range results {
 		switch result.Key {

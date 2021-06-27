@@ -10,16 +10,16 @@ import (
 	"github.com/elseano/rundown/pkg/spinner"
 )
 
-// Spinner modifier requires the TrackProgress modifier.
-type Spinner struct {
+// SpinnerFromScript modifier requires the TrackProgress modifier.
+type SpinnerFromScript struct {
 	bus.Handler
 	ExecutionModifier
 	Spinner                 spinner.Spinner
 	CommentsAsSpinnerTitles bool
 }
 
-func NewSpinner() *Spinner {
-	return &Spinner{
+func NewSpinnerFromScript() *SpinnerFromScript {
+	return &SpinnerFromScript{
 		ExecutionModifier: &NullModifier{},
 	}
 }
@@ -27,7 +27,7 @@ func NewSpinner() *Spinner {
 var commentDetector = regexp.MustCompile(`#+\s+(.*)`)
 var spinnerRpcUpdate = []byte("echo SETSPINNER $1 >> $$RDRPC")
 
-func (m *Spinner) PrepareScripts(scripts *scripts.ScriptManager) {
+func (m *SpinnerFromScript) PrepareScripts(scripts *scripts.ScriptManager) {
 	if m.CommentsAsSpinnerTitles {
 		script := scripts.GetBase()
 
@@ -39,13 +39,13 @@ func (m *Spinner) PrepareScripts(scripts *scripts.ScriptManager) {
 	bus.Subscribe(m)
 }
 
-func (m *Spinner) GetResult() []ModifierResult {
+func (m *SpinnerFromScript) GetResult(int) []ModifierResult {
 	bus.Unsubscribe(m)
 
 	return []ModifierResult{}
 }
 
-func (m *Spinner) ReceiveEvent(event bus.Event) {
+func (m *SpinnerFromScript) ReceiveEvent(event bus.Event) {
 	if rpcEvent, ok := event.(*rpc.RpcMessage); ok {
 		data := rpcEvent.Data
 

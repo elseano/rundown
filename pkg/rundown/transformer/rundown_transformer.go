@@ -195,9 +195,13 @@ func (t *Treatment) Process(reader goldtext.Reader) {
 }
 
 type NodeProcessor interface {
-	Begin()
-	Process(node goldast.Node, reader goldtext.Reader, treatments *Treatment)
-	End(treatments *Treatment)
+	Begin(openingTag *RundownHtmlTag)
+
+	// Process a Markdown Node. Returns true to indicate the processor is done and should be removed.
+	Process(node goldast.Node, reader goldtext.Reader, treatments *Treatment) bool
+
+	// Process a closing Rundown Element. Returns true to indicate the processor is done and should be removed.
+	End(node goldast.Node, openingTag *RundownHtmlTag, treatments *Treatment) bool
 }
 
 type OpenElement struct {
@@ -207,7 +211,8 @@ type OpenElement struct {
 
 func (a *rundownASTTransformer) Transform(doc *goldast.Document, reader goldtext.Reader, pc parser.Context) {
 	var treatments *Treatment = NewTreatment(reader)
-	var openNodes = []OpenElement{}
+	var openNodes = []*RundownHtmlTag{}
+	var activeProcessors = []NodeProcessor{}
 
 	goldast.Walk(doc, func(node goldast.Node, entering bool) (goldast.WalkStatus, error) {
 		if !entering {
@@ -224,16 +229,29 @@ func (a *rundownASTTransformer) Transform(doc *goldast.Document, reader goldtext
 
 				if htmlNode.closer {
 					if len(openNodes) > 0 {
-						openNodes[len(openNodes)-1].processor.End(treatments)
+						openingElement := openNodes[len(openNodes)-1]
 						openNodes = openNodes[0 : len(openNodes)-1]
+
+						newActiveProcessors := []NodeProcessor{}
+
+						for i := 0; i < len(activeProcessors); i++ {
+							if !activeProcessors[i].End(node, openingElement, treatments) {
+								newActiveProcessors = append(newActiveProcessors, activeProcessors[i])
+							}
+						}
+
+						activeProcessors = newActiveProcessors
 					}
 
-				} else if !htmlNode.closed {
+				} else {
 					if processor != nil {
-						processor.Begin()
+						processor.Begin(htmlNode)
+						activeProcessors = append(activeProcessors, processor)
 					}
 
-					openNodes = append(openNodes, OpenElement{element: htmlNode, processor: processor})
+					if !htmlNode.closed {
+						openNodes = append(openNodes, htmlNode)
+					}
 				}
 
 				// Don't leave the Rundown Element in the document tree.
@@ -249,11 +267,15 @@ func (a *rundownASTTransformer) Transform(doc *goldast.Document, reader goldtext
 
 		default:
 
-			for _, open := range openNodes {
-				if open.processor != nil {
-					open.processor.Process(node, reader, treatments)
+			newActiveProcessors := []NodeProcessor{}
+
+			for i := 0; i < len(activeProcessors); i++ {
+				if !activeProcessors[i].Process(node, reader, treatments) {
+					newActiveProcessors = append(newActiveProcessors, activeProcessors[i])
 				}
 			}
+
+			activeProcessors = newActiveProcessors
 
 		}
 
@@ -282,6 +304,13 @@ func ConvertToRundownNode(data *RundownHtmlTag, node goldast.Node, reader goldte
 				util.Logger.Debug().Msg("Parent is a heading")
 				heading.Parent().InsertBefore(heading.Parent(), heading, section)
 				section.StartNode = heading
+
+				return &SectionProcessor{SectionPointer: section}
+			} else {
+				node.Parent().InsertBefore(node.Parent(), node, section)
+				section.StartNode = node.NextSibling()
+
+				return &SectionProcessor{SectionPointer: section}
 			}
 
 		}
@@ -385,7 +414,14 @@ func ConvertToRundownNode(data *RundownHtmlTag, node goldast.Node, reader goldte
 		}
 	}
 
-	if data.HasAttr("with", "spinner", "stdout", "subenv", "sub-env", "capture-env", "replace", "borg") {
+	nextMeaningfulNode := node.NextSibling()
+	if nextMeaningfulNode == nil {
+		if para, ok := node.Parent().(*goldast.Paragraph); ok && para.ChildCount() == 1 {
+			nextMeaningfulNode = para.NextSibling()
+		}
+	}
+
+	if _, ok := nextMeaningfulNode.(*goldast.FencedCodeBlock); ok && data.HasAttr("with", "spinner", "stdout", "subenv", "sub-env", "capture-env", "replace", "borg", "reveal", "reveal-only") {
 		nextNode := node.NextSibling()
 		nodeToReplace := node
 
@@ -423,7 +459,13 @@ func ConvertToRundownNode(data *RundownHtmlTag, node goldast.Node, reader goldte
 			}
 
 			treatments.Replace(nodeToReplace, executionBlock)
-			treatments.Remove(node) // Ensure we're removing the FCB
+
+			if !executionBlock.Reveal {
+				treatments.Remove(node)
+			} else {
+				node.Parent().InsertBefore(node.Parent(), nodeToReplace, node)
+				treatments.Ignore(node)
+			}
 
 			return nil
 		}

@@ -14,7 +14,7 @@ type ModifierResult struct {
 
 type ExecutionModifier interface {
 	PrepareScripts(scripts *scripts.ScriptManager)
-	GetResult() []ModifierResult
+	GetResult(int) []ModifierResult
 	GetStdout() []io.Writer
 }
 
@@ -51,11 +51,11 @@ func (m *ExecutionModifiers) GetStdout() []io.Writer {
 	return output
 }
 
-func (m *ExecutionModifiers) GetResult() []ModifierResult {
+func (m *ExecutionModifiers) GetResult(exitCode int) []ModifierResult {
 	var results = []ModifierResult{}
 
 	for _, m := range m.mods {
-		if result := m.GetResult(); len(result) > 0 {
+		if result := m.GetResult(exitCode); len(result) > 0 {
 			results = append(results, result...)
 		}
 	}
@@ -77,6 +77,6 @@ func (m *NullModifier) PrepareScripts(scripts *scripts.ScriptManager) {
 func (m *NullModifier) ReceiveEvent(event bus.Event) {
 }
 
-func (m *NullModifier) GetResult() []ModifierResult {
+func (m *NullModifier) GetResult(int) []ModifierResult {
 	return []ModifierResult{}
 }

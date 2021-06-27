@@ -5,17 +5,17 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/yuin/goldmark/ast"
 	goldast "github.com/yuin/goldmark/ast"
 	goldrenderer "github.com/yuin/goldmark/renderer"
 )
 
 type RundownRenderer struct {
 	actualRenderer goldrenderer.Renderer
+	Section        string
 }
 
 // NewRenderer returns a new Renderer with given options.
-func NewRundownRenderer(actualRenderer goldrenderer.Renderer) *RundownRenderer {
+func NewRundownRenderer(actualRenderer goldrenderer.Renderer, options ...goldrenderer.Option) *RundownRenderer {
 
 	r := &RundownRenderer{
 		actualRenderer: actualRenderer,
@@ -31,7 +31,7 @@ func (r *RundownRenderer) AddOptions(opts ...goldrenderer.Option) {
 }
 
 // WalkJump indicates that the walker should jump to the next node.
-const WalkJump ast.WalkStatus = 100
+const WalkJump goldast.WalkStatus = 100
 
 type JumpError struct {
 	ToNode       goldast.Node
@@ -42,12 +42,19 @@ func (e JumpError) Error() string {
 	return "Jump compatible NodeWalker required"
 }
 
+type GlamourFlushNode struct{ goldast.BaseBlock }
+
+func (n *GlamourFlushNode) Kind() goldast.NodeKind { return goldast.KindDocument }
+
 // Render will individually render the child (block) nodes.
 // This is required as Glamour buffers block node renders until the end of the document, which
 // means execution blocks are run before any output is seen.
-func (r *RundownRenderer) Render(w io.Writer, source []byte, n ast.Node) error {
+func (r *RundownRenderer) Render(w io.Writer, source []byte, n goldast.Node) error {
 	if doc, ok := n.(*goldast.Document); ok {
-		for child := doc.FirstChild(); child != nil; child = child.NextSibling() {
+
+		startingNode := doc.FirstChild()
+
+		for child := startingNode; child != nil; child = child.NextSibling() {
 			outputBuffer := &bytes.Buffer{}
 
 			err := r.actualRenderer.Render(outputBuffer, source, child)

@@ -17,22 +17,33 @@ func NewGatherProcessor(replacingNode goldast.Node, newNode goldast.Node) *Gathe
 type GatherProcessor struct {
 	newBlockNode  goldast.Node
 	replacingNode goldast.Node
+	openingTag    *RundownHtmlTag
 }
 
-func (p *GatherProcessor) Begin() {}
+func (p *GatherProcessor) Begin(openingTag *RundownHtmlTag) {
+	p.openingTag = openingTag
+}
 
-func (p *GatherProcessor) End(treatments *Treatment) {
+func (p *GatherProcessor) End(node goldast.Node, openingTag *RundownHtmlTag, treatments *Treatment) bool {
+	if p.openingTag != openingTag {
+		return false
+	}
+
 	if p.newBlockNode != nil {
 		treatments.Replace(p.replacingNode, p.newBlockNode)
 	} else {
 		treatments.Remove(p.replacingNode)
 	}
+
+	return true
 }
 
-func (p *GatherProcessor) Process(node goldast.Node, reader goldtext.Reader, treatments *Treatment) {
+func (p *GatherProcessor) Process(node goldast.Node, reader goldtext.Reader, treatments *Treatment) bool {
 	if node.Parent() == p.replacingNode {
 		if p.newBlockNode != nil {
 			treatments.AppendChild(p.newBlockNode, node)
 		}
 	}
+
+	return false
 }

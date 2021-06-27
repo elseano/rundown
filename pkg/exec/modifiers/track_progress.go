@@ -39,7 +39,7 @@ func (m *TrackProgress) PrepareScripts(scripts *scripts.ScriptManager) {
 	bus.Subscribe(m)
 }
 
-func (m *TrackProgress) GetResult() []ModifierResult {
+func (m *TrackProgress) GetResult(int) []ModifierResult {
 	bus.Unsubscribe(m)
 
 	if !m.endedAt.IsZero() {

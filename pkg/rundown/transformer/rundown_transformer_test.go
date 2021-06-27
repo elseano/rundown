@@ -184,6 +184,50 @@ blah
 
 }
 
+func TestExecutionBlockReveal(t *testing.T) {
+	source := []byte(`
+<r reveal/>
+
+~~~ go
+blah
+~~~
+`)
+
+	gm := goldmark.New(
+		goldmark.WithParserOptions(
+			parser.WithASTTransformers(util.PrioritizedValue{
+				Value:    NewRundownASTTransformer(),
+				Priority: 0,
+			}),
+		),
+	)
+
+	doc := gm.Parser().Parse(text.NewReader(source))
+
+	doc.Dump(source, 0)
+
+	target := doc.FirstChild()
+
+	if assert.NotNil(t, target) && assert.Equal(t, "FencedCodeBlock", target.Kind().String()) {
+
+		target = target.NextSibling()
+
+		if assert.NotNil(t, target) && assert.Equal(t, "ExecutionBlock", target.Kind().String()) {
+			eb := target.(*ast.ExecutionBlock)
+
+			assert.Equal(t, ast.SpinnerModeVisible, eb.SpinnerMode)
+			assert.Equal(t, "Running...", eb.SpinnerName)
+
+			assert.Equal(t, "go", eb.With)
+			assert.Equal(t, true, eb.Reveal)
+
+			assert.Equal(t, false, eb.ShowStdout)
+
+		}
+	}
+
+}
+
 func TestSaveCodeBlock(t *testing.T) {
 	source := []byte(`
 <r save="GOSRC"/>

@@ -67,6 +67,9 @@ func main() {
 		goldmark.WithRenderer(rundownRenderer),
 	)
 
+	// doc := gm.Parser().Parse(text.NewReader(source))
+	// doc.Dump(source, 0)
+
 	gm.Convert(source, os.Stdout)
 
 }
