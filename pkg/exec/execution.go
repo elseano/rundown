@@ -31,6 +31,7 @@ type ExecutionIntent struct {
 	Script         []byte
 	subscriptions  []rpc.Subscription
 	terminationKey string
+	modifiers      *modifiers.ExecutionModifiers
 }
 
 type ExecutionResult struct {
@@ -45,9 +46,14 @@ func NewExecution(via string, script []byte) (*ExecutionIntent, error) {
 		Script:         script,
 		subscriptions:  []rpc.Subscription{},
 		terminationKey: "ABC123",
+		modifiers:      modifiers.NewExecutionModifiers(),
 	}
 
 	return intent, nil
+}
+
+func (i *ExecutionIntent) AddModifier(mod modifiers.ExecutionModifier) {
+	i.modifiers.AddModifier(mod)
 }
 
 func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
@@ -65,12 +71,17 @@ func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
 	content.SetBaseScript(i.Via, i.Script)
 	defer content.RemoveAll()
 
-	var modRunners = modifiers.NewExecutionModifiers()
-	modRunners.AddModifier(modifiers.NewEnvironmentCapture())
-	modRunners.AddModifier(modifiers.NewTrackProgress())
-	modRunners.AddModifier(modifiers.NewStdout())
+	// var modRunners = modifiers.NewExecutionModifiers()
+	// i.modifiers.AddModifier(modifiers.NewEnvironmentCapture())
+	// modRunners.AddModifier(modifiers.NewTrackProgress())
+	// modRunners.AddModifier(modifiers.NewStdout())
 
-	modRunners.PrepareScripts(content)
+	util.Logger.Trace().Msgf("Process: %s", i.Via)
+	util.Logger.Trace().Msgf("Script: %s", i.Script)
+
+	i.modifiers.PrepareScripts(content)
+
+	// modRunners.PrepareScripts(content)
 
 	err, process, stdout := launchProcess(content, baseEnv)
 
@@ -81,7 +92,7 @@ func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
 	var outputCaptureGroup = []io.Writer{}
 	var waiter sync.WaitGroup
 
-	outputCaptureGroup = modRunners.GetStdout()
+	outputCaptureGroup = i.modifiers.GetStdout()
 	captureOutputStream(outputCaptureGroup, &waiter, stdout)
 
 	util.Logger.Trace().Msg("Waiting process termination")
@@ -95,7 +106,7 @@ func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
 		ExitCode: exitCode,
 	}
 
-	results := modRunners.GetResult()
+	results := i.modifiers.GetResult()
 
 	for _, result := range results {
 		switch result.Key {
