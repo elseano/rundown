@@ -29,10 +29,6 @@ func (p *SubEnvProcessor) End(node goldast.Node, openingTag *RundownHtmlTag, tre
 
 func (p *SubEnvProcessor) Process(node goldast.Node, reader goldtext.Reader, treatments *Treatment) bool {
 	switch node := node.(type) {
-	// case *goldast.Emphasis:
-	// 	for child := node.FirstChild(); child != nil; child = child.NextSibling() {
-	// 		p.Process(child, reader, treatments)
-	// 	}
 	case *goldast.Text:
 		contents := node.Text(reader.Source())
 

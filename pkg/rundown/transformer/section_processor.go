@@ -7,6 +7,8 @@ import (
 )
 
 // SectionProcessor inserts a SectionEndPointer at the end of a section.
+// Sections defined on a heading are terminated at the next heading of equal or structurally higher level.
+// Sections defined as being wrapped inside a rundown tag are terminated at the end of the rundown tag.
 type SectionProcessor struct {
 	SectionPointer *ast.SectionPointer
 	openingTag     *RundownHtmlTag
