@@ -1,6 +1,7 @@
 package transformer
 
 import (
+	"fmt"
 	"testing"
 
 	"golang.org/x/net/html"
@@ -266,6 +267,8 @@ func TestSectionInsideHeading(t *testing.T) {
 	source := []byte(`
 # This is a heading <r section="SomeSection"/>
 
+<r desc="This is a longer description"/>
+
 ~~~ go
 blah
 ~~~
@@ -282,6 +285,7 @@ blah
 
 	doc := gm.Parser().Parse(text.NewReader(source))
 
+	fmt.Printf("RESULT:\n")
 	doc.Dump(source, 0)
 
 	target := doc.FirstChild()
@@ -292,6 +296,8 @@ blah
 
 		assert.Equal(t, "SomeSection", sp.SectionName)
 		assert.Equal(t, target.NextSibling(), sp.StartNode)
+		assert.Equal(t, "This is a heading", sp.DescriptionShort)
+		assert.Equal(t, "This is a longer description", sp.DescriptionLong)
 	}
 
 }
@@ -329,8 +335,55 @@ blah
 		assert.Equal(t, &ast.TypeBoolean{}, sp.OptionType)
 
 		if assert.NotNil(t, sp.OptionDefault) {
-			assert.Equal(t, "true", *sp.OptionDefault)
+			assert.Equal(t, "true", sp.OptionDefault.String)
 		}
+	}
+
+}
+
+func TestSectionOptionInsideSection(t *testing.T) {
+	source := []byte(`
+<r section="test">
+
+<r opt="skip-production" type="bool" default="true"/>
+
+</r>
+
+~~~ go
+blah
+~~~
+`)
+
+	gm := goldmark.New(
+		goldmark.WithParserOptions(
+			parser.WithASTTransformers(util.PrioritizedValue{
+				Value:    NewRundownASTTransformer(),
+				Priority: 0,
+			}),
+		),
+	)
+
+	doc := gm.Parser().Parse(text.NewReader(source))
+
+	doc.Dump(source, 0)
+
+	target := doc.FirstChild()
+
+	if assert.NotNil(t, target) && assert.Equal(t, "SectionPointer", target.Kind().String()) {
+
+		sp := target.(*ast.SectionPointer)
+
+		assert.Len(t, sp.Options, 1)
+
+		target = target.NextSibling()
+
+		if assert.NotNil(t, target) && assert.Equal(t, "SectionOption", target.Kind().String()) {
+
+			sp := target.(*ast.SectionOption)
+
+			assert.Equal(t, "skip-production", sp.OptionName)
+		}
+
 	}
 
 }
@@ -385,10 +438,16 @@ func TestDescriptionBlock(t *testing.T) {
 
 	target := doc.FirstChild()
 
-	if assert.NotNil(t, target) && assert.Equal(t, "DescriptionBlock", target.Kind().String()) {
+	if assert.NotNil(t, target) && assert.Equal(t, "Paragraph", target.Kind().String()) {
 
-		target = target.FirstChild()
-		assert.Equal(t, "This is some description", string(target.Text(source)))
+		target := target.FirstChild()
+
+		if assert.NotNil(t, target) && assert.Equal(t, "DescriptionBlock", target.Kind().String()) {
+
+			target = target.FirstChild()
+			assert.Equal(t, "This is some description", string(target.Text(source)))
+
+		}
 
 	}
 

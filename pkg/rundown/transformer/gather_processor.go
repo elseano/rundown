@@ -24,24 +24,27 @@ func (p *GatherProcessor) Begin(openingTag *RundownHtmlTag) {
 	p.openingTag = openingTag
 }
 
-func (p *GatherProcessor) End(node goldast.Node, openingTag *RundownHtmlTag, treatments *Treatment) bool {
+func (p *GatherProcessor) End(node goldast.Node, reader goldtext.Reader, openingTag *RundownHtmlTag, treatments *Treatment) bool {
 	if p.openingTag != openingTag {
 		return false
 	}
 
-	if p.newBlockNode != nil {
-		treatments.Replace(p.replacingNode, p.newBlockNode)
-	} else {
-		treatments.Remove(p.replacingNode)
-	}
+	// if p.newBlockNode != nil {
+	// 	treatments.Replace(p.replacingNode, p.newBlockNode)
+	// } else {
+	// 	treatments.Remove(p.replacingNode)
+	// }
 
 	return true
 }
 
 func (p *GatherProcessor) Process(node goldast.Node, reader goldtext.Reader, treatments *Treatment) bool {
-	if node.Parent() == p.replacingNode {
-		if p.newBlockNode != nil {
-			treatments.AppendChild(p.newBlockNode, node)
+	// Ignore RawHTML nodes.
+	if _, ok := node.(*goldast.RawHTML); !ok {
+		if node.Parent() == p.replacingNode {
+			if p.newBlockNode != nil {
+				treatments.AppendChild(p.newBlockNode, node)
+			}
 		}
 	}
 

@@ -17,28 +17,6 @@ type RundownHtmlTag struct {
 	closer   bool
 }
 
-func (r *RundownHtmlTag) HasAttr(names ...string) bool {
-	for _, name := range names {
-		for _, a := range r.attrs {
-			if a.Key == name {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-func (r *RundownHtmlTag) GetAttr(name string) *string {
-	for _, a := range r.attrs {
-		if a.Key == name {
-			return &a.Val
-		}
-	}
-
-	return nil
-}
-
 func ExtractRundownElement(node goldast.Node, reader goldtext.Reader, currentTag string) *RundownHtmlTag {
 	z := html.NewTokenizerFragment(text.NewNodeReader(node, reader), currentTag)
 	// source := string(node.Text(reader.Source()))

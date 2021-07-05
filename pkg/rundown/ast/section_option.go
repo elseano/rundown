@@ -1,9 +1,11 @@
 package ast
 
 import (
+	"fmt"
 	"strings"
 
 	goldast "github.com/yuin/goldmark/ast"
+	"gopkg.in/guregu/null.v4"
 )
 
 type OptionType interface {
@@ -28,8 +30,8 @@ type SectionOption struct {
 	goldast.BaseInline
 	OptionName     string
 	OptionType     OptionType
-	OptionPrompt   *string
-	OptionDefault  *string
+	OptionPrompt   null.String
+	OptionDefault  null.String
 	OptionRequired bool
 }
 
@@ -49,7 +51,14 @@ func (n *SectionOption) Kind() goldast.NodeKind {
 }
 
 func (n *SectionOption) Dump(source []byte, level int) {
-	goldast.DumpHelper(n, source, level, map[string]string{"OptionName": n.OptionName}, nil)
+	goldast.DumpHelper(n, source, level, map[string]string{
+		"OptionName": n.OptionName,
+		"Type":       fmt.Sprintf("%#v", n.OptionType),
+		"Required":   boolToStr(n.OptionRequired),
+		"Prompt":     n.OptionPrompt.ValueOrZero(),
+		"WillPrompt": boolToStr(n.OptionPrompt.Valid),
+		"Default":    n.OptionDefault.ValueOrZero(),
+	}, nil)
 }
 
 func BuildOptionType(optionType string) OptionType {

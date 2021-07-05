@@ -1,6 +1,7 @@
 package transformer
 
 import (
+	"fmt"
 	"regexp"
 
 	"github.com/elseano/rundown/pkg/rundown/ast"
@@ -10,31 +11,34 @@ import (
 
 // SubEnv Processor replaces all mentions of $ENV_VAR with a EnvironmentSubstitution node.
 type SubEnvProcessor struct {
-	openingTag *RundownHtmlTag
+	rundownBlock *ast.RundownBlock
 }
 
 var EnvMatcher = regexp.MustCompile(`(\$[A-Z0-9_]+)`)
 
-func (p *SubEnvProcessor) Begin(openingTag *RundownHtmlTag) {
-	p.openingTag = openingTag
+func (p *SubEnvProcessor) Begin(node *ast.RundownBlock) {
+	p.rundownBlock = node
 }
 
-func (p *SubEnvProcessor) End(node goldast.Node, openingTag *RundownHtmlTag, treatments *Treatment) bool {
-	if p.openingTag != openingTag {
-		return false
-	}
+func (p *SubEnvProcessor) End(node goldast.Node, reader goldtext.Reader, treatments *Treatment) bool {
+	// if p.openingTag != openingTag {
+	// 	return false
+	// }
 
 	return true
 }
 
-func (p *SubEnvProcessor) Process(node goldast.Node, reader goldtext.Reader, treatments *Treatment) bool {
+func ConvertTextForSubenv(node goldast.Node, reader goldtext.Reader, treatments *Treatment) {
 	switch node := node.(type) {
 	case *goldast.Text:
 		contents := node.Text(reader.Source())
 
+		fmt.Printf("Searching %s...\n", contents)
+
 		found := EnvMatcher.FindIndex(contents)
 
 		if found != nil {
+			fmt.Printf("!!!!\n")
 			parent := node.Parent()
 			last := node
 
@@ -60,6 +64,10 @@ func (p *SubEnvProcessor) Process(node goldast.Node, reader goldtext.Reader, tre
 		}
 
 	}
+}
+
+func (p *SubEnvProcessor) Process(node goldast.Node, reader goldtext.Reader, treatments *Treatment) bool {
+	ConvertTextForSubenv(node, reader, treatments)
 
 	return false
 

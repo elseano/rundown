@@ -1,13 +1,18 @@
 package ast
 
 import (
+	"strings"
+
 	goldast "github.com/yuin/goldmark/ast"
 )
 
 type SectionPointer struct {
 	goldast.BaseBlock
-	SectionName string
-	StartNode   goldast.Node
+	SectionName      string
+	StartNode        goldast.Node
+	Options          []*SectionOption
+	DescriptionShort string
+	DescriptionLong  string
 }
 
 type SectionEnd struct {
@@ -19,6 +24,7 @@ type SectionEnd struct {
 func NewSectionPointer(name string) *SectionPointer {
 	return &SectionPointer{
 		SectionName: name,
+		Options:     []*SectionOption{},
 	}
 }
 
@@ -32,7 +38,16 @@ func (n *SectionPointer) Kind() goldast.NodeKind {
 }
 
 func (n *SectionPointer) Dump(source []byte, level int) {
-	goldast.DumpHelper(n, source, level, map[string]string{"SectionName": n.SectionName}, nil)
+	optionNames := []string{}
+	for _, opt := range n.Options {
+		optionNames = append(optionNames, opt.OptionName)
+	}
+
+	goldast.DumpHelper(n, source, level, map[string]string{"SectionName": n.SectionName, "Options": strings.Join(optionNames, ", ")}, nil)
+}
+
+func (n *SectionPointer) AddOption(option *SectionOption) {
+	n.Options = append(n.Options, option)
 }
 
 // Kind implements Node.Kind.
