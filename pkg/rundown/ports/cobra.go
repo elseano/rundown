@@ -26,8 +26,9 @@ func BuildCobraCommand(filename string, sectionPointer *ast.SectionPointer) *cob
 		Long:  sectionPointer.DescriptionLong,
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			devNull, err := os.Create(os.DevNull)
+			devNull, err := os.Create("rundown.log")
 			rdutil.RedirectLogger(devNull)
+
 			ansiOptions := ansi.Options{
 				WordWrap:     80,
 				ColorProfile: termenv.TrueColor,

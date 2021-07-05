@@ -140,14 +140,14 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 
 	// r := regexp.MustCompile("([^\r\n]*)([\r\n]{0,2})")
 
-	logger.Printf("Reading and formatting output with spinner %#v\n", spinner)
+	Logger.Trace().Msgf("Reading and formatting output with spinner %#v\n", spinner)
 
 	for {
 		if n, err := reader.Read(buf); err == nil {
 
 			var toWrite strings.Builder
 
-			logger.Printf("Got input %#v", buf[0:n])
+			Logger.Trace().Msgf("Got input %#v", buf[0:n])
 
 			stringBuf := string(buf[0:n])
 			segmentContainedText := false
@@ -155,7 +155,7 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 
 			for token, data, rest := NextToken(stringBuf); token != TokenEmpty; token, data, rest = NextToken(rest) {
 
-				logger.Printf("Token: %#v, %#v, %#v\n", token, data, rest)
+				Logger.Trace().Msgf("Token: %#v, %#v, %#v\n", token, data, rest)
 
 				// if lineIsEmpty && currentlyBlankLine {
 				// 	logger.Println("This line is empty and we're already on a blank line. Skipping line.")
@@ -169,7 +169,7 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 
 				case TokenCursor:
 					lineDelta, columnDelta := DecodeCursor(data)
-					Debugf("Cursor movement: %d, %d\n", lineDelta, columnDelta)
+					Logger.Trace().Msgf("Cursor movement: %d, %d\n", lineDelta, columnDelta)
 
 					// Moving multiple new lines downwards, indent the blank line.
 					if lineDelta > 0 && lastToken == TokenCursor && !lineData.CurrentlyIndented {
@@ -189,25 +189,25 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 
 					break
 				case TokenColour:
-					Debugf("Token is Colour code\n")
+					Logger.Trace().Msgf("Token is Colour code\n")
 					fallthrough
 				case TokenWhitespace:
-					Debugf("Token is whitespace\n")
+					Logger.Trace().Msgf("Token is whitespace\n")
 					if lineData.CurrentlyIndented {
-						Debugf("We've written on this line. Writing %#v\n", lineData.FormattingStash+data)
+						Logger.Trace().Msgf("We've written on this line. Writing %#v\n", lineData.FormattingStash+data)
 						fmt.Fprint(&toWrite, lineData.FormattingStash+data)
 						lineData.FormattingStash = ""
 					} else {
-						Debugf("It's a clean line. Stashing %#v\n", lineData.FormattingStash+data)
+						Logger.Trace().Msgf("It's a clean line. Stashing %#v\n", lineData.FormattingStash+data)
 						lineData.FormattingStash = lineData.FormattingStash + data
 					}
 
 					break
 				case TokenDisplayStream:
-					Debugf("Token is display stream\n")
+					Logger.Trace().Msgf("Token is display stream\n")
 
 					if !lineData.CurrentlyIndented {
-						Debugf("Line %d not indented, indenting line with %q and formatting %q\n", currentLine, indentStr, lineData.FormattingStash)
+						Logger.Trace().Msgf("Line %d not indented, indenting line with %q and formatting %q\n", currentLine, indentStr, lineData.FormattingStash)
 						fmt.Fprintf(&toWrite, "%s%s", indentStr, lineData.FormattingStash)
 
 						lineData.LastColumn = lineData.LastColumn + len(indentStr)
@@ -215,7 +215,7 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 						lineData.CurrentlyIndented = true
 					}
 
-					Debugf("Writing: %#v\n", data)
+					Logger.Trace().Msgf("Writing: %#v\n", data)
 					fmt.Fprint(&toWrite, data)
 					lineData.LastColumn = lineData.LastColumn + len(data)
 					lineData.Dirty = true
@@ -233,10 +233,10 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 			toWriteString := toWrite.String()
 			anythingToWrite := len(toWriteString) > 0
 
-			Debugf("Cursor currently at %d, output will finish at %d:%d\n", cursorLine, currentLine, lineTracking[currentLine].LastColumn)
+			Logger.Trace().Msgf("Cursor currently at %d, output will finish at %d:%d\n", cursorLine, currentLine, lineTracking[currentLine].LastColumn)
 
 			if spinner.Active() && anythingToWrite {
-				Debugf("Stopping spinner on line %d\n", cursorLine)
+				Logger.Trace().Msgf("Stopping spinner on line %d\n", cursorLine)
 				spinner.Stop()
 				if hasShownSomething {
 					movement := oldCurrentLine - cursorLine
@@ -245,7 +245,7 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 				}
 			}
 
-			Debugf("Writing rendered content: %q\n", toWriteString)
+			Logger.Trace().Msgf("Writing rendered content: %q\n", toWriteString)
 
 			if segmentContainedText && !hasShownSomething {
 				if initialHeading != "" {
@@ -258,7 +258,7 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 			fmt.Fprint(out, toWriteString)
 			cursorLine = currentLine
 
-			Debugf("After render, current line %d, maxLines %d, current column %d\n", currentLine, maxLine, lineTracking[currentLine].LastColumn)
+			Logger.Trace().Msgf("After render, current line %d, maxLines %d, current column %d\n", currentLine, maxLine, lineTracking[currentLine].LastColumn)
 
 			// If we're on the last line of output, and we're clean, we're probably not waiting
 			// for user input, so reveal the spinner.
@@ -270,7 +270,7 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 					cursorLine = cursorLine + movement
 				}
 
-				Debugf("Starting spinner on line %d\n", cursorLine)
+				Logger.Trace().Msgf("Starting spinner on line %d\n", cursorLine)
 				spinner.Start()
 			}
 
@@ -279,7 +279,7 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 			// fmt.Printf("End of segment: %+v", lineTracking)
 		} else {
 			if err == io.EOF {
-				logger.Println("GOT EOF")
+				Logger.Trace().Msgf("GOT EOF\n")
 
 				if lineTracking[currentLine].CurrentlyIndented {
 					fmt.Fprint(out, "\r\n")
@@ -295,7 +295,7 @@ func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, spinner Pr
 
 			}
 
-			fmt.Println("ERR", err)
+			Logger.Trace().Msgf("ERR", err)
 		}
 	}
 }

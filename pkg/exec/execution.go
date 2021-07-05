@@ -154,15 +154,15 @@ func launchProcess(content *scripts.ScriptManager, baseEnv map[string]string) (e
 }
 
 func captureOutputStream(outputCaptureGroup []io.Writer, waiter *sync.WaitGroup, stdout *io.PipeReader) {
-	util.Logger.Trace().Msgf("Copying STDOUT to %d other streams", len(outputCaptureGroup))
+	util.Logger.Trace().Msgf("Copying STDOUT to %d other streams: %#v", len(outputCaptureGroup), outputCaptureGroup)
 
 	var writer = io.MultiWriter(outputCaptureGroup...)
 
 	waiter.Add(1)
 	go func() {
 		util.Logger.Trace().Msg("Capturing STDOUT")
-		_, _ = io.Copy(writer, stdout)
-		util.Logger.Trace().Msg("STDOUT closed")
+		w, _ := io.Copy(writer, stdout)
+		util.Logger.Trace().Msgf("STDOUT closed, bytes written: %d", w)
 
 		waiter.Done()
 	}()

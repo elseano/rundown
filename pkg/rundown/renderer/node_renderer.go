@@ -1,11 +1,15 @@
 package renderer
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
+	"os"
 
+	"github.com/elseano/rundown/pkg/bus"
 	"github.com/elseano/rundown/pkg/exec"
 	"github.com/elseano/rundown/pkg/exec/modifiers"
+	"github.com/elseano/rundown/pkg/exec/rpc"
 	"github.com/elseano/rundown/pkg/rundown/ast"
 	"github.com/elseano/rundown/pkg/rundown/text"
 	rutil "github.com/elseano/rundown/pkg/util"
@@ -60,6 +64,24 @@ func (r *RundownNodeRenderer) renderTodo(w util.BufWriter, source []byte, node g
 	return goldast.WalkContinue, nil
 }
 
+type BusSpinnerInterface struct {
+	IsActive bool
+}
+
+func (s *BusSpinnerInterface) Start() {
+	s.IsActive = true
+	bus.Emit(&rpc.RpcMessage{Data: "STARTSPINNER"})
+}
+
+func (s *BusSpinnerInterface) Stop() {
+	s.IsActive = false
+	bus.Emit(&rpc.RpcMessage{Data: "STOPSPINNER"})
+}
+
+func (s *BusSpinnerInterface) Active() bool {
+	return s.IsActive
+}
+
 func (r *RundownNodeRenderer) renderExecutionBlock(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {
 	if entering {
 		return goldast.WalkContinue, nil
@@ -83,18 +105,32 @@ func (r *RundownNodeRenderer) renderExecutionBlock(w util.BufWriter, source []by
 		return goldast.WalkStop, err
 	}
 
+	// intent.AddModifier(modifiers.NewStdout())
+	reader, writer, _ := os.Pipe()
+
 	if executionBlock.ShowStdout {
-		intent.AddModifier(modifiers.NewStdout())
+		rutil.Logger.Trace().Msg("Streaming STDOUT")
+		intent.AddModifier(modifiers.NewStdoutStream(writer))
+
+		spinner := BusSpinnerInterface{IsActive: true}
+
+		go func() {
+			rutil.Logger.Trace().Msg("Setting up output formatter")
+
+			rutil.ReadAndFormatOutput(reader, 1, "> ", &spinner, bufio.NewWriter(os.Stdout), nil, "Running...")
+		}()
 	}
 
 	rutil.Logger.Debug().Msgf("Spinner mode %d", executionBlock.SpinnerMode)
 
 	switch executionBlock.SpinnerMode {
 	case ast.SpinnerModeVisible:
-		intent.AddModifier(modifiers.NewSpinnerConstant(executionBlock.SpinnerName))
+		spinner := modifiers.NewSpinnerConstant(executionBlock.SpinnerName)
+		intent.AddModifier(spinner)
 	}
 
 	result, err := intent.Execute()
+	writer.Close()
 
 	if err != nil {
 		return goldast.WalkStop, err
