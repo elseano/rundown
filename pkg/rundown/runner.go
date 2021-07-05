@@ -297,9 +297,10 @@ func (r *Runner) getEngine() (goldmark.Markdown, *Context) {
 	}
 	ctx.RawOut = r.out
 
-	md, _ := NewRenderer(ctx)
+	// md, _ := NewRenderer(ctx)
 
-	return md, ctx
+	// return md, ctx
+	return nil, ctx
 }
 
 func (r *Runner) getByteData(filename string) ([]byte, error) {

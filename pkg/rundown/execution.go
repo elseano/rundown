@@ -16,7 +16,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/charmbracelet/glamour/ansi"
 	rdexec "github.com/elseano/rundown/pkg/exec"
 	"github.com/elseano/rundown/pkg/markdown"
 	"github.com/elseano/rundown/pkg/spinner"
@@ -342,7 +341,7 @@ func Execute(context *Context, executionBlock *markdown.ExecutionBlock, source [
 			go func() {
 				waiter.Add(1)
 
-				prefix := ansi.Ssprintf(context.Profile, context.Style.Heading.StylePrimitive, "‣ ")
+				prefix := "‣ "
 				endedWithoutNewline = util.ReadAndFormatOutput(stdoutReader, indent, prefix, theSpinner, bufio.NewWriter(output), logger, aurora.Faint(outputHeading).String())
 				logger.Printf("endedWithoutNewline? %v\r\n", endedWithoutNewline)
 				waiter.Done()

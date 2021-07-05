@@ -4,8 +4,24 @@ import (
 	"os"
 	"os/user"
 	"path"
+	"path/filepath"
 	"strings"
 )
+
+func MakeRelative(filename string) string {
+	wd, err := os.Getwd()
+
+	if err != nil {
+		return ""
+	}
+
+	rel, err := filepath.Rel(wd, filename)
+	if err != nil {
+		return err.Error()
+	}
+
+	return rel
+}
 
 func FileExists(name string) bool {
 	if name == "" {

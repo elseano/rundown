@@ -1,16 +1,26 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
-	"path/filepath"
-	"strings"
 
+	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/glamour/ansi"
 	shared "github.com/elseano/rundown/cmd"
 	"github.com/elseano/rundown/pkg/rundown"
+	"github.com/elseano/rundown/pkg/rundown/ast"
+	"github.com/elseano/rundown/pkg/rundown/ports"
+	"github.com/elseano/rundown/pkg/rundown/renderer"
+	"github.com/elseano/rundown/pkg/rundown/transformer"
 	"github.com/elseano/rundown/pkg/util"
+	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/parser"
+	goldrenderer "github.com/yuin/goldmark/renderer"
+	"github.com/yuin/goldmark/text"
+	goldutil "github.com/yuin/goldmark/util"
 )
 
 func Execute(version string, gitCommit string) error {
@@ -107,75 +117,117 @@ func NewDocRootCmd(args []string) *cobra.Command {
 	docRoot.ParseFlags(args)
 
 	rundownFile = shared.RundownFile(flagFilename)
-	cwd, _ := os.Getwd()
-	relRundownFile, _ := filepath.Rel(cwd, rundownFile)
+	// cwd, _ := os.Getwd()
+	// relRundownFile, _ := filepath.Rel(cwd, rundownFile)
 
-	rd, err := rundown.LoadFile(rundownFile)
-	if err != nil {
-		return docRoot // If we can't find a file, just return the rundown command itself.
+	ansiOptions := ansi.Options{
+		WordWrap:     80,
+		ColorProfile: termenv.TrueColor,
+		Styles:       glamour.DarkStyleConfig,
 	}
 
-	rd.SetLogger(flagDebug)
+	rundownNodeRenderer := renderer.NewRundownNodeRenderer()
 
-	shortCodes := rd.GetShortCodes()
+	ar := ansi.NewRenderer(ansiOptions)
+	r := goldrenderer.NewRenderer(
+		goldrenderer.WithNodeRenderers(
+			goldutil.Prioritized(ar, 1000),
+			goldutil.Prioritized(rundownNodeRenderer, 1000),
+		),
+	)
 
-	addFlags(docRoot, shortCodes.Options)
+	rundownRenderer := renderer.NewRundownRenderer(
+		r,
+	)
 
-	for _, sc := range shortCodes.Codes {
-		shortCode := sc
-		reqOpts := []string{}
+	gm := goldmark.New(
+		goldmark.WithParserOptions(
+			parser.WithASTTransformers(goldutil.PrioritizedValue{
+				Value:    transformer.NewRundownASTTransformer(),
+				Priority: 0,
+			}),
+		),
+		goldmark.WithRenderer(rundownRenderer),
+	)
 
-		for _, opt := range shortCode.Options {
-			if opt.Required {
-				reqOpts = append(reqOpts, fmt.Sprintf("--%s %s", opt.Code, strings.ToUpper(opt.Type)))
+	data, _ := ioutil.ReadFile(rundownFile)
+	doc := gm.Parser().Parse(text.NewReader(data))
+
+	for child := doc.FirstChild(); child != nil; child = child.NextSibling() {
+		if section, ok := child.(*ast.SectionPointer); ok {
+			cmd := ports.BuildCobraCommand(rundownFile, section)
+			if cmd != nil {
+				docRoot.AddCommand(cmd)
 			}
 		}
-
-		codeCommand := &cobra.Command{
-			Use:   fmt.Sprintf("%s [flags]", shortCode.Code),
-			Short: shortCode.Name,
-			Long:  fmt.Sprintf("%s is a command within %s.\n\n%s", shortCode.Code, relRundownFile, shortCode.Description),
-			RunE: func(cmd *cobra.Command, args []string) error {
-				docSpec, err := buildDocSpec(shortCode.Code, rd, cmd, args)
-
-				// fmt.Printf("Build docSpec %s\n", docSpec)
-
-				if err == nil {
-					err, callback := rd.RunCodes(docSpec)
-
-					if err != nil {
-						util.Debugf("ERROR %#v\n", err)
-
-						if errors.Is(err, rundown.InvocationError) {
-							cmd.HelpFunc()(cmd, args)
-						}
-					}
-
-					return handleError(cmd.OutOrStderr(), err, callback)
-				}
-
-				return err
-			},
-		}
-
-		addArgs(codeCommand, shortCode.Options)
-		addFlags(codeCommand, shortCode.Options)
-		addFlags(codeCommand, shortCodes.Options) // Add doc options
-
-		docRoot.AddCommand(codeCommand)
 	}
 
-	wd, err := os.Getwd()
-	if err != nil {
-		wd = "/"
-	}
+	// rd, err := rundown.LoadFile(rundownFile)
+	// if err != nil {
+	// 	return docRoot // If we can't find a file, just return the rundown command itself.
+	// }
 
-	rdf, err := filepath.Rel(wd, rundownFile)
-	if err != nil {
-		rdf = rundownFile
-	}
+	// rd.SetLogger(flagDebug)
 
-	docRoot.Long = fmt.Sprintf("%s\n\nCurrent file: %s\n\n", docRoot.Long, rdf)
+	// shortCodes := rd.GetShortCodes()
+
+	// addFlags(docRoot, shortCodes.Options)
+
+	// for _, sc := range shortCodes.Codes {
+	// 	shortCode := sc
+	// 	reqOpts := []string{}
+
+	// 	for _, opt := range shortCode.Options {
+	// 		if opt.Required {
+	// 			reqOpts = append(reqOpts, fmt.Sprintf("--%s %s", opt.Code, strings.ToUpper(opt.Type)))
+	// 		}
+	// 	}
+
+	// 	codeCommand := &cobra.Command{
+	// 		Use:   fmt.Sprintf("%s [flags]", shortCode.Code),
+	// 		Short: shortCode.Name,
+	// 		Long:  fmt.Sprintf("%s is a command within %s.\n\n%s", shortCode.Code, relRundownFile, shortCode.Description),
+	// 		RunE: func(cmd *cobra.Command, args []string) error {
+	// 			docSpec, err := buildDocSpec(shortCode.Code, rd, cmd, args)
+
+	// 			// fmt.Printf("Build docSpec %s\n", docSpec)
+
+	// 			if err == nil {
+	// 				err, callback := rd.RunCodes(docSpec)
+
+	// 				if err != nil {
+	// 					util.Debugf("ERROR %#v\n", err)
+
+	// 					if errors.Is(err, rundown.InvocationError) {
+	// 						cmd.HelpFunc()(cmd, args)
+	// 					}
+	// 				}
+
+	// 				return handleError(cmd.OutOrStderr(), err, callback)
+	// 			}
+
+	// 			return err
+	// 		},
+	// 	}
+
+	// 	addArgs(codeCommand, shortCode.Options)
+	// 	addFlags(codeCommand, shortCode.Options)
+	// 	addFlags(codeCommand, shortCodes.Options) // Add doc options
+
+	// 	docRoot.AddCommand(codeCommand)
+	// }
+
+	// wd, err := os.Getwd()
+	// if err != nil {
+	// 	wd = "/"
+	// }
+
+	// rdf, err := filepath.Rel(wd, rundownFile)
+	// if err != nil {
+	// 	rdf = rundownFile
+	// }
+
+	// docRoot.Long = fmt.Sprintf("%s\n\nCurrent file: %s\n\n", docRoot.Long, rdf)
 
 	return docRoot
 }

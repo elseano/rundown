@@ -1,6 +1,7 @@
 package renderer
 
 import (
+	"fmt"
 	"io/ioutil"
 
 	"github.com/elseano/rundown/pkg/exec"
@@ -22,6 +23,41 @@ func NewRundownNodeRenderer() *RundownNodeRenderer {
 func (r *RundownNodeRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	// blocks
 	reg.Register(ast.KindExecutionBlock, r.renderExecutionBlock)
+	reg.Register(ast.KindDescriptionBlock, r.renderNoop)
+	reg.Register(ast.KindEnvironmentSubstitution, r.renderTodo)
+	reg.Register(ast.KindIgnoreBlock, r.renderTodo)
+	reg.Register(ast.KindOnFailure, r.renderTodo)
+	reg.Register(ast.KindRundownBlock, r.renderTodo)
+	reg.Register(ast.KindSaveCodeBlock, r.renderTodo)
+	reg.Register(ast.KindSectionEnd, r.renderNoop)
+	reg.Register(ast.KindSectionOption, r.renderNoop)
+	reg.Register(ast.KindSectionPointer, r.renderNoop)
+	reg.Register(ast.KindStopFail, r.renderTodo)
+	reg.Register(ast.KindStopOk, r.renderTodo)
+
+	reg.Register(goldast.KindString, r.renderString)
+}
+
+func (r *RundownNodeRenderer) renderNoop(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {
+	return goldast.WalkContinue, nil
+}
+
+func (r *RundownNodeRenderer) renderString(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {
+	if str, ok := node.(*goldast.String); ok {
+		if entering {
+			w.Write(str.Value)
+		}
+	}
+
+	return goldast.WalkContinue, nil
+}
+
+func (r *RundownNodeRenderer) renderTodo(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {
+	if entering {
+		w.WriteString(fmt.Sprintf("TODO - %s", node.Kind().String()))
+	}
+
+	return goldast.WalkContinue, nil
 }
 
 func (r *RundownNodeRenderer) renderExecutionBlock(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {

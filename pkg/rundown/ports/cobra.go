@@ -4,10 +4,12 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/ansi"
 	"github.com/elseano/rundown/pkg/rundown/ast"
 	"github.com/elseano/rundown/pkg/rundown/renderer"
 	"github.com/elseano/rundown/pkg/rundown/transformer"
+	rdutil "github.com/elseano/rundown/pkg/util"
 	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
 	"github.com/yuin/goldmark"
@@ -17,19 +19,22 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-func BuildCobraCommand(sectionPointer *ast.SectionPointer) *cobra.Command {
+func BuildCobraCommand(filename string, sectionPointer *ast.SectionPointer) *cobra.Command {
 	command := cobra.Command{
 		Use:   sectionPointer.SectionName,
 		Short: sectionPointer.DescriptionShort,
 		Long:  sectionPointer.DescriptionLong,
 
 		RunE: func(cmd *cobra.Command, args []string) error {
+			devNull, err := os.Create(os.DevNull)
+			rdutil.RedirectLogger(devNull)
 			ansiOptions := ansi.Options{
 				WordWrap:     80,
 				ColorProfile: termenv.TrueColor,
+				Styles:       glamour.DarkStyleConfig,
 			}
 
-			source, err := ioutil.ReadFile(sectionPointer.OwningFilename)
+			source, err := ioutil.ReadFile(filename)
 
 			if err != nil {
 				return err
@@ -41,7 +46,7 @@ func BuildCobraCommand(sectionPointer *ast.SectionPointer) *cobra.Command {
 			goldmarkRenderer := goldrenderer.NewRenderer(
 				goldrenderer.WithNodeRenderers(
 					util.Prioritized(ar, 1000),
-					util.Prioritized(rundownNodeRenderer, 1000),
+					util.Prioritized(rundownNodeRenderer, 1),
 				),
 			)
 
