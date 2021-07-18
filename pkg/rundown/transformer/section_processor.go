@@ -1,10 +1,10 @@
 package transformer
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/elseano/rundown/pkg/rundown/ast"
+	"github.com/elseano/rundown/pkg/util"
 	goldast "github.com/yuin/goldmark/ast"
 	goldtext "github.com/yuin/goldmark/text"
 )
@@ -69,7 +69,7 @@ func (p *SectionProcessor) Process(node goldast.Node, reader goldtext.Reader, tr
 // Given the startNode (being the section node itself), returns the node which terminates the section.
 func FindEndOfSection(startNode *goldast.Heading) goldast.Node {
 	for sib := startNode.NextSibling(); sib != nil; sib = sib.NextSibling() {
-		fmt.Printf("Check %s\n", sib.Kind().String())
+		util.Logger.Trace().Msgf("Check %s\n", sib.Kind().String())
 		if h, ok := sib.(*goldast.Heading); ok {
 			if h.Level <= startNode.Level {
 				return h
@@ -88,7 +88,7 @@ func PopulateSectionMetadata(start *ast.SectionPointer, end *ast.SectionEnd, rea
 		}
 
 		if inside {
-			fmt.Printf("Scanning section contents: %s\n", n.Kind().String())
+			util.Logger.Trace().Msgf("Scanning section contents: %s\n", n.Kind().String())
 			switch node := n.(type) {
 			case *ast.DescriptionBlock:
 				start.DescriptionLong = string(node.Text(reader.Source()))

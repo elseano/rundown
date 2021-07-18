@@ -12,6 +12,8 @@ import (
 	// "github.com/logrusorgru/aurora"
 )
 
+// TODO - Maybe use with https://github.com/Azure/go-ansiterm
+
 type Line struct {
 	LastColumn        int
 	FormattingStash   string

@@ -9,16 +9,34 @@ import (
 	goldrenderer "github.com/yuin/goldmark/renderer"
 )
 
+type Context struct {
+	Env map[string]string
+}
+
+func NewContext() *Context {
+	return &Context{
+		Env: map[string]string{},
+	}
+}
+
+func (c *Context) ImportEnv(env map[string]string) {
+	for k, v := range env {
+		c.Env[k] = v
+	}
+}
+
 type RundownRenderer struct {
 	actualRenderer goldrenderer.Renderer
 	Section        string
+	Context        *Context
 }
 
 // NewRenderer returns a new Renderer with given options.
-func NewRundownRenderer(actualRenderer goldrenderer.Renderer, options ...goldrenderer.Option) *RundownRenderer {
+func NewRundownRenderer(actualRenderer goldrenderer.Renderer, context *Context) *RundownRenderer {
 
 	r := &RundownRenderer{
 		actualRenderer: actualRenderer,
+		Context:        context,
 	}
 
 	return r

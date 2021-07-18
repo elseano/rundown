@@ -32,6 +32,7 @@ type ExecutionIntent struct {
 	subscriptions  []rpc.Subscription
 	terminationKey string
 	modifiers      *modifiers.ExecutionModifiers
+	env            map[string]string
 }
 
 type ExecutionResult struct {
@@ -47,9 +48,16 @@ func NewExecution(via string, script []byte) (*ExecutionIntent, error) {
 		subscriptions:  []rpc.Subscription{},
 		terminationKey: "ABC123",
 		modifiers:      modifiers.NewExecutionModifiers(),
+		env:            map[string]string{},
 	}
 
 	return intent, nil
+}
+
+func (i *ExecutionIntent) ImportEnv(env map[string]string) {
+	for k, v := range env {
+		i.env[k] = v
+	}
 }
 
 func (i *ExecutionIntent) AddModifier(mod modifiers.ExecutionModifier) {
@@ -64,7 +72,11 @@ func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
 
 	defer rpcEndpoint.Close()
 
-	var baseEnv = map[string]string{} // Todo, import from Context
+	var baseEnv = map[string]string{}
+	for k, v := range i.env {
+		baseEnv[k] = v
+	}
+
 	baseEnv[rpc.EnvironmentVariableName] = rpcEndpoint.Path
 
 	var content = scripts.NewScriptManager()

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/elseano/rundown/pkg/bus"
 	"github.com/elseano/rundown/pkg/exec"
@@ -13,22 +14,25 @@ import (
 	"github.com/elseano/rundown/pkg/rundown/ast"
 	"github.com/elseano/rundown/pkg/rundown/text"
 	rutil "github.com/elseano/rundown/pkg/util"
+	"github.com/muesli/termenv"
 	goldast "github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/util"
 )
 
-type RundownNodeRenderer struct{}
+type RundownNodeRenderer struct {
+	Context *Context
+}
 
-func NewRundownNodeRenderer() *RundownNodeRenderer {
-	return &RundownNodeRenderer{}
+func NewRundownNodeRenderer(context *Context) *RundownNodeRenderer {
+	return &RundownNodeRenderer{Context: context}
 }
 
 func (r *RundownNodeRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	// blocks
 	reg.Register(ast.KindExecutionBlock, r.renderExecutionBlock)
 	reg.Register(ast.KindDescriptionBlock, r.renderNoop)
-	reg.Register(ast.KindEnvironmentSubstitution, r.renderTodo)
+	reg.Register(ast.KindEnvironmentSubstitution, r.renderEnvironmentSubstitution)
 	reg.Register(ast.KindIgnoreBlock, r.renderTodo)
 	reg.Register(ast.KindOnFailure, r.renderTodo)
 	reg.Register(ast.KindRundownBlock, r.renderTodo)
@@ -43,6 +47,23 @@ func (r *RundownNodeRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegiste
 }
 
 func (r *RundownNodeRenderer) renderNoop(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {
+	return goldast.WalkContinue, nil
+}
+
+func (r *RundownNodeRenderer) renderEnvironmentSubstitution(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {
+	if sub, ok := node.(*ast.EnvironmentSubstitution); ok {
+		if entering {
+			variable := string(sub.Value)
+			variable = strings.TrimPrefix(variable, "$")
+
+			if varData, ok := r.Context.Env[variable]; ok {
+				w.Write([]byte(varData))
+			} else {
+				w.Write([]byte(variable))
+			}
+		}
+	}
+
 	return goldast.WalkContinue, nil
 }
 
@@ -117,7 +138,11 @@ func (r *RundownNodeRenderer) renderExecutionBlock(w util.BufWriter, source []by
 		go func() {
 			rutil.Logger.Trace().Msg("Setting up output formatter")
 
-			rutil.ReadAndFormatOutput(reader, 1, "> ", &spinner, bufio.NewWriter(os.Stdout), nil, "Running...")
+			p := termenv.ColorProfile()
+
+			prefix := termenv.String("‣ ")
+			prefix.Foreground(p.Color("#5555ff"))
+			rutil.ReadAndFormatOutput(reader, 1, prefix.String(), &spinner, bufio.NewWriter(w), nil, "Running...")
 		}()
 	}
 
@@ -129,11 +154,22 @@ func (r *RundownNodeRenderer) renderExecutionBlock(w util.BufWriter, source []by
 		intent.AddModifier(spinner)
 	}
 
+	if executionBlock.CaptureEnvironment {
+		envCapture := modifiers.NewEnvironmentCapture()
+		intent.AddModifier(envCapture)
+	}
+
+	intent.ImportEnv(r.Context.Env)
+
 	result, err := intent.Execute()
 	writer.Close()
 
 	if err != nil {
 		return goldast.WalkStop, err
+	}
+
+	if result.Env != nil {
+		r.Context.ImportEnv(result.Env)
 	}
 
 	w.Write(result.Output)

@@ -1,0 +1,70 @@
+package markdown
+
+import (
+	"fmt"
+	"regexp"
+
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/text"
+	"github.com/yuin/goldmark/util"
+)
+
+/** Blocks
+ *
+ * Conditional blocks and inlines.
+ *
+ * These blocks wrap other blocks to mark them as conditionally executable. They're not extensions
+ * to the markdown syntax, rather they're created by the AST Transformer.
+ *
+**/
+
+type ConditionalBlock struct {
+	ast.BaseBlock
+	Condition string
+}
+
+type ConditionalInline struct {
+	ast.BaseInline
+	Condition string
+}
+
+func NewConditionalBlock(condition string) *ConditionalBlock {
+	return &ConditionalBlock{
+		BaseBlock: ast.BaseBlock{},
+		Condition: condition,
+	}
+}
+
+func NewConditionalInline(condition string) *ConditionalInline {
+	return &ConditionalInline{
+		BaseInline: ast.BaseInline{},
+		Condition:  condition,
+	}
+}
+
+var KindConditionalBlock = ast.NewNodeKind("ConditionalBlock")
+var KindConditionalInline = ast.NewNodeKind("ConditionalInline")
+
+func (n *ConditionalBlock) Kind() ast.NodeKind {
+	return KindConditionalBlock
+}
+
+func (n *ConditionalInline) Kind() ast.NodeKind {
+	return KindConditionalInline
+}
+
+func (n *ConditionalBlock) Dump(source []byte, level int) {
+	m := map[string]string{
+		"Condition": fmt.Sprintf("%v", n.Condition),
+	}
+	ast.DumpHelper(n, source, level, m, nil)
+}
+
+func (n *ConditionalInline) Dump(source []byte, level int) {
+	m := map[string]string{
+		"Condition": fmt.Sprintf("%v", n.Condition),
+	}
+	ast.DumpHelper(n, source, level, m, nil)
+}

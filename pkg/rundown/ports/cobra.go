@@ -19,6 +19,8 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
+var ExecutionContext = renderer.NewContext()
+
 func BuildCobraCommand(filename string, sectionPointer *ast.SectionPointer) *cobra.Command {
 	command := cobra.Command{
 		Use:   sectionPointer.SectionName,
@@ -41,7 +43,7 @@ func BuildCobraCommand(filename string, sectionPointer *ast.SectionPointer) *cob
 				return err
 			}
 
-			rundownNodeRenderer := renderer.NewRundownNodeRenderer()
+			rundownNodeRenderer := renderer.NewRundownNodeRenderer(ExecutionContext)
 
 			ar := ansi.NewRenderer(ansiOptions)
 			goldmarkRenderer := goldrenderer.NewRenderer(
@@ -51,7 +53,7 @@ func BuildCobraCommand(filename string, sectionPointer *ast.SectionPointer) *cob
 				),
 			)
 
-			rundownRenderer := renderer.NewRundownRenderer(goldmarkRenderer)
+			rundownRenderer := renderer.NewRundownRenderer(goldmarkRenderer, ExecutionContext)
 
 			gm := goldmark.New(
 				goldmark.WithParserOptions(
@@ -64,7 +66,7 @@ func BuildCobraCommand(filename string, sectionPointer *ast.SectionPointer) *cob
 			)
 
 			doc := gm.Parser().Parse(text.NewReader(source))
-			doc.Dump(source, 0)
+			// doc.Dump(source, 0)
 
 			ast.PruneDocumentToSection(doc, sectionPointer.SectionName)
 

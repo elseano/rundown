@@ -16,13 +16,21 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-func setupRenderer(source []byte) goldmark.Markdown {
+type Rundown struct {
+	goldmark.Markdown
+
+	Context *Context
+}
+
+func setupRenderer() *Rundown {
+	context := NewContext()
+
 	ansiOptions := ansi.Options{
 		WordWrap:     80,
 		ColorProfile: termenv.TrueColor,
 	}
 
-	rundownNodeRenderer := NewRundownNodeRenderer()
+	rundownNodeRenderer := NewRundownNodeRenderer(context)
 
 	ar := ansi.NewRenderer(ansiOptions)
 	renderer := renderer.NewRenderer(
@@ -34,6 +42,7 @@ func setupRenderer(source []byte) goldmark.Markdown {
 
 	rundownRenderer := NewRundownRenderer(
 		renderer,
+		context,
 	)
 
 	gm := goldmark.New(
@@ -46,7 +55,10 @@ func setupRenderer(source []byte) goldmark.Markdown {
 		goldmark.WithRenderer(rundownRenderer),
 	)
 
-	return gm
+	return &Rundown{
+		Markdown: gm,
+		Context:  context,
+	}
 }
 
 func TestNormalRender(t *testing.T) {
@@ -66,7 +78,7 @@ Done.
 
 `)
 
-	gm := setupRenderer(source)
+	gm := setupRenderer()
 
 	doc := gm.Parser().Parse(text.NewReader(source))
 	doc.Dump(source, 0)
@@ -105,7 +117,7 @@ More stuff.
 
 `)
 
-	gm := setupRenderer(source)
+	gm := setupRenderer()
 	doc := gm.Parser().Parse(text.NewReader(source))
 	doc.Dump(source, 0)
 
@@ -150,7 +162,7 @@ More stuff.
 
 `)
 
-	gm := setupRenderer(source)
+	gm := setupRenderer()
 	doc := gm.Parser().Parse(text.NewReader(source))
 	doc.Dump(source, 0)
 
@@ -160,6 +172,46 @@ More stuff.
 
 	if assert.NoError(t, gm.Renderer().Render(output, source, doc)) {
 		assert.Equal(t, "\n\nStuff\n\n", output.String())
+	}
+
+}
+
+func TestRenderContext(t *testing.T) {
+	source1 := []byte(`
+
+# Some Heading
+
+<r capture-env/>
+
+~~~ bash
+export BLAH="Hi"
+~~~
+
+`)
+
+	source2 := []byte(`
+<r stdout/>
+
+~~~ bash
+echo $BLAH
+~~~
+
+`)
+
+	gm := setupRenderer()
+	context := gm.Context
+	doc1 := gm.Parser().Parse(text.NewReader(source1))
+	doc2 := gm.Parser().Parse(text.NewReader(source2))
+
+	output := &bytes.Buffer{}
+
+	if assert.NoError(t, gm.Renderer().Render(output, source1, doc1)) {
+		assert.Equal(t, context.Env["BLAH"], "Hi")
+		output := &bytes.Buffer{}
+
+		if assert.NoError(t, gm.Renderer().Render(output, source2, doc2)) {
+			assert.Equal(t, "Running...\r\n‣ Hi\r\n\n", output.String())
+		}
 	}
 
 }

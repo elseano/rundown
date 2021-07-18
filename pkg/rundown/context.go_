@@ -20,7 +20,7 @@ import (
 	"github.com/yuin/goldmark/renderer"
 )
 
-type Context struct {
+type Context1 struct {
 	Env             map[string]string
 	Messages        chan string
 	TempDir         string

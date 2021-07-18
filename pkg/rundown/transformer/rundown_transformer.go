@@ -1,10 +1,10 @@
 package transformer
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/elseano/rundown/pkg/rundown/ast"
+	"github.com/elseano/rundown/pkg/util"
 	"gopkg.in/guregu/null.v4"
 
 	goldast "github.com/yuin/goldmark/ast"
@@ -43,7 +43,7 @@ func createRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc parse
 	var treatments *Treatment = NewTreatment(reader)
 	var openNodes = []OpenTags{}
 
-	doc.Dump(reader.Source(), 0)
+	// doc.Dump(reader.Source(), 0)
 
 	// First, transform rundown opening/closing RawHTML into RundownBlocks.
 	// This makes the next phase simpler in terms of handling what's inside any rundown block forms.
@@ -97,8 +97,8 @@ func createRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc parse
 
 	treatments.Process(reader)
 
-	fmt.Printf("Rundown Blocks:\n")
-	doc.Dump(reader.Source(), 0)
+	// util.Logger.Trace().Msgf("Rundown Blocks:\n")
+	// doc.Dump(reader.Source(), 0)
 }
 
 func (a *rundownASTTransformer) Transform(doc *goldast.Document, reader goldtext.Reader, pc parser.Context) {
@@ -160,17 +160,17 @@ func convertRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc pars
 		p.End(nil, reader, treatments)
 	}
 
-	fmt.Printf("Unprocessed doc is:\n")
-	doc.Dump(reader.Source(), 2)
+	// util.Logger.Trace().Msgf("Unprocessed doc is:\n")
+	// doc.Dump(reader.Source(), 2)
 	treatments.Process(reader)
-	fmt.Printf("Processed doc is:\n")
-	doc.Dump(reader.Source(), 2)
+	// util.Logger.Trace().Msgf("Processed doc is:\n")
+	// doc.Dump(reader.Source(), 2)
 
 	// Populate sections
 	goldast.Walk(doc, func(n goldast.Node, entering bool) (goldast.WalkStatus, error) {
 		if !entering {
 			if end, ok := n.(*ast.SectionEnd); ok {
-				fmt.Printf("Found section end\n")
+				util.Logger.Trace().Msgf("Found section end\n")
 				section := end.SectionPointer
 				PopulateSectionMetadata(section, end, reader)
 			}
@@ -179,7 +179,7 @@ func convertRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc pars
 		return goldast.WalkContinue, nil
 	})
 
-	fmt.Printf("Sections populated\n")
+	util.Logger.Trace().Msgf("Sections populated\n")
 }
 
 func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatments *Treatment) NodeProcessor {
@@ -318,7 +318,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		if node.ChildCount() > 0 {
 			treatments.ReplaceWithChildren(node, descNode, node)
 		} else if msg := node.GetAttr("desc"); msg.String != "" {
-			fmt.Printf("Desc: %s\n", msg.String)
+			util.Logger.Trace().Msgf("Desc: %s\n", msg.String)
 			node.AppendChild(node, goldast.NewString([]byte(msg.String)))
 			treatments.ReplaceWithChildren(nodeToReplace, descNode, node)
 		} else {
@@ -396,16 +396,16 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		fcb.Parent().InsertAfter(fcb.Parent(), fcb, executionBlock)
 		treatments.Remove(nodeToReplace)
 
-		fmt.Printf("Created execution block.\n")
-		executionBlock.Dump(reader.Source(), 5)
-		fmt.Printf("Replacing:\n")
-		nodeToReplace.Dump(reader.Source(), 5)
+		// util.Logger.Trace().Msgf("Created execution block.\n")
+		// executionBlock.Dump(reader.Source(), 5)
+		// util.Logger.Trace().Msgf("Replacing:\n")
+		// nodeToReplace.Dump(reader.Source(), 5)
 
-		fmt.Printf("Doc is:\n")
-		node.OwnerDocument().Dump(reader.Source(), 5)
+		// util.Logger.Trace().Msgf("Doc is:\n")
+		// node.OwnerDocument().Dump(reader.Source(), 5)
 
 		if !executionBlock.Reveal {
-			fmt.Printf("Removing the fenced code block, as we're not displaying it.\n")
+			util.Logger.Trace().Msgf("Removing the fenced code block, as we're not displaying it.\n")
 			treatments.Remove(fcb)
 		} else {
 			treatments.Ignore(fcb)
@@ -415,10 +415,10 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 	}
 
 	if node.HasAttr("subenv", "sub-env") {
-		fmt.Printf("HAVE subenv\n")
+		util.Logger.Trace().Msgf("HAVE subenv\n")
 		t := NewTreatment(reader)
 		goldast.Walk(node, func(n goldast.Node, entering bool) (goldast.WalkStatus, error) {
-			fmt.Printf("Walking %s\n", n.Kind().String())
+			util.Logger.Trace().Msgf("Walking %s\n", n.Kind().String())
 			if entering {
 				ConvertTextForSubenv(n, reader, t)
 			}
