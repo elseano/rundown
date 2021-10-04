@@ -11,25 +11,35 @@ This file tests rundown.
 
 <r opt="name" type="string" desc="The name to greet" required/>
 
+<r opt="greet" type="enum|hi|formal" desc="The greeting style" required/>
+
 <r stdout/>
 
 ``` bash
-echo "Hello $OPT_NAME"
+# sleep 2
+echo "$OPT_GREET $OPT_NAME"
+# sleep 2
 ```
 
 
-## Say Goodbye <r label="byee"/>
+## Say Goodbye <r section="byee"/>
 
-<r desc="Asks for your name, and then says goodbye"/>
+<r desc="Asks for your name, and then says goodbye, like a boss"/>
 
 <r opt="0:name" type="string" desc="The name to greet"/>
 <r opt="*:misc_stuff" type="string" desc="Other names"/>
 
-<r stdout/>
+<r reveal named-all/>
 
 ``` bash
+# Bye
+sleep 1
 echo "Bye $OPT_NAME"
+# Cya
+sleep 1
 echo "Cya $OPT_MISC"
+# Done
+sleep 1
 ```
 
 
@@ -49,3 +59,15 @@ git tag -l | tail -n 3
 git tag -a $VERSION -m "$VERSION"
 goreleaser --rm-dist --skip-validate
 ```
+
+<r section="vanilla" desc="Thing">
+
+# Heading 1
+
+Heading contents.
+
+## Heading 2
+
+Hi there.
+
+</r>
