@@ -7,20 +7,23 @@ import (
 	"github.com/elseano/rundown/pkg/bus"
 	"github.com/elseano/rundown/pkg/exec/rpc"
 	"github.com/elseano/rundown/pkg/exec/scripts"
-	"github.com/elseano/rundown/pkg/spinner"
+	"github.com/elseano/rundown/pkg/util"
 )
 
 // SpinnerFromScript modifier requires the TrackProgress modifier.
 type SpinnerFromScript struct {
 	bus.Handler
 	ExecutionModifier
-	Spinner                 spinner.Spinner
+	Spinner                 *SpinnerConstant
 	CommentsAsSpinnerTitles bool
+	nameHasBeenSet          bool
 }
 
-func NewSpinnerFromScript() *SpinnerFromScript {
+func NewSpinnerFromScript(CommentsAsSpinnerTitles bool, spinner *SpinnerConstant) *SpinnerFromScript {
 	return &SpinnerFromScript{
-		ExecutionModifier: &NullModifier{},
+		ExecutionModifier:       &NullModifier{},
+		Spinner:                 spinner,
+		CommentsAsSpinnerTitles: CommentsAsSpinnerTitles,
 	}
 }
 
@@ -50,9 +53,17 @@ func (m *SpinnerFromScript) ReceiveEvent(event bus.Event) {
 		data := rpcEvent.Data
 
 		if strings.HasPrefix(data, "SETSPINNER ") {
+			util.Logger.Debug().Msgf("Setting spinner message")
 			spinnerTitle := data[len("SETSPINNER "):]
 
-			bus.Emit(&spinner.ChangeTitleEvent{Title: spinnerTitle})
+			if m.nameHasBeenSet {
+				m.Spinner.Spinner.NewStep(spinnerTitle)
+			} else {
+				m.Spinner.Spinner.SetMessage(spinnerTitle)
+				m.nameHasBeenSet = true
+			}
+
+			// bus.Emit(&spinner.ChangeTitleEvent{Title: spinnerTitle})
 		}
 	}
 }

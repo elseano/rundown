@@ -217,6 +217,7 @@ func TestFormatDocker(t *testing.T) {
 type MockSpinner struct {
 	Out      io.Writer
 	isActive bool
+	Heading  string
 }
 
 func (s *MockSpinner) Start() {
@@ -231,6 +232,10 @@ func (s *MockSpinner) Stop() {
 
 func (s *MockSpinner) Active() bool {
 	return s.isActive
+}
+
+func (s *MockSpinner) CurrentHeading() string {
+	return s.Heading
 }
 
 func validateStreams(t *testing.T, inputStream []string, expectedStream []string, endedOnBlank bool) {
@@ -276,7 +281,7 @@ func validateStreams(t *testing.T, inputStream []string, expectedStream []string
 
 	for i := 0; i < len(inputStream); i = i + 1 {
 		inputWriter.WriteString(inputStream[i])
-		time.Sleep(1 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
 	}
 
 	inputWriter.Close()

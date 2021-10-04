@@ -13,6 +13,7 @@ import (
 	"github.com/elseano/rundown/pkg/exec/rpc"
 	"github.com/elseano/rundown/pkg/rundown/ast"
 	"github.com/elseano/rundown/pkg/rundown/text"
+	"github.com/elseano/rundown/pkg/spinner"
 	rutil "github.com/elseano/rundown/pkg/util"
 	"github.com/muesli/termenv"
 	goldast "github.com/yuin/goldmark/ast"
@@ -129,29 +130,42 @@ func (r *RundownNodeRenderer) renderExecutionBlock(w util.BufWriter, source []by
 	// intent.AddModifier(modifiers.NewStdout())
 	reader, writer, _ := os.Pipe()
 
+	rutil.Logger.Debug().Msgf("Spinner mode %d", executionBlock.SpinnerMode)
+
+	var spinnerControl spinner.Spinner
+
+	switch executionBlock.SpinnerMode {
+	case ast.SpinnerModeInlineAll:
+		spinner := modifiers.NewSpinnerConstant(executionBlock.SpinnerName)
+		intent.AddModifier(spinner)
+
+		rutil.Logger.Debug().Msg("Inline all mode")
+		spinnerDetector := modifiers.NewSpinnerFromScript(true, spinner)
+		intent.AddModifier(spinnerDetector)
+
+		spinnerControl = spinner.Spinner
+	case ast.SpinnerModeVisible:
+		name := executionBlock.SpinnerName
+		if name == "" {
+			name = "Running..."
+		}
+
+		spinner := modifiers.NewSpinnerConstant(executionBlock.SpinnerName)
+		intent.AddModifier(spinner)
+
+		spinnerControl = spinner.Spinner
+	}
+
 	if executionBlock.ShowStdout {
 		rutil.Logger.Trace().Msg("Streaming STDOUT")
 		intent.AddModifier(modifiers.NewStdoutStream(writer))
 
-		spinner := BusSpinnerInterface{IsActive: true}
-
 		go func() {
 			rutil.Logger.Trace().Msg("Setting up output formatter")
 
-			p := termenv.ColorProfile()
-
-			prefix := termenv.String("‣ ")
-			prefix.Foreground(p.Color("#5555ff"))
-			rutil.ReadAndFormatOutput(reader, 1, prefix.String(), &spinner, bufio.NewWriter(w), nil, "Running...")
+			prefix := termenv.String("  ")
+			rutil.ReadAndFormatOutput(reader, 1, prefix.String(), spinnerControl /*bufio.NewWriter(r.Context.Output)*/, bufio.NewWriter(w), nil, "Running...")
 		}()
-	}
-
-	rutil.Logger.Debug().Msgf("Spinner mode %d", executionBlock.SpinnerMode)
-
-	switch executionBlock.SpinnerMode {
-	case ast.SpinnerModeVisible:
-		spinner := modifiers.NewSpinnerConstant(executionBlock.SpinnerName)
-		intent.AddModifier(spinner)
 	}
 
 	if executionBlock.CaptureEnvironment {

@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/elseano/rundown/pkg/bus"
+	"github.com/elseano/rundown/pkg/util"
 )
 
 var EnvironmentVariableName = "RDRPC"
@@ -75,6 +76,7 @@ func (e *Endpoint) receiveLoop() {
 		}
 
 		trimmedMessage := string(bytes.TrimRight(line, "\r\n"))
+		util.Logger.Debug().Msgf("Got message: %s", trimmedMessage)
 
 		bus.Emit(&RpcMessage{Data: trimmedMessage})
 	}

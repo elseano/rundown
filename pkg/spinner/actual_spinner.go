@@ -303,7 +303,7 @@ func (s *ActualSpinner) Start() {
 				case <-s.stopChan:
 					s.confirmChan <- struct{}{}
 					return
-				case <- s.repaintChan:
+				case <-s.repaintChan:
 					s.mu.Lock()
 					if !s.active {
 						s.mu.Unlock()
@@ -334,7 +334,7 @@ func (s *ActualSpinner) Start() {
 					}
 
 					s.mu.Unlock()
-				case <- time.After(s.Delay):
+				case <-time.After(s.Delay):
 					s.repaintChan <- struct{}{}
 				}
 			}
@@ -375,6 +375,7 @@ func (s *ActualSpinner) Stop() {
 			fmt.Fprint(s.Writer, s.FinalMSG)
 		}
 		s.stopChan <- struct{}{}
+		<-s.confirmChan
 	}
 }
 

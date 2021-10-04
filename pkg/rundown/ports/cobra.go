@@ -1,6 +1,7 @@
 package ports
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -21,15 +22,44 @@ import (
 
 var ExecutionContext = renderer.NewContext()
 
-func BuildCobraCommand(filename string, sectionPointer *ast.SectionPointer) *cobra.Command {
+type optVal struct {
+	Str    *string
+	Bool   *bool
+	Option *ast.SectionOption
+}
+
+func (o optVal) String() string {
+	if o.Str != nil {
+		return *o.Str
+	}
+
+	if o.Bool != nil {
+		if *o.Bool {
+			return "true"
+		} else {
+			return "false"
+		}
+	}
+
+	return ""
+}
+
+func BuildCobraCommand(filename string, sectionPointer *ast.SectionPointer, debugAs string) *cobra.Command {
+	optionEnv := map[string]optVal{}
+
 	command := cobra.Command{
 		Use:   sectionPointer.SectionName,
 		Short: sectionPointer.DescriptionShort,
 		Long:  sectionPointer.DescriptionLong,
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			devNull, err := os.Create("rundown.log")
-			rdutil.RedirectLogger(devNull)
+			if debugAs == "" {
+				devNull, _ := os.Create("rundown.log")
+				rdutil.RedirectLogger(devNull)
+			} else {
+				rdutil.RedirectLogger(os.Stdout)
+				rdutil.SetLoggerLevel(debugAs)
+			}
 
 			ansiOptions := ansi.Options{
 				WordWrap:     80,
@@ -53,6 +83,16 @@ func BuildCobraCommand(filename string, sectionPointer *ast.SectionPointer) *cob
 				),
 			)
 
+			for k, v := range optionEnv {
+				if err := v.Option.OptionType.Validate(v.String()); err != nil {
+					return fmt.Errorf("%s: %w", v.Option.OptionName, err)
+				}
+
+				ExecutionContext.ImportEnv(map[string]string{
+					k: fmt.Sprintf("%v", v.String()),
+				})
+			}
+
 			rundownRenderer := renderer.NewRundownRenderer(goldmarkRenderer, ExecutionContext)
 
 			gm := goldmark.New(
@@ -73,6 +113,29 @@ func BuildCobraCommand(filename string, sectionPointer *ast.SectionPointer) *cob
 			return gm.Renderer().Render(os.Stdout, source, doc)
 		},
 	}
+
+	for _, o := range sectionPointer.Options {
+		opt := o
+		switch topt := opt.OptionType.(type) {
+		case *ast.TypeString:
+			optionEnv[opt.OptionAs] = optVal{Str: command.Flags().String(opt.OptionName, opt.OptionDefault.String, opt.OptionDescription), Option: opt}
+		case *ast.TypeBoolean:
+			optionEnv[opt.OptionAs] = optVal{Bool: command.Flags().Bool(opt.OptionName, topt.Normalise(opt.OptionDefault.String) == "true", opt.OptionDescription), Option: opt}
+		case *ast.TypeEnum:
+			optionEnv[opt.OptionAs] = optVal{Str: command.Flags().String(opt.OptionName, opt.OptionDefault.String, opt.OptionDescription), Option: opt}
+		case *ast.TypeFilename:
+			optionEnv[opt.OptionAs] = optVal{Str: command.Flags().String(opt.OptionName, opt.OptionDefault.String, opt.OptionDescription), Option: opt}
+		}
+
+		if opt.OptionRequired {
+			command.MarkFlagRequired(opt.OptionName)
+		}
+
+	}
+
+	command.SetFlagErrorFunc(func(errCmd *cobra.Command, err error) error {
+		return fmt.Errorf("ERROR")
+	})
 
 	return &command
 }

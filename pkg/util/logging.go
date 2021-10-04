@@ -17,3 +17,7 @@ func init() {
 func RedirectLogger(w io.Writer) {
 	Logger = log.Output(w)
 }
+
+func SetLoggerLevel(level string) {
+	Logger = Logger.Level(zerolog.DebugLevel)
+}

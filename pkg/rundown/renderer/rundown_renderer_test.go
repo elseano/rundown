@@ -193,6 +193,7 @@ export BLAH="Hi"
 <r stdout/>
 
 ~~~ bash
+sleep 1
 echo $BLAH
 ~~~
 
@@ -210,7 +211,7 @@ echo $BLAH
 		output := &bytes.Buffer{}
 
 		if assert.NoError(t, gm.Renderer().Render(output, source2, doc2)) {
-			assert.Equal(t, "Running...\r\n‣ Hi\r\n\n", output.String())
+			assert.Equal(t, "Running...\r\n  Hi\r\n\n", output.String())
 		}
 	}
 

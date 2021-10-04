@@ -3,6 +3,7 @@ package cmd
 var (
 	flagCodes          bool
 	flagDebug          bool
+	flagDebugAs        string
 	flagAsk            bool
 	flagAskRepeat      bool
 	flagDefault        string

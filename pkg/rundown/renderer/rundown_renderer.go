@@ -10,7 +10,8 @@ import (
 )
 
 type Context struct {
-	Env map[string]string
+	Env    map[string]string
+	Output io.Writer
 }
 
 func NewContext() *Context {

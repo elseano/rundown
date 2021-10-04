@@ -3,6 +3,7 @@ package exec
 import (
 	"testing"
 
+	"github.com/elseano/rundown/pkg/exec/modifiers"
 	"github.com/elseano/rundown/pkg/util"
 	"github.com/elseano/rundown/testutil"
 	"github.com/rs/zerolog"
@@ -14,6 +15,7 @@ func TestExecutionBasic(t *testing.T) {
 	script := []byte(`echo "Hello there"`)
 
 	intent, err := NewExecution("/bin/bash", script)
+	intent.AddModifier(modifiers.NewStdout())
 	util.Logger = log.Output(zerolog.ConsoleWriter{Out: testutil.NewTestWriter(t)})
 
 	if assert.NoError(t, err) {
@@ -31,6 +33,7 @@ func TestExecutionFailure(t *testing.T) {
 	script := []byte(`some_invalid_command`)
 
 	intent, err := NewExecution("/bin/bash", script)
+	intent.AddModifier(modifiers.NewStdout())
 	util.Logger = log.Output(zerolog.ConsoleWriter{Out: testutil.NewTestWriter(t)})
 
 	if assert.NoError(t, err) {
@@ -88,6 +91,7 @@ func TestExecutionEnvironmentCapture(t *testing.T) {
 	script := []byte(`export NEW_VALUE=TRUE`)
 
 	intent, _ := NewExecution("bash", script)
+	intent.AddModifier(modifiers.NewEnvironmentCapture())
 	util.Logger = log.Output(zerolog.ConsoleWriter{Out: testutil.NewTestWriter(t)})
 
 	result, err := intent.Execute()

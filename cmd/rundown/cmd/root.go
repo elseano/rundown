@@ -72,7 +72,7 @@ func NewDocRootCmd(args []string) *cobra.Command {
 
 	for child := doc.FirstChild(); child != nil; child = child.NextSibling() {
 		if section, ok := child.(*ast.SectionPointer); ok {
-			cmd := ports.BuildCobraCommand(rundownFile, section)
+			cmd := ports.BuildCobraCommand(rundownFile, section, flagDebugAs)
 			if cmd != nil {
 				docRoot.AddCommand(cmd)
 			}
@@ -122,6 +122,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.PersistentFlags().StringVarP(&flagFilename, "file", "f", "", "File to run (defaults to RUNDOWN.md then README.md)")
 	rootCmd.PersistentFlags().BoolVarP(&flagViewOnly, "display", "d", false, "Render without executing scripts")
 	rootCmd.PersistentFlags().StringVar(&flagCompletions, "completions", "", "Render shell completions for given shell (bash, zsh, fish, powershell)")
+	rootCmd.PersistentFlags().StringVar(&flagDebugAs, "debug", "", "Set the debug output level")
 
 	rootCmd.Flag("cols").Hidden = true
 	rootCmd.Flag("display").Hidden = true

@@ -288,6 +288,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		opt := ast.NewSectionOption(node.GetAttr("opt").String)
 		opt.OptionRequired = node.HasAttr("required")
 		opt.OptionPrompt = node.GetAttr("prompt")
+		opt.OptionDescription = node.GetAttr("desc").String
 
 		if node.HasAttr("type") {
 			opt.OptionType = ast.BuildOptionType(node.GetAttr("type").String)
