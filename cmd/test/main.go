@@ -43,7 +43,8 @@ func main() {
 		ansiOptions.Styles = glamour.LightStyleConfig
 	}
 
-	rundownNodeRenderer := rr.NewRundownNodeRenderer()
+	fileContext := rr.NewContext("./debug.md")
+	rundownNodeRenderer := rr.NewRundownConsoleRenderer(fileContext)
 
 	ar := ansi.NewRenderer(ansiOptions)
 	renderer := renderer.NewRenderer(
@@ -55,6 +56,7 @@ func main() {
 
 	rundownRenderer := rr.NewRundownRenderer(
 		renderer,
+		fileContext,
 	)
 
 	gm := goldmark.New(

@@ -1,0 +1,6 @@
+FROM golang:1.16-alpine
+
+RUN mkdir -p /rundown
+COPY . /rundown
+
+RUN cd /rundown && go build

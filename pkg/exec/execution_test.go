@@ -14,7 +14,7 @@ import (
 func TestExecutionBasic(t *testing.T) {
 	script := []byte(`echo "Hello there"`)
 
-	intent, err := NewExecution("/bin/bash", script)
+	intent, err := NewExecution("/bin/bash", script, ".")
 	intent.AddModifier(modifiers.NewStdout())
 	util.Logger = log.Output(zerolog.ConsoleWriter{Out: testutil.NewTestWriter(t)})
 
@@ -32,7 +32,7 @@ func TestExecutionBasic(t *testing.T) {
 func TestExecutionFailure(t *testing.T) {
 	script := []byte(`some_invalid_command`)
 
-	intent, err := NewExecution("/bin/bash", script)
+	intent, err := NewExecution("/bin/bash", script, ".")
 	intent.AddModifier(modifiers.NewStdout())
 	util.Logger = log.Output(zerolog.ConsoleWriter{Out: testutil.NewTestWriter(t)})
 
@@ -90,7 +90,7 @@ func TestExecutionFailure(t *testing.T) {
 func TestExecutionEnvironmentCapture(t *testing.T) {
 	script := []byte(`export NEW_VALUE=TRUE`)
 
-	intent, _ := NewExecution("bash", script)
+	intent, _ := NewExecution("bash", script, ".")
 	intent.AddModifier(modifiers.NewEnvironmentCapture())
 	util.Logger = log.Output(zerolog.ConsoleWriter{Out: testutil.NewTestWriter(t)})
 

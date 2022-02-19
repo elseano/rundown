@@ -11,6 +11,7 @@ import (
 type OptionType interface {
 	Validate(input string) error
 	Normalise(input string) string
+	Describe() string
 }
 
 type TypeBoolean struct{}
@@ -30,6 +31,7 @@ type SectionOption struct {
 	goldast.BaseInline
 	OptionName        string
 	OptionType        OptionType
+	OptionTypeString  string
 	OptionDescription string
 	OptionPrompt      null.String
 	OptionDefault     null.String
@@ -87,6 +89,10 @@ func BuildOptionType(optionType string) OptionType {
 		return &TypeBoolean{}
 	}
 
+	if strings.HasPrefix(optType, "file-exists") {
+		return &TypeFilename{MustExist: true}
+	}
+
 	return nil
 }
 
@@ -114,6 +120,22 @@ func (t *TypeString) Normalise(string) string {
 
 func (t *TypeBoolean) Validate(string) error {
 	return nil
+}
+
+func (t *TypeEnum) Describe() string {
+	return strings.Join(t.ValidValues, ", ")
+}
+
+func (t *TypeString) Describe() string {
+	return "any value"
+}
+
+func (t *TypeFilename) Describe() string {
+	return "any file name"
+}
+
+func (t *TypeBoolean) Describe() string {
+	return "true or false"
 }
 
 func (t *TypeBoolean) Normalise(input string) string {

@@ -41,8 +41,8 @@ func NewDocRootCmd(args []string) *cobra.Command {
 		ColorProfile: termenv.TrueColor,
 		Styles:       glamour.DarkStyleConfig,
 	}
-	context := renderer.NewContext()
-	rundownNodeRenderer := renderer.NewRundownNodeRenderer(context)
+	context := renderer.NewContext(rundownFile)
+	rundownNodeRenderer := renderer.NewRundownConsoleRenderer(context)
 
 	ar := ansi.NewRenderer(ansiOptions)
 	r := goldrenderer.NewRenderer(
@@ -114,6 +114,10 @@ func NewRootCmd() *cobra.Command {
 
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if flagServePort != "" {
+				ports.ServeRundown(rundownFile, flagDebugAs, flagServePort)
+			}
+
 			return nil
 		},
 	}
@@ -123,6 +127,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.PersistentFlags().BoolVarP(&flagViewOnly, "display", "d", false, "Render without executing scripts")
 	rootCmd.PersistentFlags().StringVar(&flagCompletions, "completions", "", "Render shell completions for given shell (bash, zsh, fish, powershell)")
 	rootCmd.PersistentFlags().StringVar(&flagDebugAs, "debug", "", "Set the debug output level")
+	rootCmd.PersistentFlags().StringVar(&flagServePort, "serve", "", "Set the port to serve a HTML interface for Rundown")
 
 	rootCmd.Flag("cols").Hidden = true
 	rootCmd.Flag("display").Hidden = true

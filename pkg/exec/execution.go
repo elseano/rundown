@@ -1,9 +1,11 @@
 package exec
 
 import (
+	"fmt"
 	"io"
 	"os/exec"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/elseano/rundown/pkg/exec/modifiers"
@@ -29,10 +31,13 @@ import (
 type ExecutionIntent struct {
 	Via            string
 	Script         []byte
+	ReplaceProcess bool
+
 	subscriptions  []rpc.Subscription
 	terminationKey string
 	modifiers      *modifiers.ExecutionModifiers
 	env            map[string]string
+	cwd            string
 }
 
 type ExecutionResult struct {
@@ -41,7 +46,7 @@ type ExecutionResult struct {
 	Env      map[string]string
 }
 
-func NewExecution(via string, script []byte) (*ExecutionIntent, error) {
+func NewExecution(via string, script []byte, cwd string) (*ExecutionIntent, error) {
 	intent := &ExecutionIntent{
 		Via:            via,
 		Script:         script,
@@ -49,6 +54,7 @@ func NewExecution(via string, script []byte) (*ExecutionIntent, error) {
 		terminationKey: "ABC123",
 		modifiers:      modifiers.NewExecutionModifiers(),
 		env:            map[string]string{},
+		cwd:            cwd,
 	}
 
 	return intent, nil
@@ -65,19 +71,22 @@ func (i *ExecutionIntent) AddModifier(mod modifiers.ExecutionModifier) {
 }
 
 func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
-	rpcEndpoint, err := rpc.Start()
-	if err != nil {
-		return nil, err
-	}
-
-	defer rpcEndpoint.Close()
-
 	var baseEnv = map[string]string{}
 	for k, v := range i.env {
 		baseEnv[k] = v
 	}
 
-	baseEnv[rpc.EnvironmentVariableName] = rpcEndpoint.Path
+	// If we're replacing the process, we don't need to worry about the RPC interface.
+	if !i.ReplaceProcess {
+		rpcEndpoint, err := rpc.Start()
+		if err != nil {
+			return nil, err
+		}
+
+		defer rpcEndpoint.Close()
+
+		baseEnv[rpc.EnvironmentVariableName] = rpcEndpoint.Path
+	}
 
 	var content = scripts.NewScriptManager()
 	content.SetBaseScript(i.Via, i.Script)
@@ -95,7 +104,25 @@ func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
 
 	// modRunners.PrepareScripts(content)
 
-	err, process, stdout := launchProcess(content, baseEnv)
+	if i.ReplaceProcess {
+		lastScript, err := content.Write()
+
+		if err != nil {
+			return nil, err
+		}
+
+		simpleEnv := make([]string, len(baseEnv))
+		i := 0
+		for k, v := range baseEnv {
+			simpleEnv[i] = fmt.Sprintf("%s=%s", k, v)
+		}
+
+		if err = syscall.Exec(lastScript.AbsolutePath, []string{lastScript.AbsolutePath}, simpleEnv); err != nil {
+			return nil, err
+		}
+	}
+
+	err, process, stdout := launchProcess(content, baseEnv, i.cwd)
 
 	if err != nil {
 		return nil, err
@@ -136,7 +163,7 @@ func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
 	return execResult, nil
 }
 
-func launchProcess(content *scripts.ScriptManager, baseEnv map[string]string) (error, *Process, *io.PipeReader) {
+func launchProcess(content *scripts.ScriptManager, baseEnv map[string]string, cwd string) (error, *Process, *io.PipeReader) {
 	lastScript, err := content.Write()
 
 	if err != nil {
@@ -144,6 +171,7 @@ func launchProcess(content *scripts.ScriptManager, baseEnv map[string]string) (e
 	}
 
 	cmd := exec.Command(lastScript.AbsolutePath)
+	cmd.Dir = cwd
 
 	for name, val := range baseEnv {
 		cmd.Env = append(cmd.Env, name+"="+val)

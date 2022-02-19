@@ -23,14 +23,14 @@ type Rundown struct {
 }
 
 func setupRenderer() *Rundown {
-	context := NewContext()
+	context := NewContext("./virt")
 
 	ansiOptions := ansi.Options{
 		WordWrap:     80,
 		ColorProfile: termenv.TrueColor,
 	}
 
-	rundownNodeRenderer := NewRundownNodeRenderer(context)
+	rundownNodeRenderer := NewRundownConsoleRenderer(context)
 
 	ar := ansi.NewRenderer(ansiOptions)
 	renderer := renderer.NewRenderer(
@@ -190,7 +190,7 @@ export BLAH="Hi"
 `)
 
 	source2 := []byte(`
-<r stdout/>
+<r stdout nospin />
 
 ~~~ bash
 sleep 1
@@ -211,7 +211,7 @@ echo $BLAH
 		output := &bytes.Buffer{}
 
 		if assert.NoError(t, gm.Renderer().Render(output, source2, doc2)) {
-			assert.Equal(t, "Running...\r\n  Hi\r\n\n", output.String())
+			assert.Equal(t, "  Hi\r\n\n", output.String())
 		}
 	}
 

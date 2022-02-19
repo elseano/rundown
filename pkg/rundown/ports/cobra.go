@@ -20,8 +20,6 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-var ExecutionContext = renderer.NewContext()
-
 type optVal struct {
 	Str    *string
 	Bool   *bool
@@ -73,7 +71,10 @@ func BuildCobraCommand(filename string, sectionPointer *ast.SectionPointer, debu
 				return err
 			}
 
-			rundownNodeRenderer := renderer.NewRundownNodeRenderer(ExecutionContext)
+			executionContext := renderer.NewContext(filename)
+			executionContext.ImportRawEnv(os.Environ())
+
+			rundownNodeRenderer := renderer.NewRundownConsoleRenderer(executionContext)
 
 			ar := ansi.NewRenderer(ansiOptions)
 			goldmarkRenderer := goldrenderer.NewRenderer(
@@ -88,12 +89,12 @@ func BuildCobraCommand(filename string, sectionPointer *ast.SectionPointer, debu
 					return fmt.Errorf("%s: %w", v.Option.OptionName, err)
 				}
 
-				ExecutionContext.ImportEnv(map[string]string{
+				executionContext.ImportEnv(map[string]string{
 					k: fmt.Sprintf("%v", v.String()),
 				})
 			}
 
-			rundownRenderer := renderer.NewRundownRenderer(goldmarkRenderer, ExecutionContext)
+			rundownRenderer := renderer.NewRundownRenderer(goldmarkRenderer, executionContext)
 
 			gm := goldmark.New(
 				goldmark.WithParserOptions(
@@ -106,11 +107,12 @@ func BuildCobraCommand(filename string, sectionPointer *ast.SectionPointer, debu
 			)
 
 			doc := gm.Parser().Parse(text.NewReader(source))
-			// doc.Dump(source, 0)
 
 			ast.PruneDocumentToSection(doc, sectionPointer.SectionName)
+			doc.Dump(source, 0)
 
 			return gm.Renderer().Render(os.Stdout, source, doc)
+			// return nil
 		},
 	}
 

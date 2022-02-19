@@ -194,7 +194,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 			nodeToReplace = para
 			nextNode = para.NextSibling()
 		} else {
-			para.Dump(reader.Source(), 0)
+			// para.Dump(reader.Source(), 0)
 		}
 	}
 
@@ -289,6 +289,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		opt.OptionRequired = node.HasAttr("required")
 		opt.OptionPrompt = node.GetAttr("prompt")
 		opt.OptionDescription = node.GetAttr("desc").String
+		opt.OptionTypeString = node.GetAttr("type").String
 
 		if node.HasAttr("type") {
 			opt.OptionType = ast.BuildOptionType(node.GetAttr("type").String)
@@ -299,6 +300,9 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		if node.HasAttr("default") {
 			defaultVal := node.GetAttr("default")
 			if defaultVal.Valid {
+				if opt.OptionType == nil {
+					panic("Unknown option type " + opt.OptionTypeString)
+				}
 				if opt.OptionType.Validate(defaultVal.String) == nil {
 					def := opt.OptionType.Normalise(defaultVal.String)
 					opt.OptionDefault = null.StringFrom(def)

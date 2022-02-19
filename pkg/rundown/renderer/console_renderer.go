@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"strings"
 
-	"github.com/elseano/rundown/pkg/bus"
 	"github.com/elseano/rundown/pkg/exec"
 	"github.com/elseano/rundown/pkg/exec/modifiers"
-	"github.com/elseano/rundown/pkg/exec/rpc"
 	"github.com/elseano/rundown/pkg/rundown/ast"
 	"github.com/elseano/rundown/pkg/rundown/text"
 	"github.com/elseano/rundown/pkg/spinner"
@@ -21,15 +20,15 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-type RundownNodeRenderer struct {
+type RundownConsoleRenderer struct {
 	Context *Context
 }
 
-func NewRundownNodeRenderer(context *Context) *RundownNodeRenderer {
-	return &RundownNodeRenderer{Context: context}
+func NewRundownConsoleRenderer(context *Context) *RundownConsoleRenderer {
+	return &RundownConsoleRenderer{Context: context}
 }
 
-func (r *RundownNodeRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
+func (r *RundownConsoleRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	// blocks
 	reg.Register(ast.KindExecutionBlock, r.renderExecutionBlock)
 	reg.Register(ast.KindDescriptionBlock, r.renderNoop)
@@ -47,11 +46,11 @@ func (r *RundownNodeRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegiste
 	reg.Register(goldast.KindString, r.renderString)
 }
 
-func (r *RundownNodeRenderer) renderNoop(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {
+func (r *RundownConsoleRenderer) renderNoop(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {
 	return goldast.WalkContinue, nil
 }
 
-func (r *RundownNodeRenderer) renderEnvironmentSubstitution(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {
+func (r *RundownConsoleRenderer) renderEnvironmentSubstitution(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {
 	if sub, ok := node.(*ast.EnvironmentSubstitution); ok {
 		if entering {
 			variable := string(sub.Value)
@@ -68,7 +67,7 @@ func (r *RundownNodeRenderer) renderEnvironmentSubstitution(w util.BufWriter, so
 	return goldast.WalkContinue, nil
 }
 
-func (r *RundownNodeRenderer) renderString(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {
+func (r *RundownConsoleRenderer) renderString(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {
 	if str, ok := node.(*goldast.String); ok {
 		if entering {
 			w.Write(str.Value)
@@ -78,7 +77,7 @@ func (r *RundownNodeRenderer) renderString(w util.BufWriter, source []byte, node
 	return goldast.WalkContinue, nil
 }
 
-func (r *RundownNodeRenderer) renderTodo(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {
+func (r *RundownConsoleRenderer) renderTodo(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {
 	if entering {
 		w.WriteString(fmt.Sprintf("TODO - %s", node.Kind().String()))
 	}
@@ -86,25 +85,7 @@ func (r *RundownNodeRenderer) renderTodo(w util.BufWriter, source []byte, node g
 	return goldast.WalkContinue, nil
 }
 
-type BusSpinnerInterface struct {
-	IsActive bool
-}
-
-func (s *BusSpinnerInterface) Start() {
-	s.IsActive = true
-	bus.Emit(&rpc.RpcMessage{Data: "STARTSPINNER"})
-}
-
-func (s *BusSpinnerInterface) Stop() {
-	s.IsActive = false
-	bus.Emit(&rpc.RpcMessage{Data: "STOPSPINNER"})
-}
-
-func (s *BusSpinnerInterface) Active() bool {
-	return s.IsActive
-}
-
-func (r *RundownNodeRenderer) renderExecutionBlock(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {
+func (r *RundownConsoleRenderer) renderExecutionBlock(w util.BufWriter, source []byte, node goldast.Node, entering bool) (goldast.WalkStatus, error) {
 	if entering {
 		return goldast.WalkContinue, nil
 	}
@@ -122,9 +103,23 @@ func (r *RundownNodeRenderer) renderExecutionBlock(w util.BufWriter, source []by
 		return goldast.WalkStop, err
 	}
 
-	intent, err := exec.NewExecution(executionBlock.With, script)
+	intent, err := exec.NewExecution(executionBlock.With, script, path.Dir(r.Context.RundownFile))
 	if err != nil {
 		return goldast.WalkStop, err
+	}
+
+	intent.ImportEnv(r.Context.Env)
+
+	intent.ReplaceProcess = executionBlock.ReplaceProcess
+
+	// If we're replacing the rundown process, then we don't need to setup spinners, etc.
+	// Just execute and check for an error, terminating early.
+	if intent.ReplaceProcess {
+		_, err := intent.Execute()
+
+		if err != nil {
+			return goldast.WalkStop, nil
+		}
 	}
 
 	// intent.AddModifier(modifiers.NewStdout())
@@ -173,8 +168,6 @@ func (r *RundownNodeRenderer) renderExecutionBlock(w util.BufWriter, source []by
 		intent.AddModifier(envCapture)
 	}
 
-	intent.ImportEnv(r.Context.Env)
-
 	result, err := intent.Execute()
 	writer.Close()
 
@@ -183,6 +176,8 @@ func (r *RundownNodeRenderer) renderExecutionBlock(w util.BufWriter, source []by
 	}
 
 	if result.Env != nil {
+		rutil.Logger.Debug().Msgf("Received environment: %#v", result.Env)
+
 		r.Context.ImportEnv(result.Env)
 	}
 

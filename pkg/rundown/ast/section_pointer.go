@@ -71,6 +71,40 @@ func FindSectionInDocument(parent goldast.Node, name string) *SectionPointer {
 	return nil
 }
 
+func GetSections(doc goldast.Node) []*SectionPointer {
+	result := []*SectionPointer{}
+
+	for child := doc.FirstChild(); child != nil; {
+		nextChild := child.NextSibling()
+
+		if section, ok := child.(*SectionPointer); ok {
+			result = append(result, section)
+		}
+
+		child = nextChild
+	}
+
+	return result
+}
+
+func PruneDocumentToRoot(doc goldast.Node) {
+	rootEnded := false
+
+	for child := doc.FirstChild(); child != nil; {
+		nextChild := child.NextSibling()
+
+		if _, ok := child.(*SectionPointer); ok {
+			rootEnded = true
+		}
+
+		if rootEnded {
+			doc.RemoveChild(doc, child)
+		}
+
+		child = nextChild
+	}
+}
+
 // Reduces the document to just the requested section.
 func PruneDocumentToSection(doc goldast.Node, sectionName string) {
 	var sectionPointer *SectionPointer = nil
@@ -95,4 +129,22 @@ func PruneDocumentToSection(doc goldast.Node, sectionName string) {
 		child = nextChild
 	}
 
+}
+
+func PruneActions(doc goldast.Node) {
+	actionsFound := false
+
+	for child := doc.FirstChild(); child != nil; {
+		nextChild := child.NextSibling()
+
+		if _, ok := child.(*ExecutionBlock); ok {
+			actionsFound = true
+		}
+
+		if actionsFound {
+			doc.RemoveChild(doc, child)
+		}
+
+		child = nextChild
+	}
 }

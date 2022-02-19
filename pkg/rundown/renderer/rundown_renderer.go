@@ -4,19 +4,22 @@ package renderer
 import (
 	"bytes"
 	"io"
+	"strings"
 
 	goldast "github.com/yuin/goldmark/ast"
 	goldrenderer "github.com/yuin/goldmark/renderer"
 )
 
 type Context struct {
-	Env    map[string]string
-	Output io.Writer
+	Env         map[string]string
+	Output      io.Writer
+	RundownFile string
 }
 
-func NewContext() *Context {
+func NewContext(rundownFile string) *Context {
 	return &Context{
-		Env: map[string]string{},
+		Env:         map[string]string{},
+		RundownFile: rundownFile,
 	}
 }
 
@@ -24,6 +27,22 @@ func (c *Context) ImportEnv(env map[string]string) {
 	for k, v := range env {
 		c.Env[k] = v
 	}
+}
+
+func (c *Context) ImportRawEnv(env []string) {
+	for _, v := range env {
+		parts := strings.SplitN(v, "=", 2)
+
+		if len(parts) == 2 {
+			c.Env[parts[0]] = parts[1]
+		} else if len(parts) == 1 {
+			c.Env[parts[0]] = ""
+		}
+	}
+}
+
+func (c *Context) AddEnv(key string, value string) {
+	c.Env[key] = value
 }
 
 type RundownRenderer struct {

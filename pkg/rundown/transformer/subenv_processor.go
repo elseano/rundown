@@ -1,7 +1,6 @@
 package transformer
 
 import (
-	"fmt"
 	"regexp"
 
 	"github.com/elseano/rundown/pkg/rundown/ast"
@@ -33,12 +32,9 @@ func ConvertTextForSubenv(node goldast.Node, reader goldtext.Reader, treatments 
 	case *goldast.Text:
 		contents := node.Text(reader.Source())
 
-		fmt.Printf("Searching %s...\n", contents)
-
 		found := EnvMatcher.FindIndex(contents)
 
 		if found != nil {
-			fmt.Printf("!!!!\n")
 			parent := node.Parent()
 			last := node
 

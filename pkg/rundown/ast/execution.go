@@ -1,7 +1,9 @@
 package ast
 
 import (
+	"crypto/rand"
 	"fmt"
+	"math/big"
 
 	goldast "github.com/yuin/goldmark/ast"
 )
@@ -21,6 +23,7 @@ type ExecutionBlock struct {
 	goldast.BaseBlock
 	CodeBlock *goldast.FencedCodeBlock
 
+	ID                    string
 	ShowStdout            bool
 	ShowStderr            bool
 	Reveal                bool
@@ -35,7 +38,10 @@ type ExecutionBlock struct {
 
 // NewRundownBlock returns a new RundownBlock node.
 func NewExecutionBlock(fcb *goldast.FencedCodeBlock) *ExecutionBlock {
+	id, _ := rand.Int(rand.Reader, big.NewInt(100000000))
+
 	return &ExecutionBlock{
+		ID:          fmt.Sprintf("%d", id),
 		BaseBlock:   goldast.NewParagraph().BaseBlock,
 		CodeBlock:   fcb,
 		SpinnerMode: SpinnerModeVisible,
