@@ -1,8 +1,8 @@
-# OnFailure Handling <r section="on_failure"/>
+# OnFailure Handling
 
 Test of the `on-failure` attribute.
 
-## Success Case
+## Success Case <r section="success"/>
 
 ``` bash
 true
@@ -10,13 +10,13 @@ true
 
 <r on-failure>You should only see me during a failure</r>
 
-## Fail Case
+## Fail Case <r section="search"/>
 
 ``` bash
 failed
 ```
 
-<r on-failure>You should only see me during a **failure**.</r>
+<r on-failure>You should only see me during a failure.</r>
 
 <r on-failure="command not found">Please install the command.</r>
 

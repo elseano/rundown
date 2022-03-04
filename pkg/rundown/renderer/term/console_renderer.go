@@ -388,13 +388,13 @@ func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(rundown_ast.KindEnvironmentSubstitution, r.renderEnvironmentSubstitution)
 	// reg.Register(rundown_ast.KindExecutionBlock, r.renderTodo)
 	reg.Register(rundown_ast.KindIgnoreBlock, r.renderTodo("Ignore"))
-	reg.Register(rundown_ast.KindOnFailure, r.renderTodo("OnFailure"))
+	reg.Register(rundown_ast.KindOnFailure, r.renderNothing)
 	reg.Register(rundown_ast.KindRundownBlock, r.renderTodo("Rundown"))
 	reg.Register(rundown_ast.KindSaveCodeBlock, r.renderTodo("SaveCode"))
 	reg.Register(rundown_ast.KindSectionEnd, r.renderTodo("SectionEnd"))
 	reg.Register(rundown_ast.KindSectionOption, r.renderHollow)
 	reg.Register(rundown_ast.KindSectionPointer, r.renderHollow)
-	reg.Register(rundown_ast.KindStopFail, r.renderTodo("StopFail"))
+	reg.Register(rundown_ast.KindStopFail, r.renderStopFail)
 	reg.Register(rundown_ast.KindStopOk, r.renderTodo("StopOk"))
 	reg.Register(rundown_ast.KindSubEnvBlock, r.renderHollow)
 
@@ -443,12 +443,26 @@ var GlobalAttributeFilter = util.NewBytesFilter(
 func (r *Renderer) renderDocument(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	r.SetLevel(r.Config.Level)
 
+	if !entering {
+		r.ensureBlockSeparator(w, node)
+	}
+
 	return ast.WalkContinue, nil
 }
 
 func (r *Renderer) renderHollow(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	// nothing to do
 	return ast.WalkContinue, nil
+}
+
+func (r *Renderer) renderNothing(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	// nothing to do
+	return ast.WalkSkipChildren, nil
+}
+
+func (r *Renderer) renderStopFail(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	w.WriteString("\n\n")
+	return ast.WalkStop, nil
 }
 
 func (r *Renderer) renderEmoji(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -586,7 +600,21 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 		w.WriteString(aurora.Red("Script Failed:\n").String())
 		r.writeLinesWithPrefix("  ", string(output), w)
 
-		return ast.WalkStop, nil
+		// Find on failure nodes
+		failureNodes := rundown_ast.GetOnFailureNodes(node)
+		insertAfterNode := node
+		for _, f := range failureNodes {
+			if f.MatchesError(output) {
+				newNode := f.ConvertToParagraph()
+				node.Parent().InsertAfter(node.Parent(), insertAfterNode, newNode)
+				insertAfterNode = newNode
+			}
+		}
+
+		node.Parent().InsertAfter(node.Parent(), insertAfterNode, rundown_ast.NewStopFail())
+
+		// Allow the FailureNode to handle this.
+		return ast.WalkContinue, nil
 	}
 
 	if result.Env != nil {

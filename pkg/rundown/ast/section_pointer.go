@@ -87,6 +87,20 @@ func GetSections(doc goldast.Node) []*SectionPointer {
 	return result
 }
 
+func GetSectionForNode(node goldast.Node) *SectionPointer {
+	// First, get the containing block element.
+	for node.Parent().Kind() != goldast.KindDocument {
+		node = node.Parent()
+	}
+
+	// The walk backwards until we find the SectionPointer
+	for node != nil && node.Kind() != KindSectionPointer {
+		node = node.PreviousSibling()
+	}
+
+	return node.(*SectionPointer)
+}
+
 func PruneDocumentToRoot(doc goldast.Node) {
 	rootEnded := false
 

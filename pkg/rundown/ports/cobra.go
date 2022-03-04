@@ -71,6 +71,7 @@ func BuildCobraCommand(filename string, section *rundown.Section, debugAs string
 			}
 
 			ast.PruneDocumentToSection(doc, sectionPointer.SectionName)
+			doc.Dump(source, 1)
 
 			ast := rdutil.CaptureStdout(func() {
 				doc.Dump(source, 0)
