@@ -43,31 +43,12 @@ sleep 1
 ```
 
 
-## Release <r label="release"/>
+## Environment <r section="env" />
 
-<r spinner="Listing previous versions..." stdout/>
-
-``` bash
-git tag -l | tail -n 3
-```
-
-<r opt="version" as="VERSION" type="string" required desc="The version to release" prompt="Version to release" />
-
-<r stdout/>
+<r capture-env spinner="Setting env..."/>
 
 ``` bash
-git tag -a $VERSION -m "$VERSION"
-goreleaser --rm-dist --skip-validate
+export RESULT=one
 ```
 
-<r section="vanilla" desc="Thing">
-
-# Heading 1
-
-Heading contents.
-
-## Heading 2
-
-Hi there.
-
-</r>
+The result is: <r sub-env>$RESULT</r>.

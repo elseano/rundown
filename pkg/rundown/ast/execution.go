@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"strings"
 
 	goldast "github.com/yuin/goldmark/ast"
 )
@@ -28,12 +29,13 @@ type ExecutionBlock struct {
 	ShowStderr            bool
 	Reveal                bool
 	Execute               bool
-	CaptureEnvironment    bool
+	CaptureEnvironment    []string
 	SubstituteEnvironment bool
 	SpinnerName           string
 	SpinnerMode           SpinnerMode
 	With                  string
 	ReplaceProcess        bool
+	SkipOnSuccess         bool
 }
 
 // NewRundownBlock returns a new RundownBlock node.
@@ -64,12 +66,13 @@ func (n *ExecutionBlock) Dump(source []byte, level int) {
 		"ShowStderr":            boolToStr(n.ShowStderr),
 		"Reveal":                boolToStr(n.Reveal),
 		"Execute":               boolToStr(n.Execute),
-		"CaptureEnvironment":    boolToStr(n.CaptureEnvironment),
+		"CaptureEnvironment":    strings.Join(n.CaptureEnvironment, ","),
 		"SubstituteEnvironment": boolToStr(n.SubstituteEnvironment),
 		"ReplaceProcess":        boolToStr(n.ReplaceProcess),
 		"SpinnerName":           n.SpinnerName,
 		"SpinnerMode":           fmt.Sprintf("%#v", n.SpinnerMode),
 		"With":                  n.With,
+		"SkipOnSuccess":         boolToStr(n.SkipOnSuccess),
 	}, nil)
 }
 

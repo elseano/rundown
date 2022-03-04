@@ -1,15 +1,8 @@
-# Rundown Modifiers
+# Rundown Modifiers <r section="mods"/>
 
 Modifiers in Fenced Code Blocks can be specified either inline on the fence itself, or just prior using a `<rundown/>` tag.
 
-## Inline
-
-``` bash named
-# This is a name
-true
-```
-
-## Tagged
+## Setting the spinner name from comments
 
 <r named/>
 

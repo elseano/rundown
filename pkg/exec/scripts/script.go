@@ -1,8 +1,10 @@
 package scripts
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -21,8 +23,13 @@ func (s *Script) Write() error {
 		return err
 	}
 
-	tempFile.Write([]byte("#!/usr/bin/env "))
-	tempFile.Write([]byte(s.Invocation))
+	invo, err := buildInvocation(s.Invocation)
+	if err != nil {
+		return err
+	}
+
+	tempFile.Write([]byte("#!"))
+	tempFile.Write([]byte(invo))
 	tempFile.Write([]byte("\n\n"))
 	tempFile.Write(s.Contents)
 
@@ -44,5 +51,22 @@ func isShellLike(via string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func buildInvocation(interpreter string) (string, error) {
+	abs, err := exec.LookPath(interpreter)
+
+	if err != nil {
+		return "", err
+	}
+
+	switch interpreter {
+	case "bash":
+		return fmt.Sprintf("%s -euo pipefail", abs), nil
+	case "sh":
+		return fmt.Sprintf("%s -euo pipefail", abs), nil
+	default:
+		return abs, nil
 	}
 }

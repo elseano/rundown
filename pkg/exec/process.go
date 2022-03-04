@@ -137,10 +137,11 @@ func NewProcess(cmd *exec.Cmd) *Process {
 	return &Process{cmd: cmd}
 }
 
-func (p *Process) Start() (*io.PipeReader, error) {
+func (p *Process) Start() (*io.PipeReader, *io.PipeReader, error) {
 	p.stdin = NewStdinReader()
 	stdinR := p.stdin.Claim()
 	stdoutR, stdoutW := io.Pipe()
+	stderrR, stderrW := io.Pipe()
 
 	// Reset TTY back if it's not set.
 	if currentUndoRaw != nil {
@@ -160,7 +161,7 @@ func (p *Process) Start() (*io.PipeReader, error) {
 
 	var err error
 	if p.pty, err = pty.Start(p.cmd); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Copy PTY to output capturing pipe
@@ -170,6 +171,16 @@ func (p *Process) Start() (*io.PipeReader, error) {
 		p.waitGroup.Add(1)
 
 		_, _ = io.Copy(stdoutW, p.pty)
+
+		p.waitGroup.Done()
+	}()
+
+	go func() {
+		defer stderrR.Close()
+
+		p.waitGroup.Add(1)
+
+		_, _ = io.Copy(stderrW, p.pty)
 
 		p.waitGroup.Done()
 	}()
@@ -185,7 +196,7 @@ func (p *Process) Start() (*io.PipeReader, error) {
 	}()
 
 	// Return output stream reader
-	return stdoutR, nil
+	return stdoutR, stderrR, nil
 }
 
 func (p *Process) Wait() error {

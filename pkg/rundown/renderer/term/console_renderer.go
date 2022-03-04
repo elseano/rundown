@@ -1,10 +1,12 @@
-package markdown
+package term
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"regexp"
 
 	icolor "image/color"
@@ -14,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/muesli/termenv"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	extast "github.com/yuin/goldmark/extension/ast"
@@ -29,6 +32,13 @@ import (
 
 	"github.com/eliukblau/pixterm/pkg/ansimage"
 
+	"github.com/elseano/rundown/pkg/exec"
+	"github.com/elseano/rundown/pkg/exec/modifiers"
+	rundown_ast "github.com/elseano/rundown/pkg/rundown/ast"
+	rundown_renderer "github.com/elseano/rundown/pkg/rundown/renderer"
+	"github.com/elseano/rundown/pkg/rundown/text"
+	emoji_ast "github.com/yuin/goldmark-emoji/ast"
+
 	rdutil "github.com/elseano/rundown/pkg/util"
 )
 
@@ -39,7 +49,7 @@ type consoleRendererExt struct {
 var ConsoleRenderer = &consoleRendererExt{}
 
 func (e *consoleRendererExt) Extend(m goldmark.Markdown) {
-	m.Renderer().AddOptions(renderer.WithNodeRenderers(util.Prioritized(NewRenderer(), 1)))
+	m.Renderer().AddOptions(renderer.WithNodeRenderers(util.Prioritized(NewRenderer(rundown_renderer.NewContext("<>")), 1)))
 }
 
 // A Config struct has configurations for the HTML based renderers.
@@ -68,7 +78,7 @@ const (
 type RundownHandler interface {
 	Mutate([]byte, ast.Node) ([]byte, error)
 	OnRundownNode(node ast.Node, entering bool) (ast.WalkStatus, error)
-	OnExecute(node *ExecutionBlock, source []byte, out util.BufWriter) (ExecutionResult, error)
+	OnExecute(node *rundown_ast.ExecutionBlock, source []byte, out util.BufWriter) (ExecutionResult, error)
 }
 
 type withRundownHandler struct {
@@ -204,16 +214,18 @@ type Renderer struct {
 	inlineStyles      *StyleStack
 	currentLevel      int
 	currentlySkipping bool
+	Context           *rundown_renderer.Context
 }
 
 // NewRenderer returns a new Renderer with given options.
-func NewRenderer(opts ...Option) renderer.NodeRenderer {
+func NewRenderer(context *rundown_renderer.Context, opts ...Option) renderer.NodeRenderer {
 	r := &Renderer{
 		Config:            NewConfig(),
 		blockStyles:       NewStyleStack(),
 		inlineStyles:      NewStyleStack(),
 		currentLevel:      1,
 		currentlySkipping: false,
+		Context:           context,
 	}
 
 	for _, opt := range opts {
@@ -237,8 +249,10 @@ type StyleStack struct {
 	Styles []Style
 }
 
-func (s *StyleStack) Push(style Style) {
+func (s *StyleStack) Push(style Style) Style {
 	s.Styles = append(s.Styles, style)
+
+	return style
 }
 
 func (s *StyleStack) Pop() Style {
@@ -329,6 +343,13 @@ func (r *Renderer) levelLinesWithPrefix(prefix string, lines string, b util.BufW
 	}
 }
 
+func (r *Renderer) writeLinesWithPrefix(prefix string, lines string, b util.BufWriter) {
+	splitlines := strings.Split(lines, "\n")
+	for _, v := range splitlines {
+		r.writeString(b, prefix+v+"\n")
+	}
+}
+
 // RegisterFuncs implements NodeRenderer.RegisterFuncs .
 func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	// blocks
@@ -344,11 +365,9 @@ func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(ast.KindParagraph, r.blockCommon(r.renderParagraph))
 	reg.Register(ast.KindTextBlock, r.blockCommon(r.renderTextBlock))
 	reg.Register(ast.KindThematicBreak, r.blockCommon(r.renderThematicBreak))
-	reg.Register(KindRundownBlock, r.blockCommon(r.renderRundownBlock))
-	reg.Register(KindSection, r.blockCommon(r.renderNothing))
-	reg.Register(KindSectionedDocument, r.blockCommon(r.renderNothing))
-	reg.Register(KindContainer, r.blockCommon(r.renderNothing))
-	reg.Register(KindExecutionBlock, r.blockCommon(r.renderExecutionBlock))
+	// reg.Register(rundown_ast.KindRundownBlock, r.blockCommon(r.renderRundownBlock))
+	// reg.Register(KindSection, r.blockCommon(r.renderNothing))
+	reg.Register(rundown_ast.KindExecutionBlock, r.blockCommon(r.renderExecutionBlock))
 
 	// inlines
 
@@ -358,11 +377,29 @@ func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(ast.KindEmphasis, r.renderEmphasis)
 	reg.Register(ast.KindImage, r.renderImage)
 	reg.Register(ast.KindLink, r.renderLink)
-	reg.Register(ast.KindRawHTML, r.renderNothing)
+	reg.Register(ast.KindRawHTML, r.renderHollow)
 	reg.Register(ast.KindText, r.renderText)
 	reg.Register(ast.KindString, r.renderString)
-	reg.Register(KindRundownInline, r.renderRundownInline)
-	reg.Register(KindCodeModifierBlock, r.renderNothing)
+
+	reg.Register(emoji_ast.KindEmoji, r.renderEmoji)
+
+	// other
+	reg.Register(rundown_ast.KindDescriptionBlock, r.renderHollow)
+	reg.Register(rundown_ast.KindEnvironmentSubstitution, r.renderEnvironmentSubstitution)
+	// reg.Register(rundown_ast.KindExecutionBlock, r.renderTodo)
+	reg.Register(rundown_ast.KindIgnoreBlock, r.renderTodo("Ignore"))
+	reg.Register(rundown_ast.KindOnFailure, r.renderTodo("OnFailure"))
+	reg.Register(rundown_ast.KindRundownBlock, r.renderTodo("Rundown"))
+	reg.Register(rundown_ast.KindSaveCodeBlock, r.renderTodo("SaveCode"))
+	reg.Register(rundown_ast.KindSectionEnd, r.renderTodo("SectionEnd"))
+	reg.Register(rundown_ast.KindSectionOption, r.renderHollow)
+	reg.Register(rundown_ast.KindSectionPointer, r.renderHollow)
+	reg.Register(rundown_ast.KindStopFail, r.renderTodo("StopFail"))
+	reg.Register(rundown_ast.KindStopOk, r.renderTodo("StopOk"))
+	reg.Register(rundown_ast.KindSubEnvBlock, r.renderHollow)
+
+	// reg.Register(KindRundownInline, r.renderRundownInline)
+	// reg.Register(KindCodeModifierBlock, r.renderNothing)
 }
 
 func (r *Renderer) writeLines(w util.BufWriter, source []byte, n ast.Node) {
@@ -409,13 +446,29 @@ func (r *Renderer) renderDocument(w util.BufWriter, source []byte, node ast.Node
 	return ast.WalkContinue, nil
 }
 
-func (r *Renderer) renderNothing(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+func (r *Renderer) renderHollow(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	// nothing to do
 	return ast.WalkContinue, nil
 }
 
+func (r *Renderer) renderEmoji(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if !entering {
+		emoji := node.(*emoji_ast.Emoji)
+		w.WriteString(string(emoji.Value.Unicode))
+	}
+
+	return ast.WalkContinue, nil
+}
+
+func (r *Renderer) renderTodo(message string) func(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	return func(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+		w.WriteString(fmt.Sprintf("[TODO - %s]", message))
+		return ast.WalkContinue, nil
+	}
+}
+
 func (r *Renderer) renderRundownBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
-	rundown := node.(*RundownBlock)
+	rundown := node.(*rundown_ast.RundownBlock)
 
 	if r.Config.RundownHandler != nil {
 		cmd, err := r.Config.RundownHandler.OnRundownNode(rundown, entering)
@@ -431,25 +484,121 @@ func (r *Renderer) renderRundownBlock(w util.BufWriter, source []byte, node ast.
 
 func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
-		if r.Config.RundownHandler != nil {
-			result, err := r.Config.RundownHandler.OnExecute(node.(*ExecutionBlock), source, w)
-			if err != nil {
-				return ast.WalkStop, err
-			}
-
-			switch result {
-			case Continue:
-				return ast.WalkContinue, nil
-			case Skip:
-				r.currentlySkipping = true
-				return ast.WalkSkipChildren, nil
-			case Stop:
-				return ast.WalkStop, nil
-			}
-		}
-	} else if _, ok := node.NextSibling().(*ExecutionBlock); !ok {
-		_, _ = w.WriteString("\n")
+		return ast.WalkContinue, nil
 	}
+
+	executionBlock := node.(*rundown_ast.ExecutionBlock)
+
+	if !executionBlock.Execute {
+		return ast.WalkContinue, nil
+	}
+
+	contentReader := text.NewNodeReaderFromSource(executionBlock.CodeBlock, source)
+
+	script, err := ioutil.ReadAll(contentReader)
+	if err != nil {
+		return ast.WalkStop, err
+	}
+
+	intent, err := exec.NewExecution(executionBlock.With, script, path.Dir(r.Context.RundownFile))
+	if err != nil {
+		return ast.WalkStop, err
+	}
+
+	intent.ImportEnv(r.Context.Env)
+
+	intent.ReplaceProcess = executionBlock.ReplaceProcess
+
+	// If we're replacing the rundown process, then we don't need to setup spinners, etc.
+	// Just execute and check for an error, terminating early.
+	if intent.ReplaceProcess {
+		_, err := intent.Execute()
+
+		if err != nil {
+			return ast.WalkStop, nil
+		}
+	}
+
+	// intent.AddModifier(modifiers.NewStdout())
+
+	rdutil.Logger.Debug().Msgf("Spinner mode %d", executionBlock.SpinnerMode)
+
+	var spinner *modifiers.SpinnerConstant
+
+	switch executionBlock.SpinnerMode {
+	case rundown_ast.SpinnerModeInlineAll:
+		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName)
+		intent.AddModifier(spinner)
+
+		rdutil.Logger.Debug().Msg("Inline all mode")
+		spinnerDetector := modifiers.NewSpinnerFromScript(true, spinner)
+		intent.AddModifier(spinnerDetector)
+
+	case rundown_ast.SpinnerModeVisible:
+		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName)
+		intent.AddModifier(spinner)
+	}
+
+	if executionBlock.ShowStdout {
+		rdutil.Logger.Trace().Msg("Streaming STDOUT")
+
+		outputCapture := modifiers.NewStdoutStream()
+		intent.AddModifier(outputCapture)
+
+		go func() {
+			<-intent.StartedChan
+			rdutil.Logger.Trace().Msg("Setting up output formatter")
+
+			prefix := termenv.String("  ")
+			rdutil.ReadAndFormatOutput(outputCapture.Reader, 1, prefix.String(), spinner.Spinner /*bufio.NewWriter(r.Context.Output)*/, bufio.NewWriter(w), nil, spinner.SpinnerName)
+		}()
+	}
+
+	errorCapture := modifiers.NewStdoutStream()
+	intent.AddModifier(errorCapture)
+
+	if executionBlock.CaptureEnvironment != nil {
+		envCapture := modifiers.NewEnvironmentCapture(executionBlock.CaptureEnvironment)
+		intent.AddModifier(envCapture)
+	}
+
+	rdutil.Logger.Trace().Msg("Executing intent")
+	result, err := intent.Execute()
+
+	if executionBlock.SkipOnSuccess {
+		if err != nil || result.ExitCode != 0 {
+			return ast.WalkContinue, nil
+		} else {
+			// FIXME - How to skip to the next heading?
+			return ast.WalkContinue, nil
+		}
+	}
+
+	if err != nil {
+		return ast.WalkStop, err
+	}
+
+	if result.ExitCode != 0 {
+		// output := result.Output
+		output, _ := ioutil.ReadAll(errorCapture.Reader)
+
+		w.WriteString("\n\n")
+		w.WriteString(aurora.Red("Script Failed:\n").String())
+		r.writeLinesWithPrefix("  ", string(output), w)
+
+		return ast.WalkStop, nil
+	}
+
+	if result.Env != nil {
+		rdutil.Logger.Debug().Msgf("Received environment: %#v", result.Env)
+
+		for _, name := range executionBlock.CaptureEnvironment {
+			r.Context.ImportEnv(map[string]string{name: result.Env[name]})
+		}
+	}
+
+	w.Write(result.Output)
+
 	return ast.WalkContinue, nil
 }
 
@@ -522,45 +671,18 @@ func (r *Renderer) writeString(w util.BufWriter, s string) {
 func (r *Renderer) renderHeading(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	n := node.(*ast.Heading)
 	if entering {
-		if node.PreviousSibling() != nil {
-			// r.writeString(w, "\n")
-		}
+		style := r.inlineStyles.Push(Color(aurora.CyanFg | aurora.BoldFm))
+		r.writeString(w, style.Begin())
 
-		r.writeString(w, paddingForLevel(n.Level))
+		r.writeString(w, strings.Repeat("#", n.Level))
+		r.writeString(w, " ")
 
-		switch n.Level {
-		case 1:
-			r.inlineStyles.Push(Color(aurora.CyanFg | aurora.BoldFm | aurora.UnderlineFm))
-		case 2:
-			r.inlineStyles.Push(Color(aurora.CyanFg | aurora.BoldFm))
-		case 3:
-			r.inlineStyles.Push(Color(aurora.CyanFg))
-		default:
-			r.inlineStyles.Push(Color(aurora.BoldFm))
-		}
+		r.writeString(w, style.End())
 
 		r.SetLevel(n.Level)
 	} else {
 		r.inlineStyles.Pop()
-
-		mods := NewModifiers()
-
-		if r, ok := node.PreviousSibling().(*RundownBlock); ok {
-			mods.Ingest(r.Modifiers)
-		}
-
-		for c := node.FirstChild(); c != nil; c = c.NextSibling() {
-			if r, ok := c.(*RundownInline); ok {
-				mods.Ingest(r.Modifiers)
-			}
-		}
-
-		if label, ok := mods.Values[Parameter("label")]; ok {
-			r.writeString(w, "\033[0m")
-			r.writeString(w, aurora.Faint(" ("+label+")").String())
-		}
-
-		r.writeString(w, "\n")
+		r.writeString(w, "\n\n")
 	}
 	return ast.WalkContinue, nil
 }
@@ -579,13 +701,20 @@ func (r *Renderer) renderBlockquote(w util.BufWriter, source []byte, n ast.Node,
 	return ast.WalkContinue, nil
 }
 
-func (r *Renderer) syntaxHighlightText(w util.BufWriter, language string, source []byte, n ast.Node) {
+func (r *Renderer) syntaxHighlightText(w util.BufWriter, language string, source []byte, n ast.Node, subEnv bool) {
 	lang := lexers.Get(language)
 	target := r.nodeLinesToString(source, n)
+
+	if subEnv {
+		for k, v := range r.Context.Env {
+			target = strings.ReplaceAll(target, fmt.Sprintf("$%s", k), v)
+		}
+	}
+
 	var buf bytes.Buffer
 
 	if lang == nil {
-		lang = lexers.Analyse(string(source))
+		lang = lexers.Analyse(target)
 	}
 
 	if lang != nil {
@@ -607,7 +736,7 @@ func (r *Renderer) syntaxHighlightText(w util.BufWriter, language string, source
 		i = i - 1
 	}
 
-	r.levelLinesWithPrefix(aurora.Black(" ┃ ").Faint().String(), strings.TrimSpace(strings.Join(lines, "")), w)
+	r.levelLinesWithPrefix("", strings.TrimSpace(strings.Join(lines, "")), w)
 	for i := len(trailing) - 1; i >= 0; i = i - 1 {
 		w.WriteString(trailing[i])
 	}
@@ -616,19 +745,45 @@ func (r *Renderer) syntaxHighlightText(w util.BufWriter, language string, source
 
 func (r *Renderer) renderCodeBlock(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
-		r.levelLinesWithPrefix(aurora.Black(" ┃ ").Faint().String(), strings.TrimSpace(r.nodeLinesToString(source, n)), w)
+		r.writeString(w, "\n\n")
+		r.levelLinesWithPrefix("", strings.TrimSpace(r.nodeLinesToString(source, n)), w)
 	} else {
 		_, _ = w.WriteString("\r\n") // Block level element, add blank line.
 	}
 	return ast.WalkContinue, nil
 }
 
+func (r *Renderer) ensureBlockSeparator(w util.BufWriter, node ast.Node) {
+	render := true
+
+	switch node.PreviousSibling().(type) {
+	case *ast.Paragraph:
+		// Paragraphs always end with new lines
+		render = false
+	case nil:
+		switch node.Parent().(type) {
+		case *rundown_ast.SubEnvBlock:
+			render = false // The next call will take care of it.
+			r.ensureBlockSeparator(w, node.Parent())
+		}
+	}
+
+	if render {
+		r.writeString(w, "\n\n")
+	}
+}
+
 func (r *Renderer) renderFencedCodeBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	n := node.(*ast.FencedCodeBlock)
+
+	// If we're embedded inside a SubEnv block, then we want to substitute environment variables.
+	_, replacingEnv := node.Parent().(*rundown_ast.SubEnvBlock)
+
 	if entering {
 		language := n.Language(source)
 		if language != nil {
-			r.syntaxHighlightText(w, string(language), source, node)
+			r.ensureBlockSeparator(w, node)
+			r.syntaxHighlightText(w, string(language), source, node, replacingEnv)
 		}
 	} else {
 		_, _ = w.WriteString("\r\n") // Block level element, add blank line.
@@ -770,6 +925,11 @@ var ParagraphAttributeFilter = GlobalAttributeFilter
 
 func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
+		// If we're folling an execution block, add a extra line.
+		if _, ok := n.PreviousSibling().(*rundown_ast.ExecutionBlock); ok {
+			w.WriteString("\n")
+		}
+
 		link, ok := n.FirstChild().(*ast.Link)
 
 		if ok && n.ChildCount() == 1 && link.Title == nil {
@@ -777,10 +937,8 @@ func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, n ast.Node, 
 			return ast.WalkSkipChildren, nil
 		}
 
-		// Indent in two cases:
-		// 1. We're not inside a list.
-		// 2. We're inside a list, but not the first child.
-		if _, ok := n.Parent().(*ast.ListItem); !ok || n.Parent().FirstChild() != n {
+		// Indent only if we're inside a list, but not the first child.
+		if _, ok := n.Parent().(*ast.ListItem); ok && n.Parent().FirstChild() != n {
 			r.writeString(w, paddingForLevel(r.currentLevel))
 		}
 
@@ -883,25 +1041,9 @@ var CodeAttributeFilter = GlobalAttributeFilter
 
 func (r *Renderer) renderCodeSpan(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
-
-		for c := n.FirstChild(); c != nil; c = c.NextSibling() {
-			segment := c.(*ast.Text).Segment
-			value := segment.Value(source)
-
-			// Swallows newline, changing it to a space.
-			if bytes.HasSuffix(value, []byte("\n")) {
-
-				_, _ = w.WriteString(aurora.Yellow(string(value[:len(value)-1])).String())
-				if c != n.LastChild() {
-					_, _ = w.Write([]byte(" "))
-				}
-			} else {
-				_, _ = w.WriteString(aurora.Yellow(string(value)).String())
-				// r.Writer.RawWrite(w, value)
-			}
-		}
-
-		return ast.WalkSkipChildren, nil
+		r.inlineStyles.Push(Color(aurora.YellowFg))
+	} else {
+		r.inlineStyles.Pop()
 	}
 
 	return ast.WalkContinue, nil
@@ -912,6 +1054,32 @@ func (r *Renderer) renderStrikethrough(w util.BufWriter, source []byte, n ast.No
 		r.inlineStyles.Push(Color(aurora.StrikeThroughFm | aurora.BlackFg))
 	} else {
 		r.inlineStyles.Pop()
+	}
+
+	return ast.WalkContinue, nil
+}
+
+func (r *Renderer) renderEnvironmentSubstitution(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
+	if !entering {
+		envSub := n.(*rundown_ast.EnvironmentSubstitution)
+		name := strings.TrimLeft(string(envSub.Value), "$")
+
+		style := r.inlineStyles.Peek()
+		if style != nil {
+			r.writeString(w, style.Begin())
+		}
+
+		if val, ok := r.Context.Env[name]; ok {
+
+			w.WriteString(val)
+		} else {
+			w.WriteString(fmt.Sprintf("\nUnknown: %s from %#v\n", name, r.Context.Env))
+		}
+
+		if style != nil {
+			r.writeString(w, style.End())
+		}
+
 	}
 
 	return ast.WalkContinue, nil
@@ -1045,20 +1213,18 @@ func (r *Renderer) renderText(w util.BufWriter, source []byte, node ast.Node, en
 
 	// If the next node is a rundown marker indicating a label, trim
 	// any trailing space to present the label properly.
-	if rundown, ok := node.NextSibling().(*RundownInline); ok {
-		if _, ok := rundown.Modifiers.Values["label"]; ok {
-			value = bytes.TrimRight(value, " ")
-		}
+	if _, ok := node.NextSibling().(*rundown_ast.SectionPointer); ok {
+		value = bytes.TrimRight(value, " ")
 	}
 
 	if n.IsRaw() {
 		_, _ = w.Write(value)
 	} else {
 		_, _ = w.Write(value)
-		if n.HardLineBreak() || (n.SoftLineBreak() && true) {
+		if n.HardLineBreak() {
 			_, _ = w.WriteString("\n")
 			r.writeString(w, paddingForLevel(r.currentLevel))
-		} else if n.SoftLineBreak() {
+		} else {
 			// Do nothing, let word wrapping handle this case.
 		}
 	}

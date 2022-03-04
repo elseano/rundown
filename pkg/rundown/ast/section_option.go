@@ -48,7 +48,7 @@ func NewSectionOption(name string) *SectionOption {
 }
 
 func toEnvName(name string) string {
-	return "OPT_" + strings.ToUpper(name)
+	return "OPT_" + strings.ReplaceAll(strings.ToUpper(name), "-", "_")
 }
 
 // KindRundownBlock is a NodeKind of the RundownBlock node.
@@ -103,7 +103,7 @@ func (t *TypeEnum) Validate(input string) error {
 		}
 	}
 
-	return fmt.Errorf("must be one of the valid values")
+	return fmt.Errorf("must be one of: %s", strings.Join(t.ValidValues, ", "))
 }
 
 func (t *TypeEnum) Normalise(string) string {

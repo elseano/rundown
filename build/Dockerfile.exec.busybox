@@ -1,0 +1,4 @@
+FROM ubuntu
+
+COPY rundown-linux /usr/bin/rundown
+COPY RUNDOWN.md /

@@ -2,6 +2,7 @@ package modifiers
 
 import (
 	"io"
+	"os"
 
 	"github.com/elseano/rundown/pkg/bus"
 )
@@ -9,16 +10,25 @@ import (
 type StdoutStream struct {
 	bus.Handler
 	ExecutionModifier
-	destination io.Writer
+	writer *os.File
+	Reader *os.File
 }
 
-func NewStdoutStream(destination io.Writer) *StdoutStream {
+func NewStdoutStream() *StdoutStream {
+	reader, writer, _ := os.Pipe()
+
 	return &StdoutStream{
 		ExecutionModifier: &NullModifier{},
-		destination:       destination,
+		Reader:            reader,
+		writer:            writer,
 	}
 }
 
 func (m *StdoutStream) GetStdout() []io.Writer {
-	return []io.Writer{m.destination}
+	return []io.Writer{m.writer}
+}
+
+func (m *StdoutStream) GetResult(int) []ModifierResult {
+	m.writer.Close()
+	return []ModifierResult{}
 }

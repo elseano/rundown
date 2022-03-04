@@ -1,60 +1,25 @@
 // Package renderer renders the given AST to certain formats.
-package renderer
+package glamour
 
 import (
 	"bytes"
 	"io"
-	"strings"
 
+	"github.com/elseano/rundown/pkg/rundown/renderer"
 	goldast "github.com/yuin/goldmark/ast"
 	goldrenderer "github.com/yuin/goldmark/renderer"
 )
 
-type Context struct {
-	Env         map[string]string
-	Output      io.Writer
-	RundownFile string
-}
-
-func NewContext(rundownFile string) *Context {
-	return &Context{
-		Env:         map[string]string{},
-		RundownFile: rundownFile,
-	}
-}
-
-func (c *Context) ImportEnv(env map[string]string) {
-	for k, v := range env {
-		c.Env[k] = v
-	}
-}
-
-func (c *Context) ImportRawEnv(env []string) {
-	for _, v := range env {
-		parts := strings.SplitN(v, "=", 2)
-
-		if len(parts) == 2 {
-			c.Env[parts[0]] = parts[1]
-		} else if len(parts) == 1 {
-			c.Env[parts[0]] = ""
-		}
-	}
-}
-
-func (c *Context) AddEnv(key string, value string) {
-	c.Env[key] = value
-}
-
-type RundownRenderer struct {
+type GlamourRenderer struct {
 	actualRenderer goldrenderer.Renderer
 	Section        string
-	Context        *Context
+	Context        *renderer.Context
 }
 
 // NewRenderer returns a new Renderer with given options.
-func NewRundownRenderer(actualRenderer goldrenderer.Renderer, context *Context) *RundownRenderer {
+func NewGlamourRenderer(actualRenderer goldrenderer.Renderer, context *renderer.Context) *GlamourRenderer {
 
-	r := &RundownRenderer{
+	r := &GlamourRenderer{
 		actualRenderer: actualRenderer,
 		Context:        context,
 	}
@@ -62,7 +27,7 @@ func NewRundownRenderer(actualRenderer goldrenderer.Renderer, context *Context) 
 	return r
 }
 
-func (r *RundownRenderer) AddOptions(opts ...goldrenderer.Option) {
+func (r *GlamourRenderer) AddOptions(opts ...goldrenderer.Option) {
 	// for _, opt := range opts {
 	// 	opt.SetConfig(r.config)
 	// }
@@ -87,7 +52,7 @@ func (n *GlamourFlushNode) Kind() goldast.NodeKind { return goldast.KindDocument
 // Render will individually render the child (block) nodes.
 // This is required as Glamour buffers block node renders until the end of the document, which
 // means execution blocks are run before any output is seen.
-func (r *RundownRenderer) Render(w io.Writer, source []byte, n goldast.Node) error {
+func (r *GlamourRenderer) Render(w io.Writer, source []byte, n goldast.Node) error {
 	if doc, ok := n.(*goldast.Document); ok {
 
 		startingNode := doc.FirstChild()

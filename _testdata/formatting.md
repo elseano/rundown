@@ -1,4 +1,4 @@
-# This is a heading
+# This is a heading <r section="all"/>
 
 This text should **be bold**.
 
@@ -15,7 +15,9 @@ This text:
 
 And this text
 
-``` ruby reveal norun
+<r reveal-only />
+
+``` ruby 
 def is_just_for_show
   true
 end
@@ -23,7 +25,9 @@ end
 
 We should also see output from an actual run:
 
-``` bash reveal
+<r stdout />
+
+``` bash
 echo "Hi"
 ```
 
@@ -47,7 +51,9 @@ Sequential runs with a middle reveal should be spaced.
 echo "Hi"
 ```
 
-``` bash reveal
+<r reveal />
+
+``` bash
 echo "Hi"
 ```
 

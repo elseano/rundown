@@ -34,6 +34,7 @@ require (
 	github.com/thecodeteam/goodbye v0.0.0-20170927022442-a83968bda2d3 // indirect
 	github.com/ugorji/go v1.2.6 // indirect
 	github.com/yuin/goldmark v1.3.8
+	github.com/yuin/goldmark-emoji v1.0.1 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e // indirect
 	golang.org/x/sys v0.0.0-20211003122950-b1ebd4e1001c // indirect

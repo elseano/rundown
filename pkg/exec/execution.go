@@ -1,6 +1,7 @@
 package exec
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os/exec"
@@ -32,6 +33,7 @@ type ExecutionIntent struct {
 	Via            string
 	Script         []byte
 	ReplaceProcess bool
+	StartedChan    chan interface{}
 
 	subscriptions  []rpc.Subscription
 	terminationKey string
@@ -41,9 +43,10 @@ type ExecutionIntent struct {
 }
 
 type ExecutionResult struct {
-	Output   []byte
-	ExitCode int
-	Env      map[string]string
+	ScriptPath string
+	Output     []byte
+	ExitCode   int
+	Env        map[string]string
 }
 
 func NewExecution(via string, script []byte, cwd string) (*ExecutionIntent, error) {
@@ -55,6 +58,7 @@ func NewExecution(via string, script []byte, cwd string) (*ExecutionIntent, erro
 		modifiers:      modifiers.NewExecutionModifiers(),
 		env:            map[string]string{},
 		cwd:            cwd,
+		StartedChan:    make(chan interface{}, 1),
 	}
 
 	return intent, nil
@@ -66,8 +70,9 @@ func (i *ExecutionIntent) ImportEnv(env map[string]string) {
 	}
 }
 
-func (i *ExecutionIntent) AddModifier(mod modifiers.ExecutionModifier) {
+func (i *ExecutionIntent) AddModifier(mod modifiers.ExecutionModifier) modifiers.ExecutionModifier {
 	i.modifiers.AddModifier(mod)
+	return mod
 }
 
 func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
@@ -122,7 +127,9 @@ func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
 		}
 	}
 
-	err, process, stdout := launchProcess(content, baseEnv, i.cwd)
+	i.StartedChan <- true
+
+	err, process, stdout, stderr := launchProcess(content, baseEnv, i.cwd)
 
 	if err != nil {
 		return nil, err
@@ -133,6 +140,7 @@ func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
 
 	outputCaptureGroup = i.modifiers.GetStdout()
 	captureOutputStream(outputCaptureGroup, &waiter, stdout)
+	captureOutputStream(outputCaptureGroup, &waiter, stderr)
 
 	util.Logger.Trace().Msg("Waiting process termination")
 	waitErr := process.Wait()
@@ -142,7 +150,8 @@ func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
 	waiter.Wait()
 
 	execResult := &ExecutionResult{
-		ExitCode: exitCode,
+		ExitCode:   exitCode,
+		ScriptPath: process.cmd.Path,
 	}
 
 	results := i.modifiers.GetResult(exitCode)
@@ -154,7 +163,11 @@ func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
 		case "Duration":
 			util.Logger.Trace().Dur("Time", result.Value.(time.Duration)).Msg("Timing data available")
 		case "Output":
-			execResult.Output = result.Value.([]byte)
+			// Trim the filename out of the output.
+			output := result.Value.([]byte)
+			output = bytes.ReplaceAll(output, []byte(fmt.Sprintf("%s: ", execResult.ScriptPath)), []byte(""))
+			output = bytes.ReplaceAll(output, []byte(execResult.ScriptPath), []byte(""))
+			execResult.Output = output
 		}
 	}
 
@@ -163,11 +176,11 @@ func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
 	return execResult, nil
 }
 
-func launchProcess(content *scripts.ScriptManager, baseEnv map[string]string, cwd string) (error, *Process, *io.PipeReader) {
+func launchProcess(content *scripts.ScriptManager, baseEnv map[string]string, cwd string) (error, *Process, *io.PipeReader, *io.PipeReader) {
 	lastScript, err := content.Write()
 
 	if err != nil {
-		return err, nil, nil
+		return err, nil, nil, nil
 	}
 
 	cmd := exec.Command(lastScript.AbsolutePath)
@@ -184,13 +197,13 @@ func launchProcess(content *scripts.ScriptManager, baseEnv map[string]string, cw
 	util.Logger.Trace().Msg("Launching process...")
 
 	process := NewProcess(cmd)
-	stdout, err := process.Start()
+	stdout, stderr, err := process.Start()
 
 	if err == nil {
 		util.Logger.Trace().Msg("Process started ok")
 	}
 
-	return err, process, stdout
+	return err, process, stdout, stderr
 }
 
 func captureOutputStream(outputCaptureGroup []io.Writer, waiter *sync.WaitGroup, stdout *io.PipeReader) {

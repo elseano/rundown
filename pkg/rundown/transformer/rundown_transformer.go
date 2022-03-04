@@ -103,7 +103,31 @@ func createRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc parse
 
 func (a *rundownASTTransformer) Transform(doc *goldast.Document, reader goldtext.Reader, pc parser.Context) {
 	createRundownBlocks(doc, reader, pc)
+	mergeTextBlocks(doc, reader, pc)
 	convertRundownBlocks(doc, reader, pc)
+}
+
+// Merges sequential text nodes into a single text block. This makes subsequent processing easier.
+func mergeTextBlocks(doc *goldast.Document, reader goldtext.Reader, pc parser.Context) {
+	goldast.Walk(doc, func(node goldast.Node, entering bool) (goldast.WalkStatus, error) {
+		if !entering {
+			return goldast.WalkContinue, nil
+		}
+
+		if text, ok := node.(*goldast.Text); ok {
+			for {
+				if nextText, ok := node.NextSibling().(*goldast.Text); ok && nextText.Segment.Start == text.Segment.Stop {
+					text.Segment.Stop = nextText.Segment.Stop
+					node.Parent().RemoveChild(node.Parent(), nextText)
+				} else {
+					break
+				}
+			}
+		}
+
+		return goldast.WalkContinue, nil
+	})
+
 }
 
 func convertRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc parser.Context) {
@@ -131,7 +155,9 @@ func convertRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc pars
 		case *goldast.FencedCodeBlock:
 			if !treatments.IsIgnored(node) {
 				eb := ast.NewExecutionBlock(node)
-				eb.With = string(node.Info.Text(reader.Source()))
+				if with := node.Info; with != nil {
+					eb.With = string(with.Text(reader.Source()))
+				}
 				treatments.Replace(node, eb)
 			}
 
@@ -196,6 +222,18 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		} else {
 			// para.Dump(reader.Source(), 0)
 		}
+	}
+
+	if node.HasAttr("import") {
+		prefix := node.GetAttr("import")
+		importBlock := ast.NewImportBlock()
+
+		if prefix.Valid {
+			importBlock.ImportPrefix = prefix.String
+		}
+
+		treatments.ReplaceWithChildren(node, importBlock, node)
+		return nil
 	}
 
 	if node.HasAttr("label", "section") {
@@ -291,6 +329,10 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		opt.OptionDescription = node.GetAttr("desc").String
 		opt.OptionTypeString = node.GetAttr("type").String
 
+		if as := node.GetAttr("as"); as.Valid {
+			opt.OptionAs = strings.ToUpper(as.String)
+		}
+
 		if node.HasAttr("type") {
 			opt.OptionType = ast.BuildOptionType(node.GetAttr("type").String)
 		} else {
@@ -369,7 +411,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		return nil
 	}
 
-	if fcb, ok := nextNode.(*goldast.FencedCodeBlock); ok && node.HasAttr("with", "spinner", "stdout", "subenv", "sub-env", "capture-env", "replace", "borg", "reveal", "reveal-only") {
+	if fcb, ok := nextNode.(*goldast.FencedCodeBlock); ok && node.HasAttr("with", "spinner", "stdout", "subenv", "sub-env", "capture-env", "replace", "borg", "reveal", "reveal-only", "skip-on-success") {
 		executionBlock := ast.NewExecutionBlock(fcb)
 
 		executionBlock.ShowStdout = node.HasAttr("stdout")
@@ -377,8 +419,16 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		executionBlock.Reveal = node.HasAttr("reveal", "reveal-only")
 		executionBlock.Execute = !node.HasAttr("reveal-only", "norun")
 		executionBlock.SubstituteEnvironment = node.HasAttr("subenv") || node.HasAttr("sub-env")
-		executionBlock.CaptureEnvironment = node.HasAttr("capture-env")
 		executionBlock.ReplaceProcess = node.HasAttr("borg")
+		executionBlock.SkipOnSuccess = node.HasAttr("skip-on-success")
+
+		if envCapture := node.GetAttr("capture-env"); envCapture.Valid {
+			executionBlock.CaptureEnvironment = strings.Split(envCapture.String, ",")
+
+			for i := range executionBlock.CaptureEnvironment {
+				executionBlock.CaptureEnvironment[i] = strings.TrimSpace(executionBlock.CaptureEnvironment[i])
+			}
+		}
 
 		if spinnerName := node.GetAttr("spinner"); spinnerName.Valid {
 			executionBlock.SpinnerName = spinnerName.String
@@ -398,7 +448,9 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		}
 
 		// Execution block goes after the fenced code block, in case we're displaying the source.
-		fcb.Parent().InsertAfter(fcb.Parent(), fcb, executionBlock)
+		if executionBlock.Execute {
+			fcb.Parent().InsertAfter(fcb.Parent(), fcb, executionBlock)
+		}
 		treatments.Remove(nodeToReplace)
 
 		// util.Logger.Trace().Msgf("Created execution block.\n")
@@ -413,13 +465,21 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 			util.Logger.Trace().Msgf("Removing the fenced code block, as we're not displaying it.\n")
 			treatments.Remove(fcb)
 		} else {
+			if node.HasAttr("sub-env") {
+				wrapper := ast.NewSubEnvBlock(fcb)
+				fcb.Parent().InsertAfter(fcb.Parent(), fcb, wrapper)
+				wrapper.AppendChild(wrapper, fcb)
+			}
+
 			treatments.Ignore(fcb)
+
 		}
 
 		return nil
 	}
 
 	if node.HasAttr("subenv", "sub-env") {
+
 		util.Logger.Trace().Msgf("HAVE subenv\n")
 		t := NewTreatment(reader)
 		goldast.Walk(node, func(n goldast.Node, entering bool) (goldast.WalkStatus, error) {

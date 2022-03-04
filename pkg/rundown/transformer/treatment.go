@@ -70,6 +70,7 @@ func (t *Treatment) DissolveRundownBlock(block goldast.Node) {
 	})
 }
 
+// Replaces the node, and adds children to it from the given node.
 func (t *Treatment) ReplaceWithChildren(nodeToReplace goldast.Node, replacement goldast.Node, nodeWithChildren goldast.Node) {
 	if replacement != nil {
 		t.newNodes = append(t.newNodes, replacement)

@@ -1,6 +1,7 @@
 package modifiers
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/elseano/rundown/pkg/bus"
@@ -12,25 +13,34 @@ import (
 type EnvironmentCapture struct {
 	ExecutionModifier
 
+	Variables []string
+
 	capturedEnv   map[string]string
 	capturing     bool
 	capturedTimes int
 }
 
-func NewEnvironmentCapture() *EnvironmentCapture {
+func NewEnvironmentCapture(variables []string) *EnvironmentCapture {
 	return &EnvironmentCapture{
 		ExecutionModifier: &NullModifier{},
+		Variables:         variables,
 	}
 }
 
-var envDumpCommand = []byte("\n\necho ENVDUMP >> $RDRPC;env >> $RDRPC;echo '' >> $RDRPC\n\n")
+var envDumpCommand = "\n\necho ENVDUMP >> $RDRPC;CAPTURE;echo '' >> $RDRPC\n\n"
 
 func (m *EnvironmentCapture) PrepareScripts(scripts *scripts.ScriptManager) {
 	script := scripts.GetBase()
 
 	if script.ShellScript {
-		script.Contents = append(envDumpCommand, script.Contents...)
-		script.Contents = append(script.Contents, envDumpCommand...)
+		envs := make([]string, len(m.Variables))
+		for i, variable := range m.Variables {
+			envs[i] = fmt.Sprintf("echo \"%s=${%s}\" >> $RDRPC", variable, variable)
+		}
+
+		envCaptureCommand := strings.Replace(envDumpCommand, "CAPTURE", strings.Join(envs, ";"), 1)
+
+		script.Contents = append(script.Contents, envCaptureCommand...)
 
 		bus.Subscribe(m)
 	}
@@ -39,7 +49,7 @@ func (m *EnvironmentCapture) PrepareScripts(scripts *scripts.ScriptManager) {
 func (m *EnvironmentCapture) GetResult(int) []ModifierResult {
 	bus.Unsubscribe(m)
 
-	if m.capturedTimes > 1 {
+	if m.capturedEnv != nil {
 		return []ModifierResult{
 			{
 				Key:   "Env",
@@ -83,24 +93,11 @@ func (m *EnvironmentCapture) ReceiveEvent(event bus.Event) {
 				return // Message probably not for us.
 			}
 
-			util.Logger.Trace().Str("key", set[0]).Str("val", set[1]).Msg("Consuming variable")
+			util.Logger.Trace().Msgf("Received var %s: %s.", set[0], set[1])
 
 			if len(set) > 1 {
-				if val, ok := m.capturedEnv[set[0]]; ok {
-					util.Logger.Trace().Msg("Key already present, checking...")
-
-					if val == set[1] {
-						util.Logger.Trace().Msg("Value of key is the same. Deleting.")
-
-						delete(m.capturedEnv, set[0])
-					} else {
-						util.Logger.Trace().Msg("Value of key is different. Storing.")
-						m.capturedEnv[set[0]] = set[1]
-					}
-				} else {
-					util.Logger.Trace().Msg("Key is new. Storing.")
-					m.capturedEnv[set[0]] = set[1]
-				}
+				util.Logger.Trace().Str("key", set[0]).Str("val", set[1]).Msg("Consuming variable")
+				m.capturedEnv[set[0]] = set[1]
 			}
 
 		}

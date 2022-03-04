@@ -2,17 +2,21 @@
 
 Rundown has a few different ways it handles and interprets errors.
 
-## Errors with skip-on-success
+## Errors with skip-on-success <r section="skip-on-success"/>
 
 If your script errors with the `skip-on-success` modifier, the error is swallowed and flow continues.
 
-``` bash skip-on-success
+<r skip-on-success />
+
+``` bash
 idontexistcall
 ```
 
 If your script succeeds with `skip-on-success`, then flow skips to the next heading.
 
-``` bash skip-on-success
+<r skip-on-success/>
+
+``` bash
 true
 ```
 

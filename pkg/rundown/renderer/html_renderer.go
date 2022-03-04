@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"path"
 	"strings"
 
@@ -180,8 +179,6 @@ func (r *RundownHtmlRenderer) renderExecutionBlock(w util.BufWriter, source []by
 		}
 	}
 
-	reader, writer, _ := os.Pipe()
-
 	rutil.Logger.Debug().Msgf("Spinner mode %d", executionBlock.SpinnerMode)
 
 	var spinnerControl spinner.Spinner
@@ -219,13 +216,14 @@ func (r *RundownHtmlRenderer) renderExecutionBlock(w util.BufWriter, source []by
 	if executionBlock.ShowStdout {
 		rutil.Logger.Trace().Msg("Streaming STDOUT")
 		w.WriteString("<pre>")
-		intent.AddModifier(modifiers.NewStdoutStream(writer))
+		stdout := modifiers.NewStdoutStream()
+		intent.AddModifier(stdout)
 
 		go func() {
 			rutil.Logger.Trace().Msg("Setting up output formatter")
 
 			prefix := termenv.String("  ")
-			rutil.ReadAndFormatOutput(reader, 1, prefix.String(), spinnerControl /*bufio.NewWriter(r.Context.Output)*/, bufio.NewWriter(w), nil, "Running...")
+			rutil.ReadAndFormatOutput(stdout.Reader, 1, prefix.String(), spinnerControl /*bufio.NewWriter(r.Context.Output)*/, bufio.NewWriter(w), nil, "Running...")
 
 			rutil.Logger.Trace().Msg("Output stream ended")
 
@@ -234,18 +232,18 @@ func (r *RundownHtmlRenderer) renderExecutionBlock(w util.BufWriter, source []by
 		}()
 	}
 
-	if executionBlock.CaptureEnvironment {
-		envCapture := modifiers.NewEnvironmentCapture()
+	if executionBlock.CaptureEnvironment != nil {
+		envCapture := modifiers.NewEnvironmentCapture(executionBlock.CaptureEnvironment)
 		intent.AddModifier(envCapture)
 	}
 
 	result, err := intent.Execute()
 	rutil.Logger.Trace().Msgf("Execution complete: %v", result)
 
-	writer.Close()
-
 	if result.Env != nil {
-		r.Context.ImportEnv(result.Env)
+		for _, name := range executionBlock.CaptureEnvironment {
+			r.Context.ImportEnv(map[string]string{name: result.Env[name]})
+		}
 	}
 
 	rutil.Logger.Trace().Msg("Waiting on done channel")

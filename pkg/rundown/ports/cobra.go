@@ -2,22 +2,15 @@ package ports
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 
-	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/glamour/ansi"
+	"github.com/elseano/rundown/pkg/rundown"
 	"github.com/elseano/rundown/pkg/rundown/ast"
-	"github.com/elseano/rundown/pkg/rundown/renderer"
-	"github.com/elseano/rundown/pkg/rundown/transformer"
+
+	// glamrend "github.com/elseano/rundown/pkg/rundown/renderer/glamour"
+
 	rdutil "github.com/elseano/rundown/pkg/util"
-	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/parser"
-	goldrenderer "github.com/yuin/goldmark/renderer"
-	"github.com/yuin/goldmark/text"
-	"github.com/yuin/goldmark/util"
 )
 
 type optVal struct {
@@ -42,8 +35,13 @@ func (o optVal) String() string {
 	return ""
 }
 
-func BuildCobraCommand(filename string, sectionPointer *ast.SectionPointer, debugAs string) *cobra.Command {
+func BuildCobraCommand(filename string, section *rundown.Section, debugAs string) *cobra.Command {
 	optionEnv := map[string]optVal{}
+
+	sectionPointer := section.Pointer
+	doc := section.Document.Document
+	source := section.Document.Source
+	gm := section.Document.Goldmark
 
 	command := cobra.Command{
 		Use:   sectionPointer.SectionName,
@@ -59,30 +57,8 @@ func BuildCobraCommand(filename string, sectionPointer *ast.SectionPointer, debu
 				rdutil.SetLoggerLevel(debugAs)
 			}
 
-			ansiOptions := ansi.Options{
-				WordWrap:     80,
-				ColorProfile: termenv.TrueColor,
-				Styles:       glamour.DarkStyleConfig,
-			}
-
-			source, err := ioutil.ReadFile(filename)
-
-			if err != nil {
-				return err
-			}
-
-			executionContext := renderer.NewContext(filename)
+			executionContext := section.Document.Context
 			executionContext.ImportRawEnv(os.Environ())
-
-			rundownNodeRenderer := renderer.NewRundownConsoleRenderer(executionContext)
-
-			ar := ansi.NewRenderer(ansiOptions)
-			goldmarkRenderer := goldrenderer.NewRenderer(
-				goldrenderer.WithNodeRenderers(
-					util.Prioritized(ar, 1000),
-					util.Prioritized(rundownNodeRenderer, 1),
-				),
-			)
 
 			for k, v := range optionEnv {
 				if err := v.Option.OptionType.Validate(v.String()); err != nil {
@@ -94,25 +70,15 @@ func BuildCobraCommand(filename string, sectionPointer *ast.SectionPointer, debu
 				})
 			}
 
-			rundownRenderer := renderer.NewRundownRenderer(goldmarkRenderer, executionContext)
-
-			gm := goldmark.New(
-				goldmark.WithParserOptions(
-					parser.WithASTTransformers(util.PrioritizedValue{
-						Value:    transformer.NewRundownASTTransformer(),
-						Priority: 0,
-					}),
-				),
-				goldmark.WithRenderer(rundownRenderer),
-			)
-
-			doc := gm.Parser().Parse(text.NewReader(source))
-
 			ast.PruneDocumentToSection(doc, sectionPointer.SectionName)
-			doc.Dump(source, 0)
+
+			ast := rdutil.CaptureStdout(func() {
+				doc.Dump(source, 0)
+			})
+
+			rdutil.Logger.Debug().Msg(ast)
 
 			return gm.Renderer().Render(os.Stdout, source, doc)
-			// return nil
 		},
 	}
 

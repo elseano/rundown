@@ -1,4 +1,4 @@
-package renderer
+package glamour
 
 import (
 	"bytes"
@@ -6,12 +6,13 @@ import (
 
 	"github.com/charmbracelet/glamour/ansi"
 	"github.com/elseano/rundown/pkg/rundown/ast"
+	"github.com/elseano/rundown/pkg/rundown/renderer"
 	"github.com/elseano/rundown/pkg/rundown/transformer"
 	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/parser"
-	"github.com/yuin/goldmark/renderer"
+	goldrenderer "github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/text"
 	"github.com/yuin/goldmark/util"
 )
@@ -19,28 +20,28 @@ import (
 type Rundown struct {
 	goldmark.Markdown
 
-	Context *Context
+	Context *renderer.Context
 }
 
 func setupRenderer() *Rundown {
-	context := NewContext("./virt")
+	context := renderer.NewContext("./virt")
 
 	ansiOptions := ansi.Options{
 		WordWrap:     80,
 		ColorProfile: termenv.TrueColor,
 	}
 
-	rundownNodeRenderer := NewRundownConsoleRenderer(context)
+	rundownNodeRenderer := NewGlamourNodeRenderer(context)
 
 	ar := ansi.NewRenderer(ansiOptions)
-	renderer := renderer.NewRenderer(
-		renderer.WithNodeRenderers(
+	renderer := goldrenderer.NewRenderer(
+		goldrenderer.WithNodeRenderers(
 			util.Prioritized(ar, 1000),
 			util.Prioritized(rundownNodeRenderer, 1000),
 		),
 	)
 
-	rundownRenderer := NewRundownRenderer(
+	rundownRenderer := NewGlamourRenderer(
 		renderer,
 		context,
 	)

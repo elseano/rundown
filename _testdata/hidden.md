@@ -1,4 +1,4 @@
-# Hidden Content
+# Hidden Content <r section="hidden"/>
 
 There's two types of hidden content in Rundown.
 
@@ -59,7 +59,9 @@ Hidden blocks are a great way to provide "progressive enhancement" to your Rundo
 
 Hidden headings are good when you want to `skip-on-failure` or `skip-on-success` without actually creating a new heading:
 
-~~~ markdown reveal norun
+<r reveal norun />
+
+~~~ markdown
 ``` bash skip-on-failure
 ifail
 ```

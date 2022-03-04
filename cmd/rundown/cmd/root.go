@@ -1,24 +1,14 @@
 package cmd
 
 import (
-	"io/ioutil"
+	"fmt"
 	"os"
 
-	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/glamour/ansi"
 	shared "github.com/elseano/rundown/cmd"
-	"github.com/elseano/rundown/pkg/rundown/ast"
+	"github.com/elseano/rundown/pkg/rundown"
 	"github.com/elseano/rundown/pkg/rundown/ports"
-	"github.com/elseano/rundown/pkg/rundown/renderer"
-	"github.com/elseano/rundown/pkg/rundown/transformer"
 	"github.com/elseano/rundown/pkg/util"
-	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/parser"
-	goldrenderer "github.com/yuin/goldmark/renderer"
-	"github.com/yuin/goldmark/text"
-	goldutil "github.com/yuin/goldmark/util"
 )
 
 func Execute(version string, gitCommit string) error {
@@ -33,49 +23,17 @@ func NewDocRootCmd(args []string) *cobra.Command {
 	docRoot.ParseFlags(args)
 
 	rundownFile = shared.RundownFile(flagFilename)
-	// cwd, _ := os.Getwd()
-	// relRundownFile, _ := filepath.Rel(cwd, rundownFile)
 
-	ansiOptions := ansi.Options{
-		WordWrap:     80,
-		ColorProfile: termenv.TrueColor,
-		Styles:       glamour.DarkStyleConfig,
+	loaded, err := rundown.Load(rundownFile)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
+		os.Exit(1)
 	}
-	context := renderer.NewContext(rundownFile)
-	rundownNodeRenderer := renderer.NewRundownConsoleRenderer(context)
 
-	ar := ansi.NewRenderer(ansiOptions)
-	r := goldrenderer.NewRenderer(
-		goldrenderer.WithNodeRenderers(
-			goldutil.Prioritized(ar, 1000),
-			goldutil.Prioritized(rundownNodeRenderer, 1000),
-		),
-	)
-
-	rundownRenderer := renderer.NewRundownRenderer(
-		r,
-		context,
-	)
-
-	gm := goldmark.New(
-		goldmark.WithParserOptions(
-			parser.WithASTTransformers(goldutil.PrioritizedValue{
-				Value:    transformer.NewRundownASTTransformer(),
-				Priority: 0,
-			}),
-		),
-		goldmark.WithRenderer(rundownRenderer),
-	)
-
-	data, _ := ioutil.ReadFile(rundownFile)
-	doc := gm.Parser().Parse(text.NewReader(data))
-
-	for child := doc.FirstChild(); child != nil; child = child.NextSibling() {
-		if section, ok := child.(*ast.SectionPointer); ok {
-			cmd := ports.BuildCobraCommand(rundownFile, section, flagDebugAs)
-			if cmd != nil {
-				docRoot.AddCommand(cmd)
-			}
+	for _, section := range loaded.GetSections() {
+		cmd := ports.BuildCobraCommand(rundownFile, section, flagDebugAs)
+		if cmd != nil {
+			docRoot.AddCommand(cmd)
 		}
 	}
 

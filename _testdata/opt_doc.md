@@ -2,11 +2,15 @@
 
 # Help using this file <r label="rundown:help"/>
 
-To use this file, make sure you specify the `+opt-one` parameter.
+To use this file, make sure you specify the `opt-one` parameter. For example:
 
-# This is a test for Options
+```
+rundown go --opt-one=Thing
+```
 
-Ignored.
+# This is a test for Options <r section="go" />
+
+Hi there <r sub-env>$OPT_OPT_ONE</r>.
 
 -----
 

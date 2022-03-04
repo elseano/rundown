@@ -1,4 +1,4 @@
-# Emoji Support
+# Emoji Support <r section="emoji"/>
 
 Supports GitHub Emojis
 

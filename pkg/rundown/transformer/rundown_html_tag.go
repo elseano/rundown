@@ -29,7 +29,7 @@ func ExtractRundownElement(node goldast.Node, reader goldtext.Reader, currentTag
 		token := z.Token()
 		switch ttype {
 		case html.StartTagToken, html.SelfClosingTagToken:
-			if token.Data == "r" || strings.HasPrefix(token.Data, "r-") {
+			if token.Data == "r" || token.Data == "rundown" {
 				currentRundownTag = &RundownHtmlTag{
 					tag:    token.Data,
 					closed: false,

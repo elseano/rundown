@@ -1,4 +1,4 @@
-# OnFailure Handling
+# OnFailure Handling <r section="on_failure"/>
 
 Test of the `on-failure` attribute.
 
