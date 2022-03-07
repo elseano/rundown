@@ -563,8 +563,16 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 			<-intent.StartedChan
 			rdutil.Logger.Trace().Msg("Setting up output formatter")
 
+			spinnerInitialTitle := ""
+			var actualSpinner rdutil.ProgressIndicator = nil
+
+			if spinner != nil {
+				spinnerInitialTitle = spinner.SpinnerName
+				actualSpinner = spinner.Spinner
+			}
+
 			prefix := termenv.String("  ")
-			rdutil.ReadAndFormatOutput(outputCapture.Reader, 1, prefix.String(), spinner.Spinner /*bufio.NewWriter(r.Context.Output)*/, bufio.NewWriter(w), nil, spinner.SpinnerName)
+			rdutil.ReadAndFormatOutput(outputCapture.Reader, 1, prefix.String(), actualSpinner /*bufio.NewWriter(r.Context.Output)*/, bufio.NewWriter(w), nil, spinnerInitialTitle)
 		}()
 	}
 

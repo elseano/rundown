@@ -86,6 +86,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.PersistentFlags().StringVar(&flagCompletions, "completions", "", "Render shell completions for given shell (bash, zsh, fish, powershell)")
 	rootCmd.PersistentFlags().StringVar(&flagDebugAs, "debug", "", "Set the debug output level")
 	rootCmd.PersistentFlags().StringVar(&flagServePort, "serve", "", "Set the port to serve a HTML interface for Rundown")
+	rootCmd.PersistentFlags().Bool("dump", false, "Dump the AST to be executed")
 
 	rootCmd.Flag("cols").Hidden = true
 	rootCmd.Flag("display").Hidden = true

@@ -77,8 +77,13 @@ func (t *Treatment) ReplaceWithChildren(nodeToReplace goldast.Node, replacement 
 	}
 
 	t.replaceNodes = append(t.replaceNodes, func() {
-		for child := nodeWithChildren.FirstChild(); child != nil; child = child.NextSibling() {
+		child := nodeWithChildren.FirstChild()
+
+		for nodeWithChildren.HasChildren() {
+			nextChild := child.NextSibling()
+
 			replacement.AppendChild(replacement, child)
+			child = nextChild
 		}
 
 		parent := nodeToReplace.Parent()

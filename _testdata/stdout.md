@@ -1,4 +1,4 @@
-# Stdout Tests
+# Stdout Tests <r section="stdout"/>
 
 Scripts can write to STDOUT. By default, this is hidden.
 
@@ -8,35 +8,46 @@ echo "You won't see this"
 
 We can reveal STDOUT easily.
 
-``` bash stdout
+<r stdout/>
+
+``` bash
 echo "You should see this"
 ```
 
 STDOUT will be indented, and correctly formatted when showing progress:
 
-``` bash stdout
+<r stdout/>
+
+``` bash
 printf "Hello\r"
 printf "World"
 ```
 
 STDOUT is also smart enough to hide the spinner when waiting for input on the same line:
 
-``` bash stdout
-read -t 1 -p "Enter something: " something || true
+<r stdout/>
+
+``` bash
+read -t 5 -p "Enter something: " something || true
 ```
 
 However, STDOUT will reveal the spinner if your input prompt is a blank line.
 
 To overcome that, use the `nospin` modifier.
 
-``` bash stdout nospin
-read -t 1 -p "Some prompt
+<r stdout nospin/>
+
+``` bash
+read -t 5 -p "Enter something:
 " something || true
 ```
 
 If you're running a `named` code segment, the output heading will be the name.
 
-``` bash stdout named
+
+<r stdout named/>
+
+``` bash 
 # This is the title
 echo "Hi there"
 ```

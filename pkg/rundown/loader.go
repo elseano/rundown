@@ -57,7 +57,6 @@ func Load(filename string) (*LoadedDocuments, error) {
 }
 
 func loadFile(filename string, context *renderer.Context) (*LoadedDocument, error) {
-	fmt.Printf("Loading %s\n", filename)
 	source, err := ioutil.ReadFile(filename)
 
 	if err != nil {
