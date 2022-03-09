@@ -18,27 +18,43 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-func Load(filename string) (*LoadedDocuments, error) {
+func LoadString(data string, filename string) (*LoadedDocuments, error) {
 	context := renderer.NewContext(filename)
-	parentDocument, err := loadFile(filename, context)
 
-	collection := &LoadedDocuments{
-		MasterDocument:    parentDocument,
-		ImportedDocuments: []*LoadedDocument{},
-		Context:           context,
-	}
+	parentDocument, err := loadBytes([]byte(data), filename, context)
 
 	if err != nil {
 		return nil, err
 	}
 
-	currentPath := path.Dir(filename)
+	return cascadeLoad(parentDocument)
+}
+
+func Load(filename string) (*LoadedDocuments, error) {
+	context := renderer.NewContext(filename)
+	parentDocument, err := loadFile(filename, context)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return cascadeLoad(parentDocument)
+}
+
+func cascadeLoad(parentDocument *LoadedDocument) (*LoadedDocuments, error) {
+	collection := &LoadedDocuments{
+		MasterDocument:    parentDocument,
+		ImportedDocuments: []*LoadedDocument{},
+		Context:           parentDocument.Context,
+	}
+
+	currentPath := path.Dir(parentDocument.Filename)
 	importDirectives := ast.ProcessImportBlocks(parentDocument.Document)
 
 	for _, directive := range importDirectives {
 		filename := directive.GetFilename()
 
-		importedDoc, err := loadFile(path.Join(currentPath, filename), context)
+		importedDoc, err := loadFile(path.Join(currentPath, filename), parentDocument.Context)
 		if err != nil {
 			return nil, err
 		}
@@ -54,6 +70,7 @@ func Load(filename string) (*LoadedDocuments, error) {
 	}
 
 	return collection, nil
+
 }
 
 func loadFile(filename string, context *renderer.Context) (*LoadedDocument, error) {
@@ -63,6 +80,10 @@ func loadFile(filename string, context *renderer.Context) (*LoadedDocument, erro
 		return nil, err
 	}
 
+	return loadBytes(source, filename, context)
+}
+
+func loadBytes(source []byte, filename string, context *renderer.Context) (*LoadedDocument, error) {
 	consoleNodeRenderer := termrend.NewRenderer(context)
 	renderer := goldrenderer.WithNodeRenderers(
 		util.Prioritized(consoleNodeRenderer, 0),

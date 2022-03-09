@@ -25,16 +25,10 @@ func TestInvisibleBlock3(t *testing.T) {
 	verifyParsedAsKinds(contents, t, []ast.NodeKind{ast.KindParagraph, ast.KindParagraph})
 }
 
-func TestInvisibleBlock4(t *testing.T) {
-	contents := []byte("<!--~ nospin -->\n\n```\nSomeCode\n\n```\nHere's more normal text")
-	verifyParsedAsKinds(contents, t, []ast.NodeKind{KindCodeModifierBlock, ast.KindFencedCodeBlock, ast.KindParagraph})
-}
-
 func verifyParsedAsKinds(contents []byte, t *testing.T, expected []ast.NodeKind) {
 	markdown := goldmark.New(
 		goldmark.WithExtensions(
 			InvisibleBlocks,
-			CodeModifiers,
 		),
 	)
 

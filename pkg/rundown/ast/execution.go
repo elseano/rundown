@@ -27,6 +27,7 @@ type ExecutionBlock struct {
 	ID                    string
 	ShowStdout            bool
 	ShowStderr            bool
+	CaptureStdoutInto     string
 	Reveal                bool
 	Execute               bool
 	CaptureEnvironment    []string
@@ -36,6 +37,7 @@ type ExecutionBlock struct {
 	With                  string
 	ReplaceProcess        bool
 	SkipOnSuccess         bool
+	SkipOnFailure         bool
 }
 
 // NewRundownBlock returns a new RundownBlock node.

@@ -1,7 +1,6 @@
 package modifiers
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/elseano/rundown/pkg/bus"
@@ -36,11 +35,11 @@ func (m *SpinnerConstant) PrepareScripts(scripts *scripts.ScriptManager) {
 func (m *SpinnerConstant) GetResult(exitCode int) []ModifierResult {
 	bus.Unsubscribe(m)
 
-	if exitCode == 0 {
-		m.Spinner.Success("OK")
-	} else {
-		m.Spinner.Error(fmt.Sprintf("Exit code %d", exitCode))
-	}
+	// if exitCode == 0 {
+	// 	m.Spinner.Success("OK")
+	// } else {
+	// 	m.Spinner.Error(fmt.Sprintf("Exit code %d", exitCode))
+	// }
 
 	return []ModifierResult{}
 }

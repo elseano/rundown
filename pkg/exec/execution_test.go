@@ -88,10 +88,10 @@ func TestExecutionFailure(t *testing.T) {
 // }
 
 func TestExecutionEnvironmentCapture(t *testing.T) {
-	script := []byte(`export NEW_VALUE=TRUE`)
+	script := []byte(`NEW_VALUE=TRUE`)
 
 	intent, _ := NewExecution("bash", script, ".")
-	intent.AddModifier(modifiers.NewEnvironmentCapture())
+	intent.AddModifier(modifiers.NewEnvironmentCapture([]string{"NEW_VALUE"}))
 	util.Logger = log.Output(zerolog.ConsoleWriter{Out: testutil.NewTestWriter(t)})
 
 	result, err := intent.Execute()

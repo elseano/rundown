@@ -58,6 +58,10 @@ func (m *TrackProgress) GetResult(int) []ModifierResult {
 	return nil
 }
 
+func (m *TrackProgress) GetDuration() time.Duration {
+	return m.endedAt.Sub(m.startedAt)
+}
+
 func (m *TrackProgress) ReceiveEvent(event bus.Event) {
 	if rpcEvent, ok := event.(*rpc.RpcMessage); ok {
 		data := rpcEvent.Data

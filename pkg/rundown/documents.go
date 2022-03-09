@@ -1,6 +1,8 @@
 package rundown
 
 import (
+	"io"
+
 	"github.com/elseano/rundown/pkg/rundown/ast"
 	"github.com/elseano/rundown/pkg/rundown/renderer"
 	"github.com/yuin/goldmark"
@@ -58,4 +60,8 @@ func (doc *LoadedDocument) GetSections() []*ast.SectionPointer {
 	}
 
 	return result
+}
+
+func (d *LoadedDocument) Render(outputStream io.Writer) error {
+	return d.Goldmark.Renderer().Render(outputStream, d.Source, d.Document)
 }

@@ -119,6 +119,32 @@ func PruneDocumentToRoot(doc goldast.Node) {
 	}
 }
 
+// Removes everything from the current node through to either SectionEnd or no more nodes.
+func PruneSectionFromNode(node goldast.Node) {
+
+	// Walk through all following siblings of the current node and delete them.
+
+	sib := node.NextSibling()
+	for sib != nil {
+		if _, ok := sib.(*SectionEnd); ok {
+			return
+		}
+
+		nextSib := sib.NextSibling()
+		sib.Parent().RemoveChild(sib.Parent(), sib)
+		sib = nextSib
+	}
+
+	// The do the same for the node's parent, unless it's a document.
+	parent := node.Parent()
+
+	if _, ok := parent.(*goldast.Document); ok {
+		return
+	}
+
+	PruneSectionFromNode(parent)
+}
+
 // Reduces the document to just the requested section.
 func PruneDocumentToSection(doc goldast.Node, sectionName string) {
 	var sectionPointer *SectionPointer = nil

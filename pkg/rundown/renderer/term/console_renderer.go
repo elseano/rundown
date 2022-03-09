@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"time"
 
 	icolor "image/color"
 
@@ -496,6 +497,10 @@ func (r *Renderer) renderRundownBlock(w util.BufWriter, source []byte, node ast.
 	return ast.WalkContinue, nil
 }
 
+func friendlyDuration(d time.Duration) string {
+	return d.String()
+}
+
 func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
 		return ast.WalkContinue, nil
@@ -519,6 +524,9 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 		return ast.WalkStop, err
 	}
 
+	progress := modifiers.NewTrackProgress()
+	intent.AddModifier(progress)
+
 	intent.ImportEnv(r.Context.Env)
 
 	intent.ReplaceProcess = executionBlock.ReplaceProcess
@@ -538,6 +546,11 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 	rdutil.Logger.Debug().Msgf("Spinner mode %d", executionBlock.SpinnerMode)
 
 	var spinner *modifiers.SpinnerConstant
+	defer func() {
+		if spinner != nil {
+			spinner.Spinner.Stop()
+		}
+	}()
 
 	switch executionBlock.SpinnerMode {
 	case rundown_ast.SpinnerModeInlineAll:
@@ -589,10 +602,26 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 	if executionBlock.SkipOnSuccess {
 		if err != nil || result.ExitCode != 0 {
+			if spinner != nil {
+				spinner.Spinner.Error(fmt.Sprintf("%s - Continue", friendlyDuration(progress.GetDuration())))
+			}
+
 			return ast.WalkContinue, nil
 		} else {
+			spinner.Spinner.Skip(fmt.Sprintf("%s - Skip on Success", friendlyDuration(progress.GetDuration())))
+
 			// FIXME - How to skip to the next heading?
 			return ast.WalkContinue, nil
+		}
+	}
+
+	if executionBlock.SkipOnFailure {
+		if err != nil || result.ExitCode != 0 {
+			if spinner != nil {
+				spinner.Spinner.Skip(fmt.Sprintf("%s - Skip on Failure (%d)", friendlyDuration(progress.GetDuration()), result.ExitCode))
+			}
+
+			return ast.WalkStop, nil
 		}
 	}
 
@@ -620,6 +649,9 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 		}
 
 		node.Parent().InsertAfter(node.Parent(), insertAfterNode, rundown_ast.NewStopFail())
+		if spinner != nil {
+			spinner.Spinner.Error("Failed")
+		}
 
 		// Allow the FailureNode to handle this.
 		return ast.WalkContinue, nil
@@ -633,7 +665,16 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 		}
 	}
 
-	w.Write(result.Output)
+	if spinner != nil {
+		spinner.Spinner.Success(friendlyDuration(progress.GetDuration()))
+	}
+
+	if executionBlock.CaptureStdoutInto != "" {
+		output, _ := ioutil.ReadAll(errorCapture.Reader)
+		outputTrimmed := strings.TrimSpace(string(output))
+
+		r.Context.AddEnv(executionBlock.CaptureStdoutInto, outputTrimmed)
+	}
 
 	return ast.WalkContinue, nil
 }

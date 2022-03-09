@@ -182,10 +182,10 @@ func TestRenderContext(t *testing.T) {
 
 # Some Heading
 
-<r capture-env/>
+<r capture-env="BLAH"/>
 
 ~~~ bash
-export BLAH="Hi"
+BLAH="Hi"
 ~~~
 
 `)
@@ -208,11 +208,12 @@ echo $BLAH
 	output := &bytes.Buffer{}
 
 	if assert.NoError(t, gm.Renderer().Render(output, source1, doc1)) {
-		assert.Equal(t, context.Env["BLAH"], "Hi")
-		output := &bytes.Buffer{}
+		if assert.Equal(t, context.Env["BLAH"], "Hi") {
+			output := &bytes.Buffer{}
 
-		if assert.NoError(t, gm.Renderer().Render(output, source2, doc2)) {
-			assert.Equal(t, "  Hi\r\n\n", output.String())
+			if assert.NoError(t, gm.Renderer().Render(output, source2, doc2)) {
+				assert.Equal(t, "  Hi\r\n\n", output.String())
+			}
 		}
 	}
 
