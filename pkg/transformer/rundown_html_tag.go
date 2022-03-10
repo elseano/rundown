@@ -3,7 +3,7 @@ package transformer
 import (
 	"strings"
 
-	"github.com/elseano/rundown/pkg/rundown/text"
+	"github.com/elseano/rundown/pkg/text"
 	goldast "github.com/yuin/goldmark/ast"
 	goldtext "github.com/yuin/goldmark/text"
 	"golang.org/x/net/html"

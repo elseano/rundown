@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -19,6 +20,15 @@ func AssertLines(t *testing.T, expected string, actual string) bool {
 		} else if strings.TrimSpace(expectedLines[i]) == "" && strings.TrimSpace(actualLines[i]) == "" {
 			continue
 		} else if !assert.Equal(t, strings.TrimRight(expectedLines[i], " "), strings.TrimRight(actualLines[i], " "), "Mismatch on line "+strconv.Itoa(i)) {
+			b := strings.Builder{}
+			for index, line := range strings.Split(actual, "\n") {
+				marker := " "
+				if index == i {
+					marker = "*"
+				}
+				b.WriteString(fmt.Sprintf("%s %00d: %s\n", marker, index+1, line))
+			}
+			t.Logf("Actual output:\n%s", b.String())
 			break
 		}
 	}

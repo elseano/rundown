@@ -3,7 +3,7 @@ package transformer
 import (
 	"strings"
 
-	"github.com/elseano/rundown/pkg/rundown/ast"
+	"github.com/elseano/rundown/pkg/ast"
 	"github.com/elseano/rundown/pkg/util"
 	goldast "github.com/yuin/goldmark/ast"
 	goldtext "github.com/yuin/goldmark/text"

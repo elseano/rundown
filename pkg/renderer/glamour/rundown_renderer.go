@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/elseano/rundown/pkg/rundown/renderer"
+	"github.com/elseano/rundown/pkg/renderer"
 	goldast "github.com/yuin/goldmark/ast"
 	goldrenderer "github.com/yuin/goldmark/renderer"
 )

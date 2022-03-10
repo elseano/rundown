@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/glamour/ansi"
-	"github.com/elseano/rundown/pkg/rundown/ast"
-	"github.com/elseano/rundown/pkg/rundown/renderer"
-	"github.com/elseano/rundown/pkg/rundown/transformer"
+	"github.com/elseano/rundown/pkg/ast"
+	"github.com/elseano/rundown/pkg/renderer"
+	"github.com/elseano/rundown/pkg/transformer"
 	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/yuin/goldmark"

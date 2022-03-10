@@ -33,11 +33,11 @@ import (
 
 	"github.com/eliukblau/pixterm/pkg/ansimage"
 
+	rundown_ast "github.com/elseano/rundown/pkg/ast"
 	"github.com/elseano/rundown/pkg/exec"
 	"github.com/elseano/rundown/pkg/exec/modifiers"
-	rundown_ast "github.com/elseano/rundown/pkg/rundown/ast"
-	rundown_renderer "github.com/elseano/rundown/pkg/rundown/renderer"
-	"github.com/elseano/rundown/pkg/rundown/text"
+	rundown_renderer "github.com/elseano/rundown/pkg/renderer"
+	"github.com/elseano/rundown/pkg/text"
 	emoji_ast "github.com/yuin/goldmark-emoji/ast"
 
 	rdutil "github.com/elseano/rundown/pkg/util"

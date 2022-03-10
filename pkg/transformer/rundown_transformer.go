@@ -3,7 +3,7 @@ package transformer
 import (
 	"strings"
 
-	"github.com/elseano/rundown/pkg/rundown/ast"
+	"github.com/elseano/rundown/pkg/ast"
 	"github.com/elseano/rundown/pkg/util"
 	"gopkg.in/guregu/null.v4"
 

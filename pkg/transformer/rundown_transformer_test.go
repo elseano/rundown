@@ -6,7 +6,7 @@ import (
 
 	"golang.org/x/net/html"
 
-	"github.com/elseano/rundown/pkg/rundown/ast"
+	"github.com/elseano/rundown/pkg/ast"
 	"github.com/stretchr/testify/assert"
 	"github.com/yuin/goldmark"
 	goldast "github.com/yuin/goldmark/ast"

@@ -5,8 +5,8 @@ import (
 	"os"
 
 	shared "github.com/elseano/rundown/cmd"
-	"github.com/elseano/rundown/pkg/rundown"
-	"github.com/elseano/rundown/pkg/rundown/ports"
+	rundown "github.com/elseano/rundown/pkg"
+	"github.com/elseano/rundown/pkg/ports"
 	"github.com/elseano/rundown/pkg/util"
 	"github.com/spf13/cobra"
 )

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/elseano/rundown/pkg/rundown"
-	"github.com/elseano/rundown/pkg/rundown/ast"
+	rundown "github.com/elseano/rundown/pkg"
+	"github.com/elseano/rundown/pkg/ast"
 
 	// glamrend "github.com/elseano/rundown/pkg/rundown/renderer/glamour"
 

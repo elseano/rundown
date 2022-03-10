@@ -10,9 +10,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/elseano/rundown/pkg/rundown/ast"
-	"github.com/elseano/rundown/pkg/rundown/renderer"
-	"github.com/elseano/rundown/pkg/rundown/transformer"
+	"github.com/elseano/rundown/pkg/ast"
+	"github.com/elseano/rundown/pkg/renderer"
+	"github.com/elseano/rundown/pkg/transformer"
 	rdutil "github.com/elseano/rundown/pkg/util"
 	"github.com/yuin/goldmark"
 	goldast "github.com/yuin/goldmark/ast"

@@ -5,12 +5,12 @@ import (
 	"io/ioutil"
 	"path"
 
-	"github.com/elseano/rundown/pkg/rundown/ast"
-	"github.com/elseano/rundown/pkg/rundown/renderer"
+	"github.com/elseano/rundown/pkg/ast"
+	"github.com/elseano/rundown/pkg/renderer"
 	emoji "github.com/yuin/goldmark-emoji"
 
-	termrend "github.com/elseano/rundown/pkg/rundown/renderer/term"
-	"github.com/elseano/rundown/pkg/rundown/transformer"
+	termrend "github.com/elseano/rundown/pkg/renderer/term"
+	"github.com/elseano/rundown/pkg/transformer"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/parser"
 	goldrenderer "github.com/yuin/goldmark/renderer"

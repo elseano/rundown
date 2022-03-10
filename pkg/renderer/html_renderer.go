@@ -8,11 +8,11 @@ import (
 	"path"
 	"strings"
 
+	"github.com/elseano/rundown/pkg/ast"
 	"github.com/elseano/rundown/pkg/exec"
 	"github.com/elseano/rundown/pkg/exec/modifiers"
-	"github.com/elseano/rundown/pkg/rundown/ast"
-	"github.com/elseano/rundown/pkg/rundown/text"
 	"github.com/elseano/rundown/pkg/spinner"
+	"github.com/elseano/rundown/pkg/text"
 	rutil "github.com/elseano/rundown/pkg/util"
 	"github.com/muesli/termenv"
 	goldast "github.com/yuin/goldmark/ast"

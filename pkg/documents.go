@@ -3,8 +3,8 @@ package rundown
 import (
 	"io"
 
-	"github.com/elseano/rundown/pkg/rundown/ast"
-	"github.com/elseano/rundown/pkg/rundown/renderer"
+	"github.com/elseano/rundown/pkg/ast"
+	"github.com/elseano/rundown/pkg/renderer"
 	"github.com/yuin/goldmark"
 	goldast "github.com/yuin/goldmark/ast"
 )
