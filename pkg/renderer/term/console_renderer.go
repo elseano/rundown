@@ -560,7 +560,7 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 	switch executionBlock.SpinnerMode {
 	case rundown_ast.SpinnerModeInlineAll:
-		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, NewSpinner(0, "", w))
+		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, NewSpinner(0, executionBlock.SpinnerName, w))
 		intent.AddModifier(spinner)
 
 		rdutil.Logger.Debug().Msg("Inline all mode")
@@ -568,7 +568,7 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 		intent.AddModifier(spinnerDetector)
 
 	case rundown_ast.SpinnerModeVisible:
-		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, NewSpinner(0, "", w))
+		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, NewSpinner(0, executionBlock.SpinnerName, w))
 		intent.AddModifier(spinner)
 	}
 

@@ -11,7 +11,7 @@ builds:
     goos:
       - linux
       - darwin
-    main: ./cmd/rundown/main.go
+    main: main.go
     ldflags:
       - -s -w -X main.GitCommit={{ .Commit }} -X main.Version={{ .Version }}
 
@@ -59,3 +59,15 @@ brews:
       output = Utils.safe_popen_read("#{bin}/rundown", "--completions", "fish")
       (fish_completion/"rundown").write output
 
+nfpms:
+  -
+    package_name: rundown
+    homepage: https://github.com/elseano/rundown
+    formats:
+      - apk
+      - deb
+      - rpm
+      - yum
+
+    dependencies:
+      - bash
