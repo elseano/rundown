@@ -26,7 +26,7 @@ func AssertLines(t *testing.T, expected string, actual string) bool {
 				if index == i {
 					marker = "*"
 				}
-				b.WriteString(fmt.Sprintf("%s %00d: %s\n", marker, index+1, line))
+				b.WriteString(fmt.Sprintf("%s %3d: %s\n", marker, index+1, line))
 			}
 			t.Logf("Actual output:\n%s", b.String())
 			break

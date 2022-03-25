@@ -49,7 +49,6 @@ curl http://example.org
 
 	expected := `Curl seems to write to pty directly
 
-Running...
 	<!doctype html>
 	<html>
 	<head>
@@ -96,6 +95,31 @@ Running...
 	</div>
 	</body>
 	</html>`
+
+	buffer := bytes.Buffer{}
+
+	loaded, _ := LoadString(code, "test.md")
+	loaded.MasterDocument.Render(&buffer)
+
+	testutil.AssertLines(t, expected, buffer.String())
+}
+
+func TestStdoutWithLs(t *testing.T) {
+	code := `Curl seems to write to pty directly
+	
+<r stdout/>
+
+~~~ bash
+ls -la --color=always ../build
+~~~
+
+`
+
+	expected := `Curl seems to write to pty directly
+	
+	
+	
+	`
 
 	buffer := bytes.Buffer{}
 

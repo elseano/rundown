@@ -1,7 +1,6 @@
 package term
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"io/ioutil"
@@ -17,7 +16,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/muesli/termenv"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	extast "github.com/yuin/goldmark/extension/ast"
@@ -566,27 +564,30 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 		intent.AddModifier(spinner)
 	}
 
+	var output *AnsiScreenWriter
+
 	if executionBlock.ShowStdout {
 		rdutil.Logger.Trace().Msg("Streaming STDOUT")
 
 		outputCapture := modifiers.NewStdoutStream()
 		intent.AddModifier(outputCapture)
 
-		go func() {
-			<-intent.StartedChan
-			rdutil.Logger.Trace().Msg("Setting up output formatter")
+		output = NewAnsiScreenWriter(outputCapture.Reader, w)
+		output.PrefixEachLine("    ")
 
-			spinnerInitialTitle := ""
-			var actualSpinner rdutil.ProgressIndicator = nil
+		if spinner != nil {
+			spinnerStamped := false
+			output.BeforeFlush(func() {
+				spinner.Spinner.Stop()
+				if !spinnerStamped {
+					fmt.Fprintf(w, "%s\r\n", aurora.Faint(fmt.Sprintf("↓ %s", spinner.Spinner.CurrentHeading())))
+					spinnerStamped = true
+				}
+			})
+			output.AfterFlush(func() { spinner.Spinner.Start() })
+		}
 
-			if spinner != nil {
-				spinnerInitialTitle = spinner.SpinnerName
-				actualSpinner = spinner.Spinner
-			}
-
-			prefix := termenv.String("  ")
-			rdutil.ReadAndFormatOutput(outputCapture.Reader, 1, prefix.String(), actualSpinner /*bufio.NewWriter(r.Context.Output)*/, bufio.NewWriter(w), nil, spinnerInitialTitle)
-		}()
+		go output.Process()
 	}
 
 	errorCapture := modifiers.NewStdoutStream()
@@ -599,6 +600,10 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 	rdutil.Logger.Trace().Msg("Executing intent")
 	result, err := intent.Execute()
+
+	if output != nil {
+		output.Flush()
+	}
 
 	if executionBlock.SkipOnSuccess {
 		if err != nil || result.ExitCode != 0 {
