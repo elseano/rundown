@@ -11,7 +11,6 @@ import (
 	"github.com/elseano/rundown/pkg/ast"
 	"github.com/elseano/rundown/pkg/exec"
 	"github.com/elseano/rundown/pkg/exec/modifiers"
-	"github.com/elseano/rundown/pkg/spinner"
 	"github.com/elseano/rundown/pkg/text"
 	rutil "github.com/elseano/rundown/pkg/util"
 	"github.com/muesli/termenv"
@@ -181,31 +180,31 @@ func (r *RundownHtmlRenderer) renderExecutionBlock(w util.BufWriter, source []by
 
 	rutil.Logger.Debug().Msgf("Spinner mode %d", executionBlock.SpinnerMode)
 
-	var spinnerControl spinner.Spinner
+	var spinnerControl modifiers.SpinnerControl
 
-	switch executionBlock.SpinnerMode {
-	case ast.SpinnerModeInlineAll:
-		spinner := modifiers.NewSpinnerConstant(executionBlock.SpinnerName)
-		intent.AddModifier(spinner)
+	// switch executionBlock.SpinnerMode {
+	// case ast.SpinnerModeInlineAll:
+	// 	spinner := modifiers.NewSpinnerConstant(executionBlock.SpinnerName)
+	// 	intent.AddModifier(spinner)
 
-		rutil.Logger.Debug().Msg("Inline all mode")
-		spinnerDetector := modifiers.NewSpinnerFromScript(true, spinner)
-		intent.AddModifier(spinnerDetector)
+	// 	rutil.Logger.Debug().Msg("Inline all mode")
+	// 	spinnerDetector := modifiers.NewSpinnerFromScript(true, spinner)
+	// 	intent.AddModifier(spinnerDetector)
 
-		spinnerControl = spinner.Spinner
-	case ast.SpinnerModeVisible:
-		name := executionBlock.SpinnerName
-		if name == "" {
-			name = "Running..."
-		}
+	// 	spinnerControl = spinner.Spinner
+	// case ast.SpinnerModeVisible:
+	// 	name := executionBlock.SpinnerName
+	// 	if name == "" {
+	// 		name = "Running..."
+	// 	}
 
-		spinner := modifiers.NewSpinnerConstant(name)
-		intent.AddModifier(spinner)
+	// 	spinner := modifiers.NewSpinnerConstant(name)
+	// 	intent.AddModifier(spinner)
 
-		updateSpinner(w, executionBlock.ID, name, "R")
+	// 	updateSpinner(w, executionBlock.ID, name, "R")
 
-		spinnerControl = spinner.Spinner
-	}
+	// 	spinnerControl = spinner.Spinner
+	// }
 
 	if executionBlock.SubstituteEnvironment {
 		intent.AddModifier(modifiers.NewReplace(r.Context.Env))

@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/elseano/rundown/pkg/spinner"
 	"github.com/logrusorgru/aurora"
 	// "github.com/logrusorgru/aurora"
 )
@@ -131,9 +130,57 @@ func moveCursor(out io.Writer, offset int) {
 	}
 }
 
+type DummySpinner struct {
+	active bool
+}
+
+func NewDummySpinner() *DummySpinner {
+	return &DummySpinner{active: false}
+}
+
+func (s *DummySpinner) Active() bool {
+	return s.active
+}
+
+func (s *DummySpinner) Spin() {
+	s.Start()
+}
+
+func (s *DummySpinner) Start() {
+}
+
+func (s *DummySpinner) Success(message string) {
+	s.Stop()
+}
+
+func (s *DummySpinner) Error(message string) {
+	s.Stop()
+}
+
+func (s *DummySpinner) Skip(message string) {
+	s.Stop()
+}
+
+func (s *DummySpinner) Stop() {
+}
+
+func (s *DummySpinner) NewStep(message string) {
+}
+
+func (s *DummySpinner) SetMessage(message string) {
+}
+
+func (s *DummySpinner) HideAndExecute(f func()) {
+	f()
+}
+
+func (s *DummySpinner) CurrentHeading() string {
+	return ""
+}
+
 func ReadAndFormatOutput(reader io.Reader, indent int, prefix string, progressIndicator ProgressIndicator, out *bufio.Writer, logger *log.Logger, initialHeading string) bool {
 	if progressIndicator == nil {
-		progressIndicator = spinner.NewDummySpinner()
+		progressIndicator = NewDummySpinner()
 	}
 
 	var indentSpaces = strings.Repeat("  ", int(math.Max(float64(indent-1), 0)))

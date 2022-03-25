@@ -290,11 +290,19 @@ const (
 )
 
 func (c Color) Begin() string {
-	return "\033[" + aurora.Color(c).Nos(false) + "m"
+	if ColorsEnabled {
+		return "\033[" + aurora.Color(c).Nos(false) + "m"
+	} else {
+		return ""
+	}
 }
 
 func (c Color) End() string {
-	return "\033[0m"
+	if ColorsEnabled {
+		return "\033[0m"
+	} else {
+		return ""
+	}
 }
 
 func (c Color) Wrap(str string) string {
@@ -552,7 +560,7 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 	switch executionBlock.SpinnerMode {
 	case rundown_ast.SpinnerModeInlineAll:
-		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName)
+		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, NewSpinner(0, "", w))
 		intent.AddModifier(spinner)
 
 		rdutil.Logger.Debug().Msg("Inline all mode")
@@ -560,7 +568,7 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 		intent.AddModifier(spinnerDetector)
 
 	case rundown_ast.SpinnerModeVisible:
-		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName)
+		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, NewSpinner(0, "", w))
 		intent.AddModifier(spinner)
 	}
 
@@ -580,7 +588,7 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 			output.BeforeFlush(func() {
 				spinner.Spinner.Stop()
 				if !spinnerStamped {
-					fmt.Fprintf(w, "%s\r\n", aurora.Faint(fmt.Sprintf("↓ %s", spinner.Spinner.CurrentHeading())))
+					fmt.Fprintf(w, "%s\r\n", Aurora.Faint(fmt.Sprintf("↓ %s", spinner.Spinner.CurrentHeading())))
 					spinnerStamped = true
 				}
 			})
@@ -776,7 +784,7 @@ var BlockquoteAttributeFilter = GlobalAttributeFilter.Extend(
 
 func (r *Renderer) renderBlockquote(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
-		r.blockStyles.Push(NewBulletSequence(aurora.Blue(" >").String(), paddingForLevel(r.currentLevel)))
+		r.blockStyles.Push(NewBulletSequence(Aurora.Blue(" >").String(), paddingForLevel(r.currentLevel)))
 	} else {
 		r.blockStyles.Pop()
 	}
@@ -916,7 +924,7 @@ func NewBulletSequence(marker string, level string) BulletSequenceStyle {
 }
 
 func (s BulletSequenceStyle) Begin() string {
-	return aurora.Bold(s.marker + " ").String()
+	return Aurora.Bold(s.marker + " ").String()
 }
 
 func (s BulletSequenceStyle) End() string {
@@ -1076,7 +1084,7 @@ func (r *Renderer) renderThematicBreak(w util.BufWriter, source []byte, n ast.No
 
 	line := strings.Repeat("-", r.Config.ConsoleWidth-4)
 
-	_, _ = w.WriteString(fmt.Sprintf("  %s  \r\n\r\n", aurora.Faint(line).String()))
+	_, _ = w.WriteString(fmt.Sprintf("  %s  \r\n\r\n", Aurora.Faint(line).String()))
 
 	return ast.WalkContinue, nil
 }
@@ -1200,9 +1208,9 @@ func (r *Renderer) renderLink(w util.BufWriter, source []byte, node ast.Node, en
 		w.WriteString("\033]8;;\033\\")
 
 		// if n.Title != nil {
-		// 	_, _ = w.WriteString(aurora.Faint(" (" + string(n.Title) + ")").String())
+		// 	_, _ = w.WriteString(Aurora.Faint(" (" + string(n.Title) + ")").String())
 		// } else {
-		// 	_, _ = w.WriteString(aurora.Faint(" (").String() + aurora.Faint(string(n.Destination)).String() + aurora.Faint(")").String())
+		// 	_, _ = w.WriteString(Aurora.Faint(" (").String() + Aurora.Faint(string(n.Destination)).String() + Aurora.Faint(")").String())
 		// }
 	}
 

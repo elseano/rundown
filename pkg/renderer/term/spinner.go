@@ -1,14 +1,13 @@
-package spinner
+package term
 
 import (
 	"io"
 	"strings"
 	"time"
 
+	"github.com/elseano/rundown/pkg/renderer/term/spinner"
 	// spx "github.com/tj/go-spin"
 	// spx "github.com/briandowns/spinner"
-
-	"github.com/logrusorgru/aurora"
 )
 
 const (
@@ -31,14 +30,15 @@ type Spinner interface {
 }
 
 type RundownSpinner struct {
-	s       *ActualSpinner
+	s       *spinner.ActualSpinner
 	indent  int
 	message string
 	out     io.Writer
 }
 
 func NewSpinner(indent int, message string, out io.Writer) Spinner {
-	s := NewActualSpinner(CharSets[21], 100*time.Millisecond, WithWriter(out), WithColor("fgHiCyan"))
+
+	s := spinner.NewActualSpinner(spinner.CharSets[21], 100*time.Millisecond, spinner.WithWriter(out), spinner.WithColor("fgHiCyan"))
 	s.Suffix = " " + message
 	s.Prefix = strings.Repeat("  ", indent)
 
@@ -58,17 +58,17 @@ func (s *RundownSpinner) Start() {
 }
 
 func (s *RundownSpinner) Success(message string) {
-	s.s.FinalMSG = strings.Repeat("  ", s.indent) + aurora.Green(TICK).String() + " " + s.message + " (" + aurora.Faint(message).String() + ")\r\n"
+	s.s.FinalMSG = strings.Repeat("  ", s.indent) + Aurora.Green(TICK).String() + " " + s.message + " (" + Aurora.Faint(message).String() + ")\r\n"
 	s.Stop()
 }
 
 func (s *RundownSpinner) Error(message string) {
-	s.s.FinalMSG = strings.Repeat("  ", s.indent) + aurora.Red(CROSS).String() + " " + s.message + " (" + aurora.Faint(message).String() + ")\r\n"
+	s.s.FinalMSG = strings.Repeat("  ", s.indent) + Aurora.Red(CROSS).String() + " " + s.message + " (" + Aurora.Faint(message).String() + ")\r\n"
 	s.Stop()
 }
 
 func (s *RundownSpinner) Skip(message string) {
-	s.s.FinalMSG = strings.Repeat("  ", s.indent) + aurora.Faint(SKIP).String() + " " + s.message + " (" + aurora.Faint(message).String() + ")\r\n"
+	s.s.FinalMSG = strings.Repeat("  ", s.indent) + Aurora.Faint(SKIP).String() + " " + s.message + " (" + Aurora.Faint(message).String() + ")\r\n"
 	s.Stop()
 }
 
@@ -84,7 +84,7 @@ func (s *RundownSpinner) NewStep(message string) {
 	var wasActive = s.Active()
 	s.Success("OK")
 
-	sp := NewActualSpinner(CharSets[21], 100*time.Millisecond, WithWriter(s.out), WithColor("fgHiCyan"))
+	sp := spinner.NewActualSpinner(spinner.CharSets[21], 100*time.Millisecond, spinner.WithWriter(s.out), spinner.WithColor("fgHiCyan"))
 	sp.Suffix = " " + message
 	sp.Prefix = strings.Repeat("  ", s.indent)
 
@@ -107,52 +107,4 @@ func (s *RundownSpinner) SetMessage(message string) {
 
 func (s *RundownSpinner) HideAndExecute(f func()) {
 	s.s.HideAndExecute(f)
-}
-
-type DummySpinner struct {
-	active bool
-}
-
-func NewDummySpinner() Spinner {
-	return &DummySpinner{active: false}
-}
-
-func (s *DummySpinner) Active() bool {
-	return s.active
-}
-
-func (s *DummySpinner) Spin() {
-	s.Start()
-}
-
-func (s *DummySpinner) Start() {
-}
-
-func (s *DummySpinner) Success(message string) {
-	s.Stop()
-}
-
-func (s *DummySpinner) Error(message string) {
-	s.Stop()
-}
-
-func (s *DummySpinner) Skip(message string) {
-	s.Stop()
-}
-
-func (s *DummySpinner) Stop() {
-}
-
-func (s *DummySpinner) NewStep(message string) {
-}
-
-func (s *DummySpinner) SetMessage(message string) {
-}
-
-func (s *DummySpinner) HideAndExecute(f func()) {
-	f()
-}
-
-func (s *DummySpinner) CurrentHeading() string {
-	return ""
 }

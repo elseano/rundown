@@ -5,6 +5,7 @@ go 1.15
 replace github.com/charmbracelet/glamour => /Users/elseano/src/glamour
 
 require (
+	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	// github.com/alecthomas/chroma v0.8.0
 	github.com/alecthomas/chroma v0.9.2
 	github.com/charmbracelet/glamour v0.3.0

@@ -1,32 +1,43 @@
 package modifiers
 
 import (
-	"os"
-
 	"github.com/elseano/rundown/pkg/bus"
 	"github.com/elseano/rundown/pkg/exec/rpc"
 	"github.com/elseano/rundown/pkg/exec/scripts"
-	"github.com/elseano/rundown/pkg/spinner"
 )
+
+type SpinnerControl interface {
+	Active() bool
+	Start()
+	Stop()
+	Success(message string)
+	Error(message string)
+	Skip(message string)
+	SetMessage(message string)
+	NewStep(message string)
+	HideAndExecute(f func())
+	CurrentHeading() string
+}
 
 // SpinnerFromScript modifier requires the TrackProgress modifier.
 type SpinnerConstant struct {
 	bus.Handler
 
 	ExecutionModifier
-	Spinner     spinner.Spinner
+	Spinner     SpinnerControl
 	SpinnerName string
 }
 
-func NewSpinnerConstant(name string) *SpinnerConstant {
+func NewSpinnerConstant(name string, spinner SpinnerControl) *SpinnerConstant {
 	return &SpinnerConstant{
 		ExecutionModifier: &NullModifier{},
 		SpinnerName:       name,
+		Spinner:           spinner,
 	}
 }
 
 func (m *SpinnerConstant) PrepareScripts(scripts *scripts.ScriptManager) {
-	m.Spinner = spinner.NewSpinner(0, m.SpinnerName, os.Stdout)
+	m.Spinner.SetMessage(m.SpinnerName)
 	m.Spinner.Start()
 
 	bus.Subscribe(m)
