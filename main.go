@@ -1,9 +1,11 @@
 package main
 
 import (
+	"errors"
 	"os"
 
 	"github.com/elseano/rundown/cmd/rundown/cmd"
+	"github.com/elseano/rundown/pkg/errs"
 	"github.com/elseano/rundown/pkg/renderer/term"
 	"github.com/elseano/rundown/pkg/util"
 	"github.com/logrusorgru/aurora"
@@ -28,5 +30,10 @@ func main() {
 	term.Aurora = aurora.NewAurora(useColors)
 	term.ColorsEnabled = useColors
 
-	cmd.Execute("", "")
+	var executionError *errs.ExecutionError
+	err := cmd.Execute("", "")
+
+	if errors.As(err, &executionError) {
+		os.Exit(executionError.ExitCode)
+	}
 }

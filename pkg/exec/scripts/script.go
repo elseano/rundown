@@ -10,7 +10,9 @@ import (
 
 type Script struct {
 	AbsolutePath     string
+	Prefix           []byte
 	Contents         []byte
+	Suffix           []byte
 	Invocation       string
 	EnvReferenceName string
 	Name             string
@@ -31,7 +33,15 @@ func (s *Script) Write() error {
 	tempFile.Write([]byte("#!"))
 	tempFile.Write([]byte(invo))
 	tempFile.Write([]byte("\n\n"))
+	if s.Prefix != nil {
+		tempFile.Write(s.Prefix)
+		tempFile.Write([]byte("\n"))
+	}
 	tempFile.Write(s.Contents)
+	if s.Suffix != nil {
+		tempFile.Write([]byte("\n"))
+		tempFile.Write(s.Suffix)
+	}
 
 	defer tempFile.Close()
 	s.AbsolutePath = tempFile.Name()

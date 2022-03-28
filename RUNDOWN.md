@@ -1,11 +1,68 @@
 <r opt="docopt" type="string" desc="An option for the document"/>
 
-# Rundown test file
-
-This file tests rundown.
+# Rundown's Rundown File
 
 
-## Some heading <r label="greets"/>
+## Release <r section="release"/>
+
+<r help>
+
+Creates a git tag for the provided version, and runs `go-releaser`.
+
+</r>
+
+<r opt="version" as="VERSION" required type="string" desc="The release version (i.e. v0.4.0-beta.6)"/>
+
+<r named-all stdout/>
+
+``` bash
+# Tagging the release...
+git tag -a $VERSION -m "First release"
+git push origin $VERSION
+source .env && goreleaser release --skip-validate --rm-dist
+```
+
+
+## Test no spin <r section="test:nospin"/>
+
+<r nospin stdout/>
+
+``` bash
+echo "Hi"
+```
+
+## Test spinner change <r section="test:spin-change"/>
+
+<r named-all stdout/>
+
+``` bash
+# Doing the hi
+sleep 1
+echo "Hi"
+
+# Doing something else
+sleep 1
+echo "Bye"
+```
+
+## Test curl response <r section="test:curl"/>
+
+<r stdout spinner="Requesting..."/>
+
+``` bash
+curl http://example.org
+```
+
+## Test curl response <r section="test:ls"/>
+
+<r stdout spinner="Executing..." nospin/>
+
+``` bash
+ls -la --color=always
+```
+
+
+## Some heading <r label="test:greets"/>
 
 <r desc="Greets you by your name"/>
 
@@ -22,7 +79,7 @@ echo "$OPT_GREET $OPT_NAME"
 ```
 
 
-## Say Goodbye <r section="byee"/>
+## Say Goodbye <r section="test:byee"/>
 
 <r desc="Asks for your name, and then says goodbye, like a boss"/>
 
@@ -43,7 +100,7 @@ sleep 1
 ```
 
 
-## Environment <r section="env" />
+## Environment <r section="test:env" />
 
 <r capture-env spinner="Setting env..."/>
 

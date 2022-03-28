@@ -40,7 +40,7 @@ func (m *EnvironmentCapture) PrepareScripts(scripts *scripts.ScriptManager) {
 
 		envCaptureCommand := strings.Replace(envDumpCommand, "CAPTURE", strings.Join(envs, ";"), 1)
 
-		script.Contents = append(script.Contents, envCaptureCommand...)
+		script.Suffix = []byte(envCaptureCommand)
 
 		bus.Subscribe(m)
 	}

@@ -32,6 +32,7 @@ import (
 	"github.com/eliukblau/pixterm/pkg/ansimage"
 
 	rundown_ast "github.com/elseano/rundown/pkg/ast"
+	"github.com/elseano/rundown/pkg/errs"
 	"github.com/elseano/rundown/pkg/exec"
 	"github.com/elseano/rundown/pkg/exec/modifiers"
 	rundown_renderer "github.com/elseano/rundown/pkg/renderer"
@@ -215,6 +216,7 @@ type Renderer struct {
 	currentLevel      int
 	currentlySkipping bool
 	Context           *rundown_renderer.Context
+	exitCode          int
 }
 
 // NewRenderer returns a new Renderer with given options.
@@ -453,6 +455,10 @@ func (r *Renderer) renderDocument(w util.BufWriter, source []byte, node ast.Node
 
 	if !entering {
 		r.ensureBlockSeparator(w, node)
+
+		if r.exitCode != 0 {
+			return ast.WalkStop, fmt.Errorf("")
+		}
 	}
 
 	return ast.WalkContinue, nil
@@ -470,7 +476,12 @@ func (r *Renderer) renderNothing(w util.BufWriter, source []byte, node ast.Node,
 
 func (r *Renderer) renderStopFail(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	w.WriteString("\n\n")
-	return ast.WalkStop, nil
+
+	if r.exitCode != 0 {
+		return ast.WalkStop, &errs.ExecutionError{ExitCode: r.exitCode}
+	}
+
+	return ast.WalkStop, &errs.ExecutionError{ExitCode: 1}
 }
 
 func (r *Renderer) renderEmoji(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -657,12 +668,16 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 	}
 
 	if result.ExitCode != 0 {
+		r.exitCode = result.ExitCode
+
 		// output := result.Output
 		output, _ := ioutil.ReadAll(errorCapture.Reader)
 
 		w.WriteString("\n\n")
 		w.WriteString(aurora.Red("Script Failed:\n").String())
-		r.writeLinesWithPrefix("  ", string(output), w)
+
+		resultErr := exec.ParseError(result.Scripts, string(output))
+		r.writeLinesWithPrefix("  ", string(resultErr.String(Aurora)), w)
 
 		// Find on failure nodes
 		failureNodes := rundown_ast.GetOnFailureNodes(node)
@@ -675,7 +690,8 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 			}
 		}
 
-		node.Parent().InsertAfter(node.Parent(), insertAfterNode, rundown_ast.NewStopFail())
+		stopFail := rundown_ast.NewStopFail()
+		node.Parent().InsertAfter(node.Parent(), insertAfterNode, stopFail)
 		if spinner != nil {
 			spinner.Spinner.Error("Failed")
 		}

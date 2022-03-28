@@ -43,10 +43,10 @@ type ExecutionIntent struct {
 }
 
 type ExecutionResult struct {
-	ScriptPath string
-	Output     []byte
-	ExitCode   int
-	Env        map[string]string
+	Scripts  *scripts.ScriptManager
+	Output   []byte
+	ExitCode int
+	Env      map[string]string
 }
 
 func NewExecution(via string, script []byte, cwd string) (*ExecutionIntent, error) {
@@ -152,8 +152,8 @@ func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
 	waiter.Wait()
 
 	execResult := &ExecutionResult{
-		ExitCode:   exitCode,
-		ScriptPath: process.cmd.Path,
+		ExitCode: exitCode,
+		Scripts:  content,
 	}
 
 	results := i.modifiers.GetResult(exitCode)
@@ -167,8 +167,11 @@ func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
 		case "Output":
 			// Trim the filename out of the output.
 			output := result.Value.([]byte)
-			output = bytes.ReplaceAll(output, []byte(fmt.Sprintf("%s: ", execResult.ScriptPath)), []byte(""))
-			output = bytes.ReplaceAll(output, []byte(execResult.ScriptPath), []byte(""))
+
+			for _, script := range content.AllScripts() {
+				output = bytes.ReplaceAll(output, []byte(fmt.Sprintf("%s: ", script.AbsolutePath)), []byte(""))
+				output = bytes.ReplaceAll(output, []byte(script.AbsolutePath), []byte(""))
+			}
 			execResult.Output = output
 		}
 	}
@@ -193,10 +196,11 @@ func launchProcess(content *scripts.ScriptManager, baseEnv map[string]string, cw
 	}
 
 	for name, val := range content.GenerateReferences() {
+		util.Logger.Trace().Msgf("ENV %s=%s", name, val)
 		cmd.Env = append(cmd.Env, name+"="+val)
 	}
 
-	util.Logger.Trace().Msg("Launching process...")
+	util.Logger.Trace().Fields(map[string]interface{}{"ENV": cmd.Env}).Msg("Launching process...")
 
 	process := NewProcess(cmd)
 	stdout, stderr, err := process.Start()

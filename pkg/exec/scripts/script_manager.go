@@ -26,6 +26,15 @@ func (m *ScriptManager) SetBaseScript(invocation string, contents []byte) (*Scri
 	return m.AddScript("BASE", invocation, contents)
 }
 
+func (m *ScriptManager) AllScripts() []*Script {
+	result := []*Script{}
+	for _, s := range m.scripts {
+		result = append(result, s)
+	}
+
+	return result
+}
+
 func (m *ScriptManager) AddScript(name, invocation string, contents []byte) (*Script, error) {
 	script := &Script{
 		AbsolutePath:     "",

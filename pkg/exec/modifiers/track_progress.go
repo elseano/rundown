@@ -27,14 +27,14 @@ func NewTrackProgress() *TrackProgress {
 	}
 }
 
-var progressScript = "echo %s START >> $RDRPC\n$%s\nEC=$?;echo %s END $EC >> $RDRPC;exit $EC"
-
 func (m *TrackProgress) PrepareScripts(scripts *scripts.ScriptManager) {
 	m.signallingKey = "ABC123"
 
 	script := scripts.GetPrevious()
 
-	scripts.AddScript("PROGRESS", "/bin/bash", []byte(fmt.Sprintf(progressScript, m.signallingKey, script.EnvReferenceName, m.signallingKey)))
+	newScript, _ := scripts.AddScript("PROGRESS", "/bin/bash", []byte(fmt.Sprintf("$%s", script.EnvReferenceName)))
+	newScript.Prefix = []byte(fmt.Sprintf("set -euo pipefail\n\necho %s START >> $RDRPC\n", m.signallingKey))
+	newScript.Suffix = []byte(fmt.Sprintf("\nEC=$?\necho %s END $EC >> $RDRPC\nexit $EC\n", m.signallingKey))
 
 	bus.Subscribe(m)
 }
