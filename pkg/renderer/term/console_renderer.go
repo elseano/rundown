@@ -520,12 +520,16 @@ func friendlyDuration(d time.Duration) string {
 }
 
 // Creates the correct spinner based on the environment.
-func createSpinner() Spinner {
+func createSpinner(env map[string]string) Spinner {
+	var s Spinner
+
 	if _, gitlab := os.LookupEnv("GITLAB_CI"); gitlab {
-		return spinner.NewGitlabSpinner(os.Stdout)
+		s = spinner.NewGitlabSpinner(os.Stdout)
+	} else {
+		s = spinner.NewStdoutSpinner(Aurora, ColorsEnabled, os.Stdout)
 	}
 
-	return spinner.NewStdoutSpinner(Aurora, ColorsEnabled, os.Stdout)
+	return spinner.NewSubenvSpinner(env, s)
 }
 
 func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -582,7 +586,7 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 	switch executionBlock.SpinnerMode {
 	case rundown_ast.SpinnerModeInlineAll:
-		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, createSpinner())
+		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, createSpinner(r.Context.Env))
 		intent.AddModifier(spinner)
 
 		rdutil.Logger.Debug().Msg("Inline all mode")
@@ -591,7 +595,7 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 	case rundown_ast.SpinnerModeVisible:
 		rdutil.Logger.Debug().Msg("Normal spinner mode")
-		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, createSpinner())
+		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, createSpinner(r.Context.Env))
 		intent.AddModifier(spinner)
 
 	default:

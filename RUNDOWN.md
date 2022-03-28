@@ -22,6 +22,19 @@ git push origin $VERSION
 source .env && goreleaser release --skip-validate --rm-dist
 ```
 
+## Test env spinner <r section="test:envspin"/>
+
+<r spinner="Setting env" capture-env="NAME"/>
+
+``` bash
+NAME="Hi there"
+```
+
+<r spinner="Greeting $NAME" stdout/>
+
+``` bash
+echo "Hi"
+```
 
 ## Test no spin <r section="test:nospin"/>
 
