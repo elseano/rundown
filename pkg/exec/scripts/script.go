@@ -25,7 +25,7 @@ func (s *Script) Write() error {
 		return err
 	}
 
-	invo, err := buildInvocation(s.Invocation)
+	invo, prefix, err := buildInvocation(s.Invocation)
 	if err != nil {
 		return err
 	}
@@ -33,6 +33,13 @@ func (s *Script) Write() error {
 	tempFile.Write([]byte("#!"))
 	tempFile.Write([]byte(invo))
 	tempFile.Write([]byte("\n\n"))
+	if prefix != "" {
+		if s.Prefix == nil {
+			s.Prefix = []byte(fmt.Sprintf("%s\n", prefix))
+		} else {
+			s.Prefix = append(s.Prefix, []byte(fmt.Sprintf("%s\n", prefix))...)
+		}
+	}
 	if s.Prefix != nil {
 		tempFile.Write(s.Prefix)
 		tempFile.Write([]byte("\n"))
@@ -64,19 +71,19 @@ func isShellLike(via string) bool {
 	}
 }
 
-func buildInvocation(interpreter string) (string, error) {
+func buildInvocation(interpreter string) (string, string, error) {
 	abs, err := exec.LookPath(interpreter)
 
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	switch interpreter {
 	case "bash":
-		return fmt.Sprintf("%s -euo pipefail", abs), nil
+		return abs, "set -euo pipefail", nil
 	case "sh":
-		return fmt.Sprintf("%s -euo pipefail", abs), nil
+		return abs, "set -euo pipefail", nil
 	default:
-		return abs, nil
+		return abs, "", nil
 	}
 }

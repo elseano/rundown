@@ -139,14 +139,10 @@ func boolPtr(str string) *bool {
 	}
 }
 
-func ServeRundown(filename string, debugAs string, port string) error {
-	if debugAs == "" {
+func ServeRundown(filename string, debug bool, port string) error {
+	if debug {
 		devNull, _ := os.Create("rundown.log")
 		rdutil.RedirectLogger(devNull)
-	} else {
-		fmt.Printf("Logging to stdout as %s\n", debugAs)
-		rdutil.RedirectLogger(os.Stdout)
-		rdutil.SetLoggerLevel(debugAs)
 	}
 
 	_, err := ioutil.ReadFile(filename)

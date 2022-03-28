@@ -31,7 +31,7 @@ func NewDocRootCmd(args []string) *cobra.Command {
 	}
 
 	for _, section := range loaded.GetSections() {
-		cmd := ports.BuildCobraCommand(rundownFile, section, flagDebugAs)
+		cmd := ports.BuildCobraCommand(rundownFile, section, flagDebug)
 		if cmd != nil {
 			docRoot.AddCommand(cmd)
 		}
@@ -73,7 +73,7 @@ func NewRootCmd() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if flagServePort != "" {
-				ports.ServeRundown(rundownFile, flagDebugAs, flagServePort)
+				ports.ServeRundown(rundownFile, flagDebug, flagServePort)
 			}
 
 			return nil
@@ -84,7 +84,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.PersistentFlags().StringVarP(&flagFilename, "file", "f", "", "File to run (defaults to RUNDOWN.md then README.md)")
 	rootCmd.PersistentFlags().BoolVarP(&flagViewOnly, "display", "d", false, "Render without executing scripts")
 	rootCmd.PersistentFlags().StringVar(&flagCompletions, "completions", "", "Render shell completions for given shell (bash, zsh, fish, powershell)")
-	rootCmd.PersistentFlags().StringVar(&flagDebugAs, "debug", "", "Set the debug output level")
+	rootCmd.PersistentFlags().BoolVar(&flagDebug, "debug", false, "Write debugging info to rundown.log")
 	rootCmd.PersistentFlags().StringVar(&flagServePort, "serve", "", "Set the port to serve a HTML interface for Rundown")
 	rootCmd.PersistentFlags().Bool("dump", false, "Dump the AST to be executed")
 

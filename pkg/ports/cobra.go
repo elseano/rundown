@@ -36,7 +36,7 @@ func (o optVal) String() string {
 	return ""
 }
 
-func BuildCobraCommand(filename string, section *rundown.Section, debugAs string) *cobra.Command {
+func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool) *cobra.Command {
 	optionEnv := map[string]optVal{}
 
 	sectionPointer := section.Pointer
@@ -58,12 +58,9 @@ func BuildCobraCommand(filename string, section *rundown.Section, debugAs string
 		Long:  longDesc,
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if debugAs == "" {
+			if writeLog {
 				devNull, _ := os.Create("rundown.log")
 				rdutil.RedirectLogger(devNull)
-			} else {
-				rdutil.RedirectLogger(os.Stdout)
-				rdutil.SetLoggerLevel(debugAs)
 			}
 
 			executionContext := section.Document.Context

@@ -47,7 +47,7 @@ func parseError(stdout string, errorIndex int, source *scripts.Script) *ErrorDet
 			line, _ = strconv.Atoi(matches[3])
 		}
 
-		line -= (lineOffset(source) + 2)
+		line -= (lineOffset(source) + 1)
 
 		errText := matches[4]
 
