@@ -60,7 +60,7 @@ func (p *SectionProcessor) Process(node goldast.Node, reader goldtext.Reader, tr
 	if option, ok := node.(*ast.SectionOption); ok {
 		p.SectionPointer.AddOption(option)
 	} else if desc, ok := node.(*ast.DescriptionBlock); ok {
-		p.SectionPointer.DescriptionLong = string(desc.Text(reader.Source()))
+		p.SectionPointer.DescriptionLong = desc
 	}
 
 	return false
@@ -91,7 +91,7 @@ func PopulateSectionMetadata(start *ast.SectionPointer, end *ast.SectionEnd, rea
 			util.Logger.Trace().Msgf("Scanning section contents: %s\n", n.Kind().String())
 			switch node := n.(type) {
 			case *ast.DescriptionBlock:
-				start.DescriptionLong = string(node.Text(reader.Source()))
+				start.DescriptionLong = node
 			case *ast.SectionOption:
 				start.Options = append(start.Options, node)
 			}

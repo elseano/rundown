@@ -3,6 +3,7 @@ package ports
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	rundown "github.com/elseano/rundown/pkg"
 	"github.com/elseano/rundown/pkg/ast"
@@ -43,10 +44,18 @@ func BuildCobraCommand(filename string, section *rundown.Section, debugAs string
 	source := section.Document.Source
 	gm := section.Document.Goldmark
 
+	longDesc := ""
+
+	if sectionPointer.DescriptionLong != nil {
+		str := strings.Builder{}
+		gm.Renderer().Render(&str, source, sectionPointer.DescriptionLong)
+		longDesc = str.String()
+	}
+
 	command := cobra.Command{
 		Use:   sectionPointer.SectionName,
 		Short: sectionPointer.DescriptionShort,
-		Long:  sectionPointer.DescriptionLong,
+		Long:  longDesc,
 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if debugAs == "" {

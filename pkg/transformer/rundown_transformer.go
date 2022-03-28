@@ -375,6 +375,16 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		return nil
 	}
 
+	if node.HasAttr("help") {
+		helpNode := ast.NewDescriptionBlock()
+
+		if node.ChildCount() > 0 {
+			treatments.ReplaceWithChildren(node, helpNode, node)
+		}
+
+		return nil
+	}
+
 	if node.HasAttr("stop-fail") {
 		stop := ast.NewStopFail()
 

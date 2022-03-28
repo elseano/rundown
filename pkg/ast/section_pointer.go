@@ -12,7 +12,7 @@ type SectionPointer struct {
 	StartNode        goldast.Node
 	Options          []*SectionOption
 	DescriptionShort string
-	DescriptionLong  string
+	DescriptionLong  *DescriptionBlock
 }
 
 type SectionEnd struct {
