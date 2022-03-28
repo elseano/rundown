@@ -11,9 +11,10 @@ import (
 	"github.com/elseano/rundown/pkg/exec"
 	"github.com/elseano/rundown/pkg/exec/modifiers"
 	"github.com/elseano/rundown/pkg/renderer"
-	"github.com/elseano/rundown/pkg/renderer/term"
+	"github.com/elseano/rundown/pkg/renderer/term/spinner"
 	"github.com/elseano/rundown/pkg/text"
 	rutil "github.com/elseano/rundown/pkg/util"
+	"github.com/logrusorgru/aurora"
 	"github.com/muesli/termenv"
 	goldast "github.com/yuin/goldmark/ast"
 	goldrenderer "github.com/yuin/goldmark/renderer"
@@ -128,7 +129,7 @@ func (r *GlamourNodeRenderer) renderExecutionBlock(w util.BufWriter, source []by
 
 	switch executionBlock.SpinnerMode {
 	case ast.SpinnerModeInlineAll:
-		spinner := modifiers.NewSpinnerConstant(executionBlock.SpinnerName, term.NewSpinner(0, "", w))
+		spinner := modifiers.NewSpinnerConstant(executionBlock.SpinnerName, spinner.NewStdoutSpinner(aurora.NewAurora(true), true, w))
 		intent.AddModifier(spinner)
 
 		rutil.Logger.Debug().Msg("Inline all mode")
@@ -138,7 +139,7 @@ func (r *GlamourNodeRenderer) renderExecutionBlock(w util.BufWriter, source []by
 		spinnerControl = spinner.Spinner
 	case ast.SpinnerModeVisible:
 
-		spinner := modifiers.NewSpinnerConstant(executionBlock.SpinnerName, term.NewSpinner(0, "", w))
+		spinner := modifiers.NewSpinnerConstant(executionBlock.SpinnerName, spinner.NewStdoutSpinner(aurora.NewAurora(true), true, w))
 		intent.AddModifier(spinner)
 
 		spinnerControl = spinner.Spinner

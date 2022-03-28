@@ -71,6 +71,8 @@ func (i *ExecutionIntent) ImportEnv(env map[string]string) {
 }
 
 func (i *ExecutionIntent) AddModifier(mod modifiers.ExecutionModifier) modifiers.ExecutionModifier {
+	util.Logger.Debug().Msgf("Adding mod: %T", mod)
+
 	i.modifiers.AddModifier(mod)
 	return mod
 }

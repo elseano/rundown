@@ -5,6 +5,7 @@ import (
 
 	"github.com/elseano/rundown/pkg/bus"
 	"github.com/elseano/rundown/pkg/exec/scripts"
+	rdutil "github.com/elseano/rundown/pkg/util"
 )
 
 type ModifierResult struct {
@@ -37,6 +38,8 @@ func (m *ExecutionModifiers) AddModifier(modifier ExecutionModifier) {
 
 func (m *ExecutionModifiers) PrepareScripts(scripts *scripts.ScriptManager) {
 	for _, m := range m.mods {
+		rdutil.Logger.Debug().Msgf("Prepare scripts: %T", m)
+
 		m.PrepareScripts(scripts)
 	}
 }

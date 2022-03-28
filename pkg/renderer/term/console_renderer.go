@@ -35,6 +35,7 @@ import (
 	"github.com/elseano/rundown/pkg/exec"
 	"github.com/elseano/rundown/pkg/exec/modifiers"
 	rundown_renderer "github.com/elseano/rundown/pkg/renderer"
+	"github.com/elseano/rundown/pkg/renderer/term/spinner"
 	"github.com/elseano/rundown/pkg/text"
 	emoji_ast "github.com/yuin/goldmark-emoji/ast"
 
@@ -507,6 +508,15 @@ func friendlyDuration(d time.Duration) string {
 	return d.String()
 }
 
+// Creates the correct spinner based on the environment.
+func createSpinner() Spinner {
+	if _, gitlab := os.LookupEnv("GITLAB_CI"); gitlab {
+		return spinner.NewGitlabSpinner(os.Stdout)
+	}
+
+	return spinner.NewStdoutSpinner(Aurora, ColorsEnabled, os.Stdout)
+}
+
 func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
 		return ast.WalkContinue, nil
@@ -551,7 +561,8 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 	rdutil.Logger.Debug().Msgf("Spinner mode %d", executionBlock.SpinnerMode)
 
-	var spinner *modifiers.SpinnerConstant
+	var spinner *modifiers.SpinnerConstant = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, spinner.NewNullSpinner())
+
 	defer func() {
 		if spinner != nil {
 			spinner.Spinner.Stop()
@@ -560,7 +571,7 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 	switch executionBlock.SpinnerMode {
 	case rundown_ast.SpinnerModeInlineAll:
-		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, NewSpinner(0, executionBlock.SpinnerName, w))
+		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, createSpinner())
 		intent.AddModifier(spinner)
 
 		rdutil.Logger.Debug().Msg("Inline all mode")
@@ -568,8 +579,13 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 		intent.AddModifier(spinnerDetector)
 
 	case rundown_ast.SpinnerModeVisible:
-		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, NewSpinner(0, executionBlock.SpinnerName, w))
+		rdutil.Logger.Debug().Msg("Normal spinner mode")
+		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, createSpinner())
 		intent.AddModifier(spinner)
+
+	default:
+		intent.AddModifier(spinner)
+
 	}
 
 	var output *AnsiScreenWriter
@@ -584,13 +600,11 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 		output.PrefixEachLine("    ")
 
 		if spinner != nil {
-			spinnerStamped := false
 			output.BeforeFlush(func() {
+				rdutil.Logger.Debug().Msg("Stopping spinner for output")
+
 				spinner.Spinner.Stop()
-				if !spinnerStamped {
-					fmt.Fprintf(w, "%s\r\n", Aurora.Faint(fmt.Sprintf("↓ %s", spinner.Spinner.CurrentHeading())))
-					spinnerStamped = true
-				}
+				spinner.Spinner.StampShadow()
 			})
 			output.AfterFlush(func() { spinner.Spinner.Start() })
 		}

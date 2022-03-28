@@ -6,13 +6,18 @@ import (
 	goldast "github.com/yuin/goldmark/ast"
 )
 
+// The rundown import block expects to wrap a markdown link to the file to import.
+//
+// For example: <r import="ci">[Our CI scripts](./ci/RUNDOWN.md)</r>
+//
+// Will import our the ./ci/RUNDOWN.md file, namespacing all commands under the "ci:" prefix.
 type ImportBlock struct {
 	goldast.BaseBlock
 
 	ImportPrefix string
 }
 
-// NewRundownBlock returns a new RundownBlock node.
+// NewImportBlock returns a new RundownBlock node.
 func NewImportBlock() *ImportBlock {
 	return &ImportBlock{
 		BaseBlock: goldast.NewParagraph().BaseBlock,

@@ -67,7 +67,6 @@ nfpms:
       - apk
       - deb
       - rpm
-      - yum
 
     dependencies:
       - bash
