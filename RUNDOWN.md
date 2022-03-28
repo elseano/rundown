@@ -5,20 +5,20 @@
 
 ## Release <r section="release"/>
 
-<r help>
-
-Creates a git tag for the provided version, and runs `go-releaser`.
-
-</r>
+<r help>Creates a git tag for the provided version, and runs `go-releaser`.</r>
 
 <r opt="version" as="VERSION" required type="string" desc="The release version (i.e. v0.4.0-beta.6)"/>
 
-<r named-all stdout/>
+<r spinner="Tagging..." stdout>Go releaser works from git tags. So make sure there's a tag.</r>
 
 ``` bash
-# Tagging the release...
 git tag -a $VERSION -m "First release"
 git push origin $VERSION
+```
+
+<r spinner="Releasing..." stdout>Then, run `goreleaser` to cross-compile and publish the release to GitHub</r>
+
+``` bash
 source .env && goreleaser release --skip-validate --rm-dist
 ```
 
