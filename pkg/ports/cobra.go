@@ -1,12 +1,14 @@
 package ports
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 
 	rundown "github.com/elseano/rundown/pkg"
 	"github.com/elseano/rundown/pkg/ast"
+	"github.com/elseano/rundown/pkg/errs"
 	"gopkg.in/guregu/null.v4"
 
 	// glamrend "github.com/elseano/rundown/pkg/rundown/renderer/glamour"
@@ -54,9 +56,10 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 	}
 
 	command := cobra.Command{
-		Use:   sectionPointer.SectionName,
-		Short: sectionPointer.DescriptionShort,
-		Long:  longDesc,
+		Use:           sectionPointer.SectionName,
+		Short:         sectionPointer.DescriptionShort,
+		Long:          longDesc,
+		SilenceErrors: true,
 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if writeLog {
@@ -89,7 +92,14 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 
 			rdutil.Logger.Debug().Msg(ast)
 
-			return gm.Renderer().Render(os.Stdout, source, doc)
+			err := gm.Renderer().Render(os.Stdout, source, doc)
+
+			switch {
+			case errors.Is(err, errs.ErrStopOk):
+				return nil
+			default:
+				return err
+			}
 		},
 	}
 

@@ -74,6 +74,53 @@ curl http://example.org
 ls -la --color=always
 ```
 
+## Test Stop Ok <r section="test:stopok"/>
+
+Renders.
+
+<r stop-ok>Stopped.</r>
+
+Doesn't render.
+
+## Test Stop Ok If is True <r section="test:stopokift"/>
+
+Renders.
+
+<r stop-ok if="true">Stopped.</r>
+
+Doesn't render.
+
+## Test Stop Ok If is False <r section="test:stopokiff"/>
+
+Renders.
+
+<r stop-ok if="false">Doesn't Render.</r>
+
+End naturally.
+
+## Test Stop Fail <r section="test:stopfail"/>
+
+Renders.
+
+<r stop-fail>Stopped.</r>
+
+Doesn't render.
+
+## Test Stop Fail If is True <r section="test:stopfailift"/>
+
+Renders.
+
+<r stop-fail if="true">Stopped.</r>
+
+Doesn't render.
+
+## Test Stop Fail If is False <r section="test:stopfailiff"/>
+
+Renders.
+
+<r stop-fail if="false">Doesn't Render.</r>
+
+End naturally.
 
 ## Some heading <r label="test:greets"/>
 

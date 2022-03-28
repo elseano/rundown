@@ -36,4 +36,8 @@ func main() {
 	if errors.As(err, &executionError) {
 		os.Exit(executionError.ExitCode)
 	}
+
+	if errors.Is(err, errs.ErrStopFail) {
+		os.Exit(1)
+	}
 }

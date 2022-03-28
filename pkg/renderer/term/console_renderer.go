@@ -405,7 +405,7 @@ func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(rundown_ast.KindSectionOption, r.renderHollow)
 	reg.Register(rundown_ast.KindSectionPointer, r.renderHollow)
 	reg.Register(rundown_ast.KindStopFail, r.renderStopFail)
-	reg.Register(rundown_ast.KindStopOk, r.renderTodo("StopOk"))
+	reg.Register(rundown_ast.KindStopOk, r.renderStopOk)
 	reg.Register(rundown_ast.KindSubEnvBlock, r.renderHollow)
 
 	// reg.Register(KindRundownInline, r.renderRundownInline)
@@ -474,14 +474,82 @@ func (r *Renderer) renderNothing(w util.BufWriter, source []byte, node ast.Node,
 	return ast.WalkSkipChildren, nil
 }
 
-func (r *Renderer) renderStopFail(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
-	w.WriteString("\n\n")
+func runIfScript(ctx *rundown_renderer.Context, ifScript string) (bool, error) {
+	intent, err := exec.NewExecution("bash", []byte(ifScript), path.Dir(ctx.RundownFile))
 
-	if r.exitCode != 0 {
-		return ast.WalkStop, &errs.ExecutionError{ExitCode: r.exitCode}
+	if err != nil {
+		return false, err
 	}
 
-	return ast.WalkStop, &errs.ExecutionError{ExitCode: 1}
+	spinner := createSpinner(ctx.Env)
+	defer spinner.Stop()
+
+	intent.AddModifier(modifiers.NewSpinnerConstant("Checking...", spinner))
+	result, err := intent.Execute()
+
+	if err != nil {
+		return false, err
+	}
+
+	return result.ExitCode == 0, nil
+}
+
+func (r *Renderer) renderStopFail(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	stop := node.(*rundown_ast.StopFail)
+
+	if stop.IfScript != "" {
+		if stop.Result == nil {
+			result, err := runIfScript(r.Context, stop.IfScript)
+
+			if err != nil {
+				return ast.WalkStop, err
+			}
+
+			stop.Result = &result
+		}
+
+		if !*stop.Result {
+			return ast.WalkSkipChildren, nil
+		}
+	}
+
+	if !entering {
+		w.WriteString("\n")
+		if r.exitCode != 0 {
+			return ast.WalkStop, &errs.ExecutionError{ExitCode: r.exitCode}
+		}
+		w.Flush()
+		return ast.WalkStop, errs.ErrStopFail
+	} else {
+		return ast.WalkContinue, nil
+	}
+}
+
+func (r *Renderer) renderStopOk(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	stop := node.(*rundown_ast.StopOk)
+
+	if stop.IfScript != "" {
+		if stop.Result == nil {
+			result, err := runIfScript(r.Context, stop.IfScript)
+
+			if err != nil {
+				return ast.WalkStop, err
+			}
+
+			stop.Result = &result
+		}
+
+		if !*stop.Result {
+			return ast.WalkSkipChildren, nil
+		}
+	}
+
+	if !entering {
+		w.WriteString("\n")
+		return ast.WalkStop, nil
+	} else {
+		return ast.WalkContinue, nil
+	}
 }
 
 func (r *Renderer) renderEmoji(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -1049,8 +1117,15 @@ var ParagraphAttributeFilter = GlobalAttributeFilter
 
 func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
-		// If we're folling an execution block, add a extra line.
-		if _, ok := n.PreviousSibling().(*rundown_ast.ExecutionBlock); ok {
+		var prevBlock ast.Node = n.PreviousSibling()
+		if _, ok := n.Parent().(*rundown_ast.StopFail); ok {
+			prevBlock = n.Parent().PreviousSibling()
+		}
+		if _, ok := n.Parent().(*rundown_ast.StopOk); ok {
+			prevBlock = n.Parent().PreviousSibling()
+		}
+		// If we're following an execution block, add a extra line.
+		if _, ok := prevBlock.(*rundown_ast.ExecutionBlock); ok {
 			w.WriteString("\n")
 		}
 

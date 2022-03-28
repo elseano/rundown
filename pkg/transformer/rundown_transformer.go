@@ -389,7 +389,13 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		stop := ast.NewStopFail()
 
 		if msg := node.GetAttr("stop-fail"); msg.Valid {
-			node.AppendChild(node, goldast.NewString([]byte(msg.String)))
+			para := goldast.NewParagraph()
+			para.AppendChild(para, goldast.NewString([]byte(msg.String)))
+			node.AppendChild(node, para)
+		}
+
+		if ifScript := node.GetAttr("if"); ifScript.Valid {
+			stop.IfScript = ifScript.String
 		}
 
 		treatments.ReplaceWithChildren(nodeToReplace, stop, node)
@@ -400,7 +406,13 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		stop := ast.NewStopOk()
 
 		if msg := node.GetAttr("stop-ok"); msg.Valid {
-			node.AppendChild(node, goldast.NewString([]byte(msg.String)))
+			para := goldast.NewParagraph()
+			para.AppendChild(para, goldast.NewString([]byte(msg.String)))
+			node.AppendChild(node, para)
+		}
+
+		if ifScript := node.GetAttr("if"); ifScript.Valid {
+			stop.IfScript = ifScript.String
 		}
 
 		treatments.ReplaceWithChildren(nodeToReplace, stop, node)

@@ -6,6 +6,8 @@ import (
 
 type StopFail struct {
 	goldast.BaseBlock
+	IfScript string
+	Result   *bool
 }
 
 // NewRundownBlock returns a new RundownBlock node.

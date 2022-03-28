@@ -1,5 +1,7 @@
 package errs
 
+import "errors"
+
 type ExecutionError struct {
 	ExitCode int
 }
@@ -7,3 +9,6 @@ type ExecutionError struct {
 func (e *ExecutionError) Error() string {
 	return "Cannot continue"
 }
+
+var ErrStopOk = errors.New("StopOK")
+var ErrStopFail = errors.New("StopFail")
