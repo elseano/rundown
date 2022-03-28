@@ -7,6 +7,7 @@ import (
 
 	rundown "github.com/elseano/rundown/pkg"
 	"github.com/elseano/rundown/pkg/ast"
+	"gopkg.in/guregu/null.v4"
 
 	// glamrend "github.com/elseano/rundown/pkg/rundown/renderer/glamour"
 
@@ -94,6 +95,12 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 
 	for _, o := range sectionPointer.Options {
 		opt := o
+
+		// Populate defaults with the current environment setting, unless default has been specified.
+		if cval, ok := os.LookupEnv(opt.OptionAs); ok && !opt.OptionDefault.Valid {
+			opt.OptionDefault = null.NewString(cval, cval != "")
+		}
+
 		switch topt := opt.OptionType.(type) {
 		case *ast.TypeString:
 			optionEnv[opt.OptionAs] = optVal{Str: command.Flags().String(opt.OptionName, opt.OptionDefault.String, opt.OptionDescription), Option: opt}
@@ -105,7 +112,7 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 			optionEnv[opt.OptionAs] = optVal{Str: command.Flags().String(opt.OptionName, opt.OptionDefault.String, opt.OptionDescription), Option: opt}
 		}
 
-		if opt.OptionRequired {
+		if opt.OptionRequired && !opt.OptionDefault.Valid {
 			command.MarkFlagRequired(opt.OptionName)
 		}
 

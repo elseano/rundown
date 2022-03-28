@@ -16,7 +16,7 @@ git tag -a $VERSION -m "First release"
 git push origin $VERSION
 ```
 
-<r spinner="Releasing..." stdout>Then, run `goreleaser` to cross-compile and publish the release to GitHub</r>
+<r spinner="Releasing $VERSION..." stdout>Then, run `goreleaser` to cross-compile and publish the release to GitHub</r>
 
 ``` bash
 source .env && goreleaser release --skip-validate --rm-dist
