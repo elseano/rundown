@@ -26,7 +26,7 @@ How Rundown runs your code can be modified using these attributes:
 
 ### Example 1 - Spinner Customisation <r section="spinner" />
 
-Given this:
+The spinner attribute allows you to customise the spinner text...
 
 ~~~ markdown
 <r spinner="Tweaking widgets..." />
@@ -171,3 +171,30 @@ Script Failed:
   
   Line 2: this_command_doesnt_exist: command not found
 ```
+
+### Example 7 - Dynamic spinners <r section="dynamic-spinner"/>
+
+Sometimes you'd like to have your spinners be a bit more descriptive. Rundown expands environment variables in spinner names:
+
+~~~ markdown
+<r capture-env="TITLE"/>
+
+``` bash
+TITLE="Some title"
+```
+
+<r spinner="$TITLE..." stdout/>
+
+``` bash
+echo "Hi from a dynamic spinner"
+```
+~~~
+
+Will render:
+
+~~~ expected
+✔ Running...
+↓ Some title...
+    Hi from a dynamic spinner
+✔ Some title...
+~~~
