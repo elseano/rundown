@@ -172,7 +172,7 @@ Script Failed:
   Line 2: this_command_doesnt_exist: command not found
 ```
 
-### Example 7 - Dynamic spinners <r section="dynamic-spinner"/>
+### Example 7 - Dynamic spinners <r-disabled section="dynamic-spinner"/>
 
 Sometimes you'd like to have your spinners be a bit more descriptive. Rundown expands environment variables in spinner names:
 
