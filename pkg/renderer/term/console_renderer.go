@@ -595,6 +595,8 @@ func createSpinner(writer io.Writer, env map[string]string) Spinner {
 		s = NewSpinnerFunc(writer)
 	} else if _, gitlab := os.LookupEnv("GITLAB_CI"); gitlab {
 		s = spinner.NewGitlabSpinner(writer)
+	} else if _, ci := os.LookupEnv("CI"); ci {
+		s = spinner.NewCISpinner(writer)
 	} else {
 		s = spinner.NewStdoutSpinner(Aurora, ColorsEnabled, writer)
 	}
