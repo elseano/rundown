@@ -744,13 +744,17 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 	}
 
 	if result.ExitCode != 0 {
+		if spinner != nil {
+			spinner.Spinner.Error("Failed")
+		}
+
 		r.exitCode = result.ExitCode
 
 		// output := result.Output
 		output, _ := ioutil.ReadAll(errorCapture.Reader)
 
-		w.WriteString("\n\n")
-		w.WriteString(aurora.Red("Script Failed:\n").String())
+		w.WriteString("\n")
+		w.WriteString(Aurora.Red("Script Failed:\n").String())
 
 		resultErr := exec.ParseError(result.Scripts, string(output))
 		r.writeLinesWithPrefix("  ", string(resultErr.String(Aurora)), w)
@@ -768,9 +772,6 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 		stopFail := rundown_ast.NewStopFail()
 		node.Parent().InsertAfter(node.Parent(), insertAfterNode, stopFail)
-		if spinner != nil {
-			spinner.Spinner.Error("Failed")
-		}
 
 		// Allow the FailureNode to handle this.
 		return ast.WalkContinue, nil

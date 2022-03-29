@@ -98,7 +98,11 @@ func GetSectionForNode(node goldast.Node) *SectionPointer {
 		node = node.PreviousSibling()
 	}
 
-	return node.(*SectionPointer)
+	if p, ok := node.(*SectionPointer); ok {
+		return p
+	}
+
+	return nil
 }
 
 func PruneDocumentToRoot(doc goldast.Node) {

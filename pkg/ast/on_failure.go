@@ -51,6 +51,11 @@ func (n *OnFailure) ConvertToParagraph() *goldast.Paragraph {
 // Searches the current node's section for OnFailure nodes and returns them.
 func GetOnFailureNodes(node goldast.Node) []*OnFailure {
 	section := GetSectionForNode(node)
+
+	if section == nil {
+		return []*OnFailure{}
+	}
+
 	result := []*OnFailure{}
 
 	sectionReached := false

@@ -144,3 +144,30 @@ SQL can't be run directly. Lets just write it out to the console:
     SELECT * FROM Users
 ✔ Querying database...
 ~~~
+
+### Example 6 - A broken script <r section="broken"/>
+
+There's going to be times when your script won't work. Rundown does it's best to highlight where your script broke:
+
+~~~ markdown
+<r spinner="Running..." />
+
+``` bash
+echo "Hi there"
+this_command_doesnt_exist
+echo "Never reached"
+```
+~~~
+
+Should render:
+
+``` expected-err
+✖ Running...
+
+Script Failed:
+       1: echo "Hi there"
+  *    2: this_command_doesnt_exist
+       3: echo "Never reached"
+  
+  Line 2: this_command_doesnt_exist: command not found
+```
