@@ -2,6 +2,7 @@ package exec
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -141,8 +142,8 @@ func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
 	var waiter sync.WaitGroup
 
 	outputCaptureGroup = i.modifiers.GetStdout()
-	captureOutputStream(outputCaptureGroup, &waiter, stdout)
-	captureOutputStream(outputCaptureGroup, &waiter, stderr)
+	captureOutputStream(outputCaptureGroup, &waiter, stdout, "STDOUT")
+	captureOutputStream(outputCaptureGroup, &waiter, stderr, "STDERR")
 
 	util.Logger.Trace().Msg("Waiting process termination")
 	waitErr := process.Wait()
@@ -212,18 +213,22 @@ func launchProcess(content *scripts.ScriptManager, baseEnv map[string]string, cw
 	return err, process, stdout, stderr
 }
 
-func captureOutputStream(outputCaptureGroup []io.Writer, waiter *sync.WaitGroup, stdout *io.PipeReader) {
-	util.Logger.Trace().Msgf("Copying STDOUT to %d other streams: %#v", len(outputCaptureGroup), outputCaptureGroup)
+func captureOutputStream(outputCaptureGroup []io.Writer, waiter *sync.WaitGroup, stdout *io.PipeReader, name string) {
+	util.Logger.Trace().Msgf("Copying %s to %d other streams: %#v", name, len(outputCaptureGroup), outputCaptureGroup)
 
 	var writer = io.MultiWriter(outputCaptureGroup...)
 
 	waiter.Add(1)
 	go func() {
-		util.Logger.Trace().Msg("Capturing STDOUT")
-		w, _ := io.Copy(writer, stdout)
-		util.Logger.Trace().Msgf("STDOUT closed, bytes written: %d", w)
+		defer waiter.Done()
 
-		waiter.Done()
+		util.Logger.Trace().Msgf("Capturing %s", name)
+		w, err := io.Copy(writer, stdout)
+		if err != nil && !errors.Is(err, io.ErrClosedPipe) {
+			util.Logger.Err(err).Msgf("Error: %s", err.Error())
+			return
+		}
+		util.Logger.Trace().Msgf("%s closed, bytes written: %d", name, w)
 	}()
 }
 

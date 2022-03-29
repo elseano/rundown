@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	a "github.com/Azure/go-ansiterm"
+	"github.com/elseano/rundown/pkg/util"
 )
 
 // Writes terminal output to the screen, while allowing for per-line alterations.
@@ -72,7 +73,7 @@ func (f *AnsiScreenWriter) Process() {
 		processed, err := f.parser.Parse(buffer[0:count])
 
 		if err != nil {
-			fmt.Printf("ERR: %s", err.Error())
+			util.Logger.Err(err).Msgf("Error: %s", err.Error())
 			return
 		}
 
@@ -87,17 +88,6 @@ func (f *AnsiScreenWriter) allocLineStat(line int) {
 	for i := len(f.stats.lines); i <= line+1; i++ {
 		f.stats.lines = append(f.stats.lines, lineInfo{unwrittenChars: bytes.Buffer{}, hasVisibleChars: false})
 	}
-}
-
-// Stores an invisible char into the line buffer
-func (f *AnsiScreenWriter) storeUnwrittenString(s string) {
-	line := f.stats.cursor.line
-
-	f.allocLineStat(line)
-
-	f.stats.lines[line].unwrittenChars.WriteString(s)
-
-	f.stats.cursor.column++
 }
 
 // Print
@@ -142,26 +132,36 @@ func (f *AnsiScreenWriter) Execute(b byte) error {
 
 // Cursor Up
 func (f *AnsiScreenWriter) CUU(count int) error {
-	f.stats.cursor.line -= count
-	f.stats.cursor.column = 0
+	line := f.stats.cursor.line
+	line -= count
 
-	if f.stats.cursor.line < 0 {
-		f.stats.cursor.line = 0
+	if line < 0 {
+		line = 0
 	}
 
-	line := f.stats.cursor.line
+	oldLine := f.stats.cursor.line
+	f.stats.cursor.line = line
+
 	f.allocLineStat(line)
 	f.stats.lines[line].hasIndent = false
 
-	f.flushBuffer.WriteString(fmt.Sprintf("\033[%dA", count))
+	util.Logger.Trace().Msgf("Cursor up by %d. Was line %d, now on line %d, diff: %d", count, oldLine, line, line-oldLine)
+
+	if oldLine-line > 0 {
+		f.flushBuffer.WriteString(fmt.Sprintf("\033[%dA", oldLine-line))
+	}
 
 	return nil
 }
 
 // CUrsor Down
 func (f *AnsiScreenWriter) CUD(count int) error {
+	oldLine := f.stats.cursor.line
 	f.stats.cursor.line += count
 
+	util.Logger.Trace().Msgf("Cursor down by %d. Was line %d, now on line %d, diff: %d", count, oldLine, f.stats.cursor.line)
+
+	f.flushBuffer.WriteString(fmt.Sprintf("\033[%dB", count))
 	return nil
 }
 
@@ -179,6 +179,8 @@ func (f *AnsiScreenWriter) CUB(count int) error {
 		f.stats.cursor.column = 0
 	}
 
+	util.Logger.Trace().Msgf("Cursor back by %d", count)
+
 	return nil
 }
 
@@ -186,7 +188,7 @@ func (f *AnsiScreenWriter) CUB(count int) error {
 func (f *AnsiScreenWriter) CNL(count int) error {
 	f.stats.cursor.line += count
 	f.stats.cursor.column = 0
-	return nil
+	return fmt.Errorf("not implemented: CNL")
 }
 
 // Cursor to Previous Line
@@ -198,40 +200,51 @@ func (f *AnsiScreenWriter) CPL(count int) error {
 		f.stats.cursor.line = 0
 	}
 
-	return nil
+	return fmt.Errorf("not implemented: CPL")
 }
 
 // Cursor Horizontal position Absolute
 func (f *AnsiScreenWriter) CHA(pos int) error {
 	f.stats.cursor.column = pos
+
+	f.stats.lines[f.stats.cursor.line].hasIndent = false
+	util.Logger.Trace().Msgf("Cursor Horizontal to %d", pos)
+
+	f.flushBuffer.WriteString(fmt.Sprintf("\033[%dG", pos))
+
 	return nil
 }
 
 // Vertical line Position Absolute
 func (f *AnsiScreenWriter) VPA(pos int) error {
 	f.stats.cursor.line = pos
-	return nil
+	return fmt.Errorf("not implemented: VPA")
 }
 
 // CUrsor Position
 func (f *AnsiScreenWriter) CUP(x int, y int) error {
 	f.stats.cursor.line = y
 	f.stats.cursor.column = x
-	return nil
+	return fmt.Errorf("not implemented: CUP")
 }
 
 // Horizontal and Vertical Position (depends on PUM)
 func (f *AnsiScreenWriter) HVP(x int, y int) error {
 	f.stats.cursor.line = y
 	f.stats.cursor.column = x
-	return nil
 
+	return fmt.Errorf("not implemented: HVP")
 }
 
 // Text Cursor Enable Mode
 func (f *AnsiScreenWriter) DECTCEM(enable bool) error {
-	return fmt.Errorf("not implemented: CursorEnable %+v", enable)
-
+	if enable {
+		_, err := f.flushBuffer.WriteString("\033[?25h")
+		return err
+	} else {
+		_, err := f.flushBuffer.WriteString("\033[?25l")
+		return err
+	}
 }
 
 // Origin Mode
@@ -335,23 +348,26 @@ func (f *AnsiScreenWriter) RI() error {
 
 // Flush updates from previous commands
 func (f *AnsiScreenWriter) Flush() error {
-	if f.beforeFlush != nil {
-		f.beforeFlush()
-	}
+	if f.flushBuffer.Len() > 0 {
+		if f.beforeFlush != nil {
+			f.beforeFlush()
+		}
 
-	f.currentRunOutput.Write(f.flushBuffer.Bytes())
-	f.flushBuffer.Reset()
+		util.Logger.Trace().Msgf("Flushing: %#v", f.flushBuffer.Bytes())
+		f.currentRunOutput.Write(f.flushBuffer.Bytes())
+		f.flushBuffer.Reset()
 
-	type flushable interface {
-		Flush() error
-	}
+		type flushable interface {
+			Flush() error
+		}
 
-	if flushWriter, ok := f.currentRunOutput.(flushable); ok {
-		flushWriter.Flush()
-	}
+		if flushWriter, ok := f.currentRunOutput.(flushable); ok {
+			flushWriter.Flush()
+		}
 
-	if f.afterFlush != nil {
-		f.afterFlush()
+		if f.afterFlush != nil {
+			f.afterFlush()
+		}
 	}
 
 	return nil
