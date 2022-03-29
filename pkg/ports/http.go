@@ -96,7 +96,7 @@ func renderDoc(w http.ResponseWriter, r *http.Request, gm goldmark.Markdown, doc
 			w.Write([]byte("<ul>"))
 
 			for _, s := range sections {
-				w.Write([]byte(fmt.Sprintf("<li><a href='/%s'>%s</a> &mdash; %s</li>", s.SectionName, s.DescriptionShort, s.DescriptionLong)))
+				w.Write([]byte(fmt.Sprintf("<li><a href='/%s'>%s</a></li>", s.SectionName, s.DescriptionShort)))
 			}
 
 			w.Write([]byte("</ul>"))

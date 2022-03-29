@@ -17,7 +17,7 @@ func TestErrorParseBash(t *testing.T) {
 	err := ParseError(sm, output)
 
 	if assert.NotNil(t, err.ErrorSource) {
-		if assert.Equal(t, 5, err.ErrorSource.Line) {
+		if assert.Equal(t, 4, err.ErrorSource.Line) {
 			assert.Equal(t, "DOCKER_BUILD_TAG: unbound variable", err.Error)
 		}
 	}
@@ -33,7 +33,7 @@ func TestErrorParseBashAdjustsForPrefix(t *testing.T) {
 	err := ParseError(sm, output)
 
 	if assert.NotNil(t, err.ErrorSource) {
-		if assert.Equal(t, 1, err.ErrorSource.Line) {
+		if assert.Equal(t, 0, err.ErrorSource.Line) {
 			assert.Equal(t, "DOCKER_BUILD_TAG: unbound variable", err.Error)
 		}
 	}

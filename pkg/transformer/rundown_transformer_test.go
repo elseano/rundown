@@ -148,7 +148,7 @@ blah
 
 }
 
-func TestExecutionBlockDefaults(t *testing.T) {
+func TestExecutionBlockNotDefault(t *testing.T) {
 	source := []byte(`
 ~~~ go
 blah
@@ -170,18 +170,8 @@ blah
 
 	target := doc.FirstChild()
 
-	if assert.NotNil(t, target) && assert.Equal(t, "ExecutionBlock", target.Kind().String()) {
-
-		eb := target.(*ast.ExecutionBlock)
-
-		assert.Equal(t, ast.SpinnerModeVisible, eb.SpinnerMode)
-		assert.Equal(t, "Running...", eb.SpinnerName)
-
-		assert.Equal(t, "go", eb.With)
-
-		assert.Equal(t, false, eb.ShowStdout)
-
-	}
+	assert.NotNil(t, target)
+	assert.Equal(t, "FencedCodeBlock", target.Kind().String())
 
 }
 
@@ -297,7 +287,7 @@ blah
 		assert.Equal(t, "SomeSection", sp.SectionName)
 		assert.Equal(t, target.NextSibling(), sp.StartNode)
 		assert.Equal(t, "This is a heading", sp.DescriptionShort)
-		assert.Equal(t, "This is a longer description", sp.DescriptionLong)
+		assert.Equal(t, "This is a longer description", string(sp.DescriptionLong.FirstChild().(*goldast.String).Value))
 	}
 
 }

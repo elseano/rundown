@@ -380,7 +380,6 @@ func getAst(contents []byte) ast.Node {
 	md := goldmark.New(
 		goldmark.WithExtensions(
 			extension.GFM,
-			InvisibleBlocks,
 			extension.Strikethrough,
 			RundownElements,
 			Emoji,
