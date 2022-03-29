@@ -36,14 +36,16 @@ func ExtractRundownElement(node goldast.Node, reader goldtext.Reader, currentTag
 				}
 			}
 
-			if token.Attr != nil {
-				currentRundownTag.attrs = make([]html.Attribute, len(token.Attr))
-				copy(currentRundownTag.attrs, token.Attr)
-			}
+			if currentRundownTag != nil {
+				if token.Attr != nil {
+					currentRundownTag.attrs = make([]html.Attribute, len(token.Attr))
+					copy(currentRundownTag.attrs, token.Attr)
+				}
 
-			if ttype == html.SelfClosingTagToken {
-				currentRundownTag.closed = true
-				return currentRundownTag
+				if ttype == html.SelfClosingTagToken {
+					currentRundownTag.closed = true
+					return currentRundownTag
+				}
 			}
 		case html.TextToken:
 			if currentRundownTag != nil {
