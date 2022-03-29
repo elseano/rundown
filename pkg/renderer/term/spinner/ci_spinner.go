@@ -3,15 +3,19 @@ package spinner
 import (
 	"fmt"
 	"io"
+
+	"github.com/logrusorgru/aurora"
 )
 
 type CISpinner struct {
 	out            io.Writer
 	currentHeading string
+	stampedHeading string
+	colors         aurora.Aurora
 }
 
-func NewCISpinner(out io.Writer) *CISpinner {
-	return &CISpinner{out: out}
+func NewCISpinner(out io.Writer, colors aurora.Aurora) *CISpinner {
+	return &CISpinner{out: out, colors: colors}
 }
 
 func (s *CISpinner) Active() bool {
@@ -23,18 +27,34 @@ func (s *CISpinner) Start() {}
 func (s *CISpinner) Stop() {}
 
 func (s *CISpinner) StampShadow() {
+	if s.stampedHeading != s.currentHeading {
+		s.out.Write([]byte(s.colors.Faint(fmt.Sprintf("↓ %s\r\n", s.currentHeading)).String()))
+		s.stampedHeading = s.currentHeading
+	}
 }
 
 func (s *CISpinner) Success(message string) {
-	s.out.Write([]byte(fmt.Sprintf("  %s %s (%s)", TICK, s.CurrentHeading(), message)))
+	if message != "" {
+		message = s.colors.Faint(fmt.Sprintf("(%s)", message)).String()
+	}
+
+	s.out.Write([]byte(fmt.Sprintf("%s %s %s\n", s.colors.Green(TICK), s.CurrentHeading(), message)))
 }
 
 func (s *CISpinner) Error(message string) {
-	s.out.Write([]byte(fmt.Sprintf("  %s %s (%s)", CROSS, s.CurrentHeading(), message)))
+	if message != "" {
+		message = s.colors.Faint(fmt.Sprintf("(%s)", message)).String()
+	}
+
+	s.out.Write([]byte(fmt.Sprintf("%s %s %s\n", s.colors.Red(CROSS), s.CurrentHeading(), message)))
 }
 
 func (s *CISpinner) Skip(message string) {
-	s.out.Write([]byte(fmt.Sprintf("  %s %s (%s)", SKIP, s.CurrentHeading(), message)))
+	if message != "" {
+		message = s.colors.Faint(fmt.Sprintf("(%s)", message)).String()
+	}
+
+	s.out.Write([]byte(fmt.Sprintf("%s %s %s\n", s.colors.Yellow(SKIP), s.CurrentHeading(), message)))
 }
 
 func (s *CISpinner) SetMessage(message string) {

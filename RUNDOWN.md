@@ -60,11 +60,15 @@ echo "Bye"
 
 ## Test curl response <r section="test:curl"/>
 
+Makes a call to `http://example.org` via `curl` and renders the result as it is received.
+
 <r stdout spinner="Requesting..."/>
 
 ``` bash
 curl http://example.org
 ```
+
+:rocket: Test completed successfully.
 
 ## Test curl response <r section="test:ls"/>
 
