@@ -159,7 +159,7 @@ func (f *AnsiScreenWriter) CUD(count int) error {
 	oldLine := f.stats.cursor.line
 	f.stats.cursor.line += count
 
-	util.Logger.Trace().Msgf("Cursor down by %d. Was line %d, now on line %d, diff: %d", count, oldLine, f.stats.cursor.line)
+	util.Logger.Trace().Msgf("Cursor down by %d. Was line %d, now on line %d", count, oldLine, f.stats.cursor.line)
 
 	f.flushBuffer.WriteString(fmt.Sprintf("\033[%dB", count))
 	return nil
