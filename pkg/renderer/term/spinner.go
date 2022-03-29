@@ -1,5 +1,7 @@
 package term
 
+import "io"
+
 // spx "github.com/tj/go-spin"
 // spx "github.com/briandowns/spinner"
 
@@ -16,3 +18,5 @@ type Spinner interface {
 	CurrentHeading() string
 	StampShadow()
 }
+
+var NewSpinnerFunc func(w io.Writer) Spinner = nil

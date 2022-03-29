@@ -153,13 +153,13 @@ func convertRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc pars
 			// treatments.Remove(node)
 
 		case *goldast.FencedCodeBlock:
-			if !treatments.IsIgnored(node) {
-				eb := ast.NewExecutionBlock(node)
-				if with := node.Info; with != nil {
-					eb.With = string(with.Text(reader.Source()))
-				}
-				treatments.Replace(node, eb)
-			}
+			// if !treatments.IsIgnored(node) {
+			// 	eb := ast.NewExecutionBlock(node)
+			// 	if with := node.Info; with != nil {
+			// 		eb.With = string(with.Text(reader.Source()))
+			// 	}
+			// 	treatments.Replace(node, eb)
+			// }
 
 		}
 

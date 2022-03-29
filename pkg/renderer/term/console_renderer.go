@@ -3,6 +3,7 @@ package term
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -474,17 +475,13 @@ func (r *Renderer) renderNothing(w util.BufWriter, source []byte, node ast.Node,
 	return ast.WalkSkipChildren, nil
 }
 
-func runIfScript(ctx *rundown_renderer.Context, ifScript string) (bool, error) {
+func runIfScript(ctx *rundown_renderer.Context, w io.Writer, ifScript string) (bool, error) {
 	intent, err := exec.NewExecution("bash", []byte(ifScript), path.Dir(ctx.RundownFile))
 
 	if err != nil {
 		return false, err
 	}
 
-	spinner := createSpinner(ctx.Env)
-	defer spinner.Stop()
-
-	intent.AddModifier(modifiers.NewSpinnerConstant("Checking...", spinner))
 	result, err := intent.Execute()
 
 	if err != nil {
@@ -499,7 +496,7 @@ func (r *Renderer) renderStopFail(w util.BufWriter, source []byte, node ast.Node
 
 	if stop.IfScript != "" {
 		if stop.Result == nil {
-			result, err := runIfScript(r.Context, stop.IfScript)
+			result, err := runIfScript(r.Context, w, stop.IfScript)
 
 			if err != nil {
 				return ast.WalkStop, err
@@ -530,7 +527,7 @@ func (r *Renderer) renderStopOk(w util.BufWriter, source []byte, node ast.Node, 
 
 	if stop.IfScript != "" {
 		if stop.Result == nil {
-			result, err := runIfScript(r.Context, stop.IfScript)
+			result, err := runIfScript(r.Context, w, stop.IfScript)
 
 			if err != nil {
 				return ast.WalkStop, err
@@ -588,13 +585,20 @@ func friendlyDuration(d time.Duration) string {
 }
 
 // Creates the correct spinner based on the environment.
-func createSpinner(env map[string]string) Spinner {
+func createSpinner(writer io.Writer, env map[string]string) Spinner {
 	var s Spinner
 
+	// Ensure we always immediately flush when writing the spinner.
+	writer = NewFlushingWriter(writer)
+
+	if NewSpinnerFunc != nil {
+		return NewSpinnerFunc(writer)
+	}
+
 	if _, gitlab := os.LookupEnv("GITLAB_CI"); gitlab {
-		s = spinner.NewGitlabSpinner(os.Stdout)
+		s = spinner.NewGitlabSpinner(writer)
 	} else {
-		s = spinner.NewStdoutSpinner(Aurora, ColorsEnabled, os.Stdout)
+		s = spinner.NewStdoutSpinner(Aurora, ColorsEnabled, writer)
 	}
 
 	return spinner.NewSubenvSpinner(env, s)
@@ -654,7 +658,7 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 	switch executionBlock.SpinnerMode {
 	case rundown_ast.SpinnerModeInlineAll:
-		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, createSpinner(r.Context.Env))
+		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, createSpinner(w, r.Context.Env))
 		intent.AddModifier(spinner)
 
 		rdutil.Logger.Debug().Msg("Inline all mode")
@@ -663,7 +667,7 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 	case rundown_ast.SpinnerModeVisible:
 		rdutil.Logger.Debug().Msg("Normal spinner mode")
-		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, createSpinner(r.Context.Env))
+		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, createSpinner(w, r.Context.Env))
 		intent.AddModifier(spinner)
 
 	default:
@@ -1125,8 +1129,15 @@ func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, n ast.Node, 
 			prevBlock = n.Parent().PreviousSibling()
 		}
 		// If we're following an execution block, add a extra line.
-		if _, ok := prevBlock.(*rundown_ast.ExecutionBlock); ok {
+		switch prevBlock.(type) {
+		case *rundown_ast.ExecutionBlock:
 			w.WriteString("\n")
+		case *rundown_ast.StopFail, *rundown_ast.StopOk:
+			// If prev is stop, then the if check failed, look further back.
+			switch prevBlock.PreviousSibling().(type) {
+			case *rundown_ast.ExecutionBlock:
+				w.WriteString("\n")
+			}
 		}
 
 		link, ok := n.FirstChild().(*ast.Link)

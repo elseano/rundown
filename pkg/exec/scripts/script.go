@@ -30,9 +30,12 @@ func (s *Script) Write() error {
 		return err
 	}
 
-	tempFile.Write([]byte("#!"))
-	tempFile.Write([]byte(invo))
-	tempFile.Write([]byte("\n\n"))
+	if invo != "" {
+		tempFile.Write([]byte("#!"))
+		tempFile.Write([]byte(invo))
+		tempFile.Write([]byte("\n\n"))
+	}
+
 	if prefix != "" {
 		if s.Prefix == nil {
 			s.Prefix = []byte(fmt.Sprintf("%s\n", prefix))
@@ -53,7 +56,9 @@ func (s *Script) Write() error {
 	defer tempFile.Close()
 	s.AbsolutePath = tempFile.Name()
 
-	os.Chmod(s.AbsolutePath, 0700)
+	if invo != "" {
+		os.Chmod(s.AbsolutePath, 0700)
+	}
 
 	return nil
 }
@@ -72,6 +77,11 @@ func isShellLike(via string) bool {
 }
 
 func buildInvocation(interpreter string) (string, string, error) {
+	// If no interpreter, just save the file.
+	if interpreter == "" {
+		return "", "", nil
+	}
+
 	abs, err := exec.LookPath(interpreter)
 
 	if err != nil {

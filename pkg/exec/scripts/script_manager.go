@@ -23,6 +23,15 @@ func NewScriptManager() *ScriptManager {
 }
 
 func (m *ScriptManager) SetBaseScript(invocation string, contents []byte) (*Script, error) {
+	// If theres a space in the invocation, then it's a command with options,
+	// so wrap it in a bash script.
+	if strings.IndexByte(invocation, ' ') > -1 {
+		m.AddScript("FILE", "", contents)
+		base, err := m.AddScript("BASE", "bash", []byte(invocation))
+
+		return base, err
+	}
+
 	return m.AddScript("BASE", invocation, contents)
 }
 
