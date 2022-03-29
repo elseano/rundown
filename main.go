@@ -22,7 +22,8 @@ func main() {
 	useColors := true
 
 	if !isatty.IsTerminal(os.Stdout.Fd()) {
-		useColors = false
+		_, isCI := os.LookupEnv("CI")
+		useColors = isCI
 	} else if _, ok := os.LookupEnv("NO_COLOR"); ok {
 		useColors = false
 	}
