@@ -145,7 +145,7 @@ SQL can't be run directly. Lets just write it out to the console:
 ✔ Querying database...
 ~~~
 
-### Example 6 - A broken script <r section="broken"/>
+### Example 6 - A broken script <r-disabled section="broken"/>
 
 There's going to be times when your script won't work. Rundown does it's best to highlight where your script broke:
 
