@@ -69,6 +69,7 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 
 			executionContext := section.Document.Context
 			executionContext.ImportRawEnv(os.Environ())
+			executionContext.RundownFile = section.Document.Filename
 
 			for k, v := range optionEnv {
 				if err := v.Option.OptionType.Validate(v.String()); err != nil {
@@ -81,16 +82,13 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 			}
 
 			ast.PruneDocumentToSection(doc, sectionPointer.SectionName)
+			sectionPointer.SetIfScript("") // Ensure the requested section runs.
 
 			if val, err := cmd.Flags().GetBool("dump"); err == nil && val {
 				doc.Dump(source, 1)
 			}
 
-			ast := rdutil.CaptureStdout(func() {
-				doc.Dump(source, 0)
-			})
-
-			rdutil.Logger.Debug().Msg(ast)
+			fmt.Printf("Running %s in %s...\n\n", sectionPointer.SectionName, section.Document.Filename)
 
 			err := gm.Renderer().Render(os.Stdout, source, doc)
 
@@ -129,7 +127,8 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 	}
 
 	command.SetFlagErrorFunc(func(errCmd *cobra.Command, err error) error {
-		return fmt.Errorf("ERROR")
+		fmt.Printf("Error: %s\n", err.Error())
+		return fmt.Errorf("error: %w", err)
 	})
 
 	return &command

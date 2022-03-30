@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 
 	"github.com/elseano/rundown/cmd/rundown/cmd"
@@ -39,6 +40,11 @@ func main() {
 	}
 
 	if errors.Is(err, errs.ErrStopFail) {
+		os.Exit(1)
+	}
+
+	if err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
 		os.Exit(1)
 	}
 }

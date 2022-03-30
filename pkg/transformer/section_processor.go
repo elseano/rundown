@@ -69,8 +69,9 @@ func (p *SectionProcessor) Process(node goldast.Node, reader goldtext.Reader, tr
 // Given the startNode (being the section node itself), returns the node which terminates the section.
 func FindEndOfSection(startNode *goldast.Heading) goldast.Node {
 	for sib := startNode.NextSibling(); sib != nil; sib = sib.NextSibling() {
-		util.Logger.Trace().Msgf("Check %s\n", sib.Kind().String())
+		util.Logger.Trace().Msgf("Check %s", sib.Kind().String())
 		if h, ok := sib.(*goldast.Heading); ok {
+			util.Logger.Trace().Msgf("FindEndOfSection: Found heading at %d, section at %d", h.Level, startNode.Level)
 			if h.Level <= startNode.Level {
 				return h
 			}
@@ -88,7 +89,7 @@ func PopulateSectionMetadata(start *ast.SectionPointer, end *ast.SectionEnd, rea
 		}
 
 		if inside {
-			util.Logger.Trace().Msgf("Scanning section contents: %s\n", n.Kind().String())
+			util.Logger.Trace().Msgf("Scanning section contents: %s", n.Kind().String())
 			switch node := n.(type) {
 			case *ast.DescriptionBlock:
 				start.DescriptionLong = node

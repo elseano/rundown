@@ -8,6 +8,7 @@ var (
 	flagAskRepeat      bool
 	flagDefault        string
 	flagCols           int
+	flagDump           bool
 	flagFilename       string
 	flagCompletions    string
 	flagNonInteractive bool

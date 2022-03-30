@@ -1,6 +1,8 @@
 package ast
 
 import (
+	"fmt"
+
 	goldast "github.com/yuin/goldmark/ast"
 )
 
@@ -8,7 +10,9 @@ type SaveCodeBlock struct {
 	goldast.BaseBlock
 	CodeBlock *goldast.FencedCodeBlock
 
+	Reveal         bool
 	SaveToVariable string
+	Replacements   map[string]string
 }
 
 // NewRundownBlock returns a new RundownBlock node.
@@ -17,6 +21,7 @@ func NewSaveCodeBlock(fcb *goldast.FencedCodeBlock, saveToVariable string) *Save
 		BaseBlock:      goldast.NewParagraph().BaseBlock,
 		CodeBlock:      fcb,
 		SaveToVariable: saveToVariable,
+		Replacements:   map[string]string{},
 	}
 }
 
@@ -31,5 +36,6 @@ func (n *SaveCodeBlock) Kind() goldast.NodeKind {
 func (n *SaveCodeBlock) Dump(source []byte, level int) {
 	goldast.DumpHelper(n, source, level, map[string]string{
 		"SaveToVariable": n.SaveToVariable,
+		"Replacements":   fmt.Sprintf("%#v", n.Replacements),
 	}, nil)
 }

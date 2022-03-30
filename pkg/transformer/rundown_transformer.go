@@ -251,11 +251,16 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 
 				heading.Parent().InsertBefore(heading.Parent(), heading, start)
 
+				if ifScript := node.GetAttr("if"); ifScript.Valid {
+					start.SetIfScript(ifScript.String)
+				}
+
+				util.Logger.Debug().Msgf("FindEndOfSection: %s", start.SectionName)
 				end := FindEndOfSection(heading)
 				if end != nil {
-					end.Parent().InsertBefore(end.Parent(), end, &ast.SectionEnd{SectionPointer: start})
+					end.Parent().InsertBefore(end.Parent(), end, start.End)
 				} else {
-					node.OwnerDocument().AppendChild(node.OwnerDocument(), &ast.SectionEnd{SectionPointer: start})
+					node.OwnerDocument().AppendChild(node.OwnerDocument(), start.End)
 				}
 
 				treatments.Remove(node)
@@ -266,15 +271,52 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 				start.DescriptionShort = node.GetAttr("desc").ValueOrZero()
 
 				node.Parent().InsertBefore(node.Parent(), node, start)
-
-				end := &ast.SectionEnd{SectionPointer: start}
-				node.Parent().InsertAfter(node.Parent(), node, end)
+				node.Parent().InsertAfter(node.Parent(), node, start.End)
 
 				treatments.DissolveRundownBlock(node)
 			}
 		}
 
 		return nil
+	} else if h, ok := node.Parent().(*goldast.Heading); ok {
+		// Check if there's a conditional...
+
+		if ifScript := node.GetAttr("if"); ifScript.Valid {
+			cond := ast.NewConditionalStart()
+			cond.SetIfScript(ifScript.String)
+
+			h.Parent().InsertBefore(h.Parent(), h, cond)
+
+			postH := false
+			nextHeading := ast.FindNode(h.Parent(), func(n goldast.Node) bool {
+				if n == h {
+					postH = true
+					return false
+				}
+
+				if postH {
+					if hh, ok := n.(*goldast.Heading); ok {
+						// The end is another heading at the same level, or a heading at a lower level.
+						return hh.Level <= h.Level
+					}
+				}
+
+				return false
+			})
+
+			// Make sure the conditional end stays inside the section.
+			if nextHeading != nil {
+				if n, ok := nextHeading.PreviousSibling().(*ast.SectionEnd); ok {
+					nextHeading = n
+				}
+
+				nextHeading.Parent().InsertBefore(nextHeading.Parent(), nextHeading, cond.End)
+			} else {
+				h.OwnerDocument().AppendChild(h.OwnerDocument(), cond.End)
+			}
+
+			treatments.Remove(node)
+		}
 	}
 
 	// if node.HasAttr("label", "section") {
@@ -309,13 +351,25 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 
 	// }
 
-	if node.HasAttr("save") {
+	if node.HasAttr("save") || node.HasAttr("save-as") {
 		if fcb, ok := nextNode.(*goldast.FencedCodeBlock); ok {
-			if saveName := node.GetAttr("save"); saveName.Valid {
+
+			if saveName := node.GetFirstAttr("save", "save-as"); saveName.Valid {
 				executionBlock := ast.NewSaveCodeBlock(fcb, saveName.String)
+				executionBlock.Reveal = node.HasAttr("reveal")
+
+				for _, r := range node.GetAttrList("replace") {
+					rParts := strings.SplitN(r, ":", 2)
+					if len(rParts) == 1 {
+						executionBlock.Replacements[r] = r
+					} else {
+						executionBlock.Replacements[rParts[0]] = rParts[1]
+					}
+				}
 
 				treatments.Ignore(node)
 				treatments.Replace(nodeToReplace, executionBlock)
+				treatments.Remove(fcb) // SaveCodeBlock looks after it's own rendering.
 			}
 		}
 
@@ -395,7 +449,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		}
 
 		if ifScript := node.GetAttr("if"); ifScript.Valid {
-			stop.IfScript = ifScript.String
+			stop.SetIfScript(ifScript.String)
 		}
 
 		treatments.ReplaceWithChildren(nodeToReplace, stop, node)
@@ -412,7 +466,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		}
 
 		if ifScript := node.GetAttr("if"); ifScript.Valid {
-			stop.IfScript = ifScript.String
+			stop.SetIfScript(ifScript.String)
 		}
 
 		treatments.ReplaceWithChildren(nodeToReplace, stop, node)

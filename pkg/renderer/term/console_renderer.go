@@ -218,6 +218,7 @@ type Renderer struct {
 	currentlySkipping bool
 	Context           *rundown_renderer.Context
 	exitCode          int
+	skipUntil         ast.Node
 }
 
 // NewRenderer returns a new Renderer with given options.
@@ -365,20 +366,20 @@ func (r *Renderer) writeLinesWithPrefix(prefix string, lines string, b util.BufW
 func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	// blocks
 
-	reg.Register(ast.KindDocument, r.blockCommon(r.renderDocument))
-	reg.Register(ast.KindHeading, r.blockCommon(r.renderHeading))
-	reg.Register(ast.KindBlockquote, r.blockCommon(r.renderBlockquote))
-	reg.Register(ast.KindCodeBlock, r.blockCommon(r.renderCodeBlock))
-	reg.Register(ast.KindFencedCodeBlock, r.blockCommon(r.renderFencedCodeBlock))
-	reg.Register(ast.KindHTMLBlock, r.blockCommon(r.renderHTMLBlock))
-	reg.Register(ast.KindList, r.blockCommon(r.renderList))
-	reg.Register(ast.KindListItem, r.blockCommon(r.renderListItem))
-	reg.Register(ast.KindParagraph, r.blockCommon(r.renderParagraph))
-	reg.Register(ast.KindTextBlock, r.blockCommon(r.renderTextBlock))
-	reg.Register(ast.KindThematicBreak, r.blockCommon(r.renderThematicBreak))
+	reg.Register(ast.KindDocument, r.supportSkipping(r.blockCommon(r.renderDocument)))
+	reg.Register(ast.KindHeading, r.supportSkipping(r.blockCommon(r.renderHeading)))
+	reg.Register(ast.KindBlockquote, r.supportSkipping(r.blockCommon(r.renderBlockquote)))
+	reg.Register(ast.KindCodeBlock, r.supportSkipping(r.blockCommon(r.renderCodeBlock)))
+	reg.Register(ast.KindFencedCodeBlock, r.supportSkipping(r.blockCommon(r.renderFencedCodeBlock)))
+	reg.Register(ast.KindHTMLBlock, r.supportSkipping(r.blockCommon(r.renderHTMLBlock)))
+	reg.Register(ast.KindList, r.supportSkipping(r.blockCommon(r.renderList)))
+	reg.Register(ast.KindListItem, r.supportSkipping(r.blockCommon(r.renderListItem)))
+	reg.Register(ast.KindParagraph, r.supportSkipping(r.blockCommon(r.renderParagraph)))
+	reg.Register(ast.KindTextBlock, r.supportSkipping(r.blockCommon(r.renderTextBlock)))
+	reg.Register(ast.KindThematicBreak, r.supportSkipping(r.blockCommon(r.renderThematicBreak)))
 	// reg.Register(rundown_ast.KindRundownBlock, r.blockCommon(r.renderRundownBlock))
 	// reg.Register(KindSection, r.blockCommon(r.renderNothing))
-	reg.Register(rundown_ast.KindExecutionBlock, r.blockCommon(r.renderExecutionBlock))
+	reg.Register(rundown_ast.KindExecutionBlock, r.supportSkipping(r.blockCommon(r.renderExecutionBlock)))
 
 	// inlines
 
@@ -395,19 +396,23 @@ func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(emoji_ast.KindEmoji, r.renderEmoji)
 
 	// other
-	reg.Register(rundown_ast.KindDescriptionBlock, r.renderHollow)
-	reg.Register(rundown_ast.KindEnvironmentSubstitution, r.renderEnvironmentSubstitution)
-	// reg.Register(rundown_ast.KindExecutionBlock, r.renderTodo)
-	reg.Register(rundown_ast.KindIgnoreBlock, r.renderTodo("Ignore"))
-	reg.Register(rundown_ast.KindOnFailure, r.renderNothing)
-	reg.Register(rundown_ast.KindRundownBlock, r.renderTodo("Rundown"))
-	reg.Register(rundown_ast.KindSaveCodeBlock, r.renderTodo("SaveCode"))
-	reg.Register(rundown_ast.KindSectionEnd, r.renderTodo("SectionEnd"))
-	reg.Register(rundown_ast.KindSectionOption, r.renderHollow)
-	reg.Register(rundown_ast.KindSectionPointer, r.renderHollow)
-	reg.Register(rundown_ast.KindStopFail, r.renderStopFail)
-	reg.Register(rundown_ast.KindStopOk, r.renderStopOk)
-	reg.Register(rundown_ast.KindSubEnvBlock, r.renderHollow)
+	reg.Register(rundown_ast.KindDescriptionBlock, r.supportSkipping(r.renderHollow))
+	reg.Register(rundown_ast.KindEnvironmentSubstitution, r.supportSkipping(r.renderEnvironmentSubstitution))
+	// reg.Register(rundown_ast.KindExecutionBlock, r.renderTodo))
+	reg.Register(rundown_ast.KindIgnoreBlock, r.supportSkipping(r.renderTodo("Ignore")))
+	reg.Register(rundown_ast.KindOnFailure, r.supportSkipping(r.renderNothing))
+	reg.Register(rundown_ast.KindRundownBlock, r.supportSkipping(r.renderTodo("Rundown")))
+	reg.Register(rundown_ast.KindSaveCodeBlock, r.supportSkipping(r.renderSaveCodeBlock))
+	reg.Register(rundown_ast.KindSectionEnd, r.supportSkipping(r.renderTodo("SectionEnd")))
+	reg.Register(rundown_ast.KindSectionOption, r.supportSkipping(r.renderHollow))
+	reg.Register(rundown_ast.KindSectionPointer, r.supportSkipping(r.renderHollow))
+	reg.Register(rundown_ast.KindStopFail, r.supportSkipping(r.renderStopFail))
+	reg.Register(rundown_ast.KindStopOk, r.supportSkipping(r.renderStopOk))
+	reg.Register(rundown_ast.KindSubEnvBlock, r.supportSkipping(r.renderHollow))
+
+	// Conditional blocks are transparent, they shouldn't render.
+	reg.Register(rundown_ast.KindConditionalStart, r.supportSkipping(r.renderHollow))
+	reg.Register(rundown_ast.KindConditionalEnd, r.supportSkipping(r.renderHollow))
 
 	// reg.Register(KindRundownInline, r.renderRundownInline)
 	// reg.Register(KindCodeModifierBlock, r.renderNothing)
@@ -466,7 +471,6 @@ func (r *Renderer) renderDocument(w util.BufWriter, source []byte, node ast.Node
 }
 
 func (r *Renderer) renderHollow(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
-	// nothing to do
 	return ast.WalkContinue, nil
 }
 
@@ -475,8 +479,14 @@ func (r *Renderer) renderNothing(w util.BufWriter, source []byte, node ast.Node,
 	return ast.WalkSkipChildren, nil
 }
 
-func runIfScript(ctx *rundown_renderer.Context, w io.Writer, ifScript string) (bool, error) {
+func runIfScript(ctx *rundown_renderer.Context, ifScript string) (bool, error) {
+	// Allow unset variables here, typically the script will be checking for these.
+	ifScript = fmt.Sprintf("set +u\n%s\n", ifScript)
+
 	intent, err := exec.NewExecution("bash", []byte(ifScript), path.Dir(ctx.RundownFile))
+	intent.ImportEnv(ctx.Env)
+
+	rdutil.Logger.Debug().Msgf("Running with env: %#v", ctx.Env)
 
 	if err != nil {
 		return false, err
@@ -492,24 +502,6 @@ func runIfScript(ctx *rundown_renderer.Context, w io.Writer, ifScript string) (b
 }
 
 func (r *Renderer) renderStopFail(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
-	stop := node.(*rundown_ast.StopFail)
-
-	if stop.IfScript != "" {
-		if stop.Result == nil {
-			result, err := runIfScript(r.Context, w, stop.IfScript)
-
-			if err != nil {
-				return ast.WalkStop, err
-			}
-
-			stop.Result = &result
-		}
-
-		if !*stop.Result {
-			return ast.WalkSkipChildren, nil
-		}
-	}
-
 	if !entering {
 		w.WriteString("\n")
 		if r.exitCode != 0 {
@@ -523,24 +515,6 @@ func (r *Renderer) renderStopFail(w util.BufWriter, source []byte, node ast.Node
 }
 
 func (r *Renderer) renderStopOk(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
-	stop := node.(*rundown_ast.StopOk)
-
-	if stop.IfScript != "" {
-		if stop.Result == nil {
-			result, err := runIfScript(r.Context, w, stop.IfScript)
-
-			if err != nil {
-				return ast.WalkStop, err
-			}
-
-			stop.Result = &result
-		}
-
-		if !*stop.Result {
-			return ast.WalkSkipChildren, nil
-		}
-	}
-
 	if !entering {
 		w.WriteString("\n")
 		return ast.WalkStop, nil
@@ -560,7 +534,10 @@ func (r *Renderer) renderEmoji(w util.BufWriter, source []byte, node ast.Node, e
 
 func (r *Renderer) renderTodo(message string) func(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	return func(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
-		w.WriteString(fmt.Sprintf("[TODO - %s]", message))
+		if entering {
+			w.WriteString(fmt.Sprintf("[TODO - %s]", message))
+		}
+
 		return ast.WalkContinue, nil
 	}
 }
@@ -575,6 +552,52 @@ func (r *Renderer) renderRundownBlock(w util.BufWriter, source []byte, node ast.
 		}
 
 		return cmd, nil
+	}
+
+	return ast.WalkContinue, nil
+}
+
+func (r *Renderer) renderSaveCodeBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if !entering {
+		return ast.WalkContinue, nil
+	}
+
+	scb := node.(*rundown_ast.SaveCodeBlock)
+
+	reader := text.NewNodeReaderFromSource(scb.CodeBlock, source)
+	contents, _ := ioutil.ReadAll(reader)
+
+	rdutil.Logger.Debug().Msgf("Rendering SaveCodeBlock...")
+
+	rdutil.Logger.Debug().Msgf("Env is currently: %#v", r.Context.Env)
+
+	for k, v := range scb.Replacements {
+		if strings.HasPrefix(v, "$") {
+			v = r.Context.Env[v[1:]]
+		}
+
+		rdutil.Logger.Debug().Msgf("Replacing %s with %s...", k, v)
+		contents = bytes.Replace(contents, []byte(k), []byte(v), -1)
+	}
+
+	rdutil.Logger.Debug().Msgf("Contents: %s", string(contents))
+
+	newFile, err := r.Context.CreateTempFile(scb.SaveToVariable)
+	if err != nil {
+		return ast.WalkStop, err
+	}
+
+	defer newFile.Close()
+
+	_, err = newFile.Write(contents)
+	if err != nil {
+		return ast.WalkStop, err
+	}
+
+	if scb.Reveal {
+		lang := string(scb.CodeBlock.Info.Text(source))
+		r.syntaxHighlightBytes(w, lang, string(contents), false)
+		w.WriteString("\n")
 	}
 
 	return ast.WalkContinue, nil
@@ -865,8 +888,78 @@ func (r *Renderer) writeString(w util.BufWriter, s string) {
 	_, _ = w.WriteString(s)
 }
 
+func (r *Renderer) supportSkipping(renderFunc renderer.NodeRendererFunc) renderer.NodeRendererFunc {
+	return func(writer util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if r.skipUntil != nil {
+			if n != r.skipUntil {
+				rdutil.Logger.Debug().Msgf("Skipping %T", n)
+				return ast.WalkSkipChildren, nil
+			} else {
+				rdutil.Logger.Debug().Msgf("Reached skip target. Rendering this one %T", n)
+				r.skipUntil = nil
+			}
+		}
+
+		if !entering {
+			return renderFunc(writer, source, n, entering)
+		}
+
+		result, err := r.checkIfScript(n)
+		rdutil.Logger.Debug().Msgf("Result of %T is %d", n, result)
+
+		if result == ast.WalkSkipChildren {
+			rdutil.Logger.Debug().Msgf("%T", n)
+
+			r.skipUntil = n.NextSibling()
+
+			if far, ok := n.(rundown_ast.FarSkip); ok {
+				r.skipUntil = far.GetEndSkipNode(n)
+			}
+
+			rdutil.Logger.Debug().Msgf("Skipping until %#v", r.skipUntil)
+
+			return result, err
+		}
+
+		return renderFunc(writer, source, n, entering)
+	}
+}
+
+func (r *Renderer) checkIfScript(node ast.Node) (ast.WalkStatus, error) {
+	if container, ok := node.(rundown_ast.Conditional); ok {
+		rdutil.Logger.Debug().Msgf("Is a conditional: %T", node)
+		if container.HasIfScript() {
+			rdutil.Logger.Debug().Msgf("Has conditional script: %s", container.GetIfScript())
+
+			if !container.HasResult() {
+				result, err := runIfScript(r.Context, container.GetIfScript())
+
+				if err != nil {
+					rdutil.Logger.Error().Msgf("Error running conditional: %s", err.Error())
+					return ast.WalkStop, err
+				}
+
+				container.SetResult(result)
+			}
+
+			if !container.GetResult() {
+				return ast.WalkSkipChildren, nil
+			}
+		}
+	}
+
+	return ast.WalkContinue, nil
+}
+
 func (r *Renderer) renderHeading(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	n := node.(*ast.Heading)
+
+	reader := text.NewNodeReaderFromSource(n, source)
+	contents, _ := ioutil.ReadAll(reader)
+	if bytes.Equal(contents, []byte{}) {
+		return ast.WalkSkipChildren, nil
+	}
+
 	if entering {
 		style := r.inlineStyles.Push(Color(aurora.CyanFg | aurora.BoldFm))
 		r.writeString(w, style.Begin())
@@ -898,30 +991,40 @@ func (r *Renderer) renderBlockquote(w util.BufWriter, source []byte, n ast.Node,
 	return ast.WalkContinue, nil
 }
 
-func (r *Renderer) syntaxHighlightText(w util.BufWriter, language string, source []byte, n ast.Node, subEnv bool) {
-	lang := lexers.Get(language)
+func (r *Renderer) syntaxHighlightNode(w util.BufWriter, language string, source []byte, n ast.Node, subEnv bool) {
 	target := r.nodeLinesToString(source, n)
+
+	r.syntaxHighlightBytes(w, language, target, subEnv)
+}
+
+func (r *Renderer) syntaxHighlightBytes(w util.BufWriter, language string, source string, subEnv bool) {
+	lang := lexers.Get(language)
 
 	if subEnv {
 		for k, v := range r.Context.Env {
-			target = strings.ReplaceAll(target, fmt.Sprintf("$%s", k), v)
+			source = strings.ReplaceAll(source, fmt.Sprintf("$%s", k), v)
 		}
 	}
 
 	var buf bytes.Buffer
 
 	if lang == nil {
-		lang = lexers.Analyse(target)
+		lang = lexers.Analyse(source)
 	}
 
 	if lang != nil {
 		lexer := chroma.Coalesce(lexers.Get(language))
+
 		formatter := formatters.TTY256
 
-		iterator, _ := lexer.Tokenise(nil, target)
+		if !ColorsEnabled {
+			formatter = formatters.NoOp
+		}
+
+		iterator, _ := lexer.Tokenise(nil, source)
 		_ = formatter.Format(&buf, styles.Pygments, iterator) == nil
 	} else {
-		buf.WriteString(target)
+		buf.WriteString(source)
 	}
 
 	// Trim any trailing formatting only lines.
@@ -937,7 +1040,6 @@ func (r *Renderer) syntaxHighlightText(w util.BufWriter, language string, source
 	for i := len(trailing) - 1; i >= 0; i = i - 1 {
 		w.WriteString(trailing[i])
 	}
-
 }
 
 func (r *Renderer) renderCodeBlock(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -980,7 +1082,7 @@ func (r *Renderer) renderFencedCodeBlock(w util.BufWriter, source []byte, node a
 		language := n.Language(source)
 		if language != nil {
 			r.ensureBlockSeparator(w, node)
-			r.syntaxHighlightText(w, string(language), source, node, replacingEnv)
+			r.syntaxHighlightNode(w, string(language), source, node, replacingEnv)
 		}
 	} else {
 		_, _ = w.WriteString("\r\n") // Block level element, add blank line.
@@ -1134,6 +1236,7 @@ func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, n ast.Node, 
 		case *rundown_ast.ExecutionBlock:
 			w.WriteString("\n")
 		case *rundown_ast.StopFail, *rundown_ast.StopOk:
+			rdutil.Logger.Debug().Msgf("This para is after a Stop block which didn't render. The block before it is %T", prevBlock.PreviousSibling())
 			// If prev is stop, then the if check failed, look further back.
 			switch prevBlock.PreviousSibling().(type) {
 			case *rundown_ast.ExecutionBlock:

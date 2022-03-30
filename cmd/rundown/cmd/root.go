@@ -49,6 +49,10 @@ func NewRootCmd() *cobra.Command {
 		SilenceErrors: false,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			rundownFile = shared.RundownFile(flagFilename)
+			if flagDebug {
+				devNull, _ := os.Create("rundown.log")
+				util.RedirectLogger(devNull)
+			}
 
 			util.Debugf("RundownFile = %s\n", rundownFile)
 
@@ -76,9 +80,16 @@ func NewRootCmd() *cobra.Command {
 				ports.ServeRundown(rundownFile, flagDebug, flagServePort)
 			}
 
+			if flagDump {
+				doc, _ := rundown.Load(rundownFile)
+				doc.MasterDocument.Document.Dump(doc.MasterDocument.Source, 0)
+			}
+
 			return nil
 		},
 	}
+
+	rootCmd.Flags().BoolVar(&flagDump, "dump", false, "Dump the AST only")
 
 	rootCmd.PersistentFlags().IntVar(&flagCols, "cols", util.IntMin(util.GetConsoleWidth(), 120), "Number of columns in display")
 	rootCmd.PersistentFlags().StringVarP(&flagFilename, "file", "f", "", "File to run (defaults to RUNDOWN.md then README.md)")
@@ -91,6 +102,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.Flag("cols").Hidden = true
 	rootCmd.Flag("display").Hidden = true
 	rootCmd.Flag("completions").Hidden = true
+	rootCmd.Flag("dump").Hidden = true
 
 	return rootCmd
 }

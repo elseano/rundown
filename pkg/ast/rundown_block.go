@@ -58,3 +58,25 @@ func (r *RundownBlock) GetAttr(name string) null.String {
 
 	return null.StringFromPtr(nil)
 }
+
+func (r *RundownBlock) GetFirstAttr(names ...string) null.String {
+	for _, name := range names {
+		if s := r.GetAttr(name); s.Valid {
+			return s
+		}
+	}
+
+	return null.StringFromPtr(nil)
+}
+
+func (r *RundownBlock) GetAttrList(name string) []string {
+	result := []string{}
+
+	for _, a := range r.Attrs {
+		if a.Key == name {
+			result = append(result, a.Val)
+		}
+	}
+
+	return result
+}

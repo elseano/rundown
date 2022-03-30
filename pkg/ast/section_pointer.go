@@ -8,11 +8,14 @@ import (
 
 type SectionPointer struct {
 	goldast.BaseBlock
+	ConditionalImpl
+
 	SectionName      string
 	StartNode        goldast.Node
 	Options          []*SectionOption
 	DescriptionShort string
 	DescriptionLong  *DescriptionBlock
+	End              *SectionEnd
 }
 
 type SectionEnd struct {
@@ -22,10 +25,14 @@ type SectionEnd struct {
 
 // NewRundownBlock returns a new RundownBlock node.
 func NewSectionPointer(name string) *SectionPointer {
-	return &SectionPointer{
+	p := &SectionPointer{
 		SectionName: name,
 		Options:     []*SectionOption{},
+		End:         &SectionEnd{},
 	}
+
+	p.End.SectionPointer = p
+	return p
 }
 
 // KindRundownBlock is a NodeKind of the RundownBlock node.
@@ -48,6 +55,10 @@ func (n *SectionPointer) Dump(source []byte, level int) {
 
 func (n *SectionPointer) AddOption(option *SectionOption) {
 	n.Options = append(n.Options, option)
+}
+
+func (n *SectionPointer) GetEndSkipNode(node goldast.Node) goldast.Node {
+	return n.End
 }
 
 // Kind implements Node.Kind.
