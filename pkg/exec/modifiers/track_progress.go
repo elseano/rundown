@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/elseano/rundown/pkg/bus"
@@ -15,7 +14,6 @@ import (
 type TrackProgress struct {
 	ExecutionModifier
 	signallingKey string
-	wait          sync.WaitGroup
 	startedAt     time.Time
 	endedAt       time.Time
 	exitCode      int
@@ -67,12 +65,9 @@ func (m *TrackProgress) ReceiveEvent(event bus.Event) {
 		data := rpcEvent.Data
 
 		if data == m.signallingKey+" START" {
-			m.wait.Add(1)
 			m.startedAt = time.Now()
 
 		} else if strings.HasPrefix(data, m.signallingKey+" END") {
-
-			m.wait.Done()
 			m.endedAt = time.Now()
 			exitCodeString := data[len(m.signallingKey+" END "):]
 			if code, err := strconv.Atoi(exitCodeString); err == nil {
