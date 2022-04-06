@@ -1,66 +1,86 @@
 package scripts
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/elseano/rundown/pkg/util"
 )
 
 type Script struct {
+	tempFile         *os.File
 	AbsolutePath     string
 	Prefix           []byte
 	Contents         []byte
+	OriginalContents []byte
 	Suffix           []byte
-	Invocation       string
+	BinaryPath       string
+	CommandLine      string
 	EnvReferenceName string
 	Name             string
 	ShellScript      bool
 }
 
+func NewScript(binary string, language string, contents []byte) (*Script, error) {
+	tempFile, err := ioutil.TempFile("", "rd-*")
+	if err != nil {
+		return nil, err
+	}
+
+	binaryPath, prefix, err := buildInvocation(binary, language)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var commandline string
+	if strings.Contains(binaryPath, "$SCRIPT_FILE") {
+		commandline = binaryPath
+	} else {
+		commandline = fmt.Sprintf("%s %s", binaryPath, tempFile.Name())
+	}
+
+	return &Script{OriginalContents: contents, CommandLine: commandline, BinaryPath: binaryPath, Contents: contents, tempFile: tempFile, AbsolutePath: tempFile.Name(), Prefix: []byte(prefix)}, nil
+}
+
+func (s *Script) MakeExecutable() {
+	os.Chmod(s.AbsolutePath, 0700)
+}
+
+func (s *Script) AppendCommand(command string) {
+	if s.Suffix == nil {
+		s.Suffix = make([]byte, 0)
+	}
+
+	s.Suffix = append(s.Suffix, []byte(command)...)
+	s.Suffix = append(s.Suffix, []byte("\n")...)
+}
+
 func (s *Script) Write() error {
-	tempFile, err := ioutil.TempFile("", "rd-"+strings.ToLower(s.Name)+"-*")
-	if err != nil {
-		return err
+	defer s.tempFile.Close()
+
+	result := bytes.Buffer{}
+
+	if len(s.Prefix) > 0 {
+		result.Write(s.Prefix)
+		result.Write([]byte("\n"))
 	}
 
-	invo, prefix, err := buildInvocation(s.Invocation)
-	if err != nil {
-		return err
-	}
+	result.Write(s.Contents)
 
-	if invo != "" {
-		tempFile.Write([]byte("#!"))
-		tempFile.Write([]byte(invo))
-		tempFile.Write([]byte("\n\n"))
-	}
-
-	if prefix != "" {
-		if s.Prefix == nil {
-			s.Prefix = []byte(fmt.Sprintf("%s\n", prefix))
-		} else {
-			s.Prefix = append(s.Prefix, []byte(fmt.Sprintf("%s\n", prefix))...)
-		}
-	}
-	if s.Prefix != nil {
-		tempFile.Write(s.Prefix)
-		tempFile.Write([]byte("\n"))
-	}
-	tempFile.Write(s.Contents)
 	if s.Suffix != nil {
-		tempFile.Write([]byte("\n"))
-		tempFile.Write(s.Suffix)
+		result.Write([]byte("\n"))
+		result.Write(s.Suffix)
 	}
 
-	defer tempFile.Close()
-	s.AbsolutePath = tempFile.Name()
+	util.Logger.Debug().Msgf("FINAL Script is: %s", result.String())
+	_, err := s.tempFile.Write(result.Bytes())
 
-	if invo != "" {
-		os.Chmod(s.AbsolutePath, 0700)
-	}
-
-	return nil
+	return err
 }
 
 func isShellLike(via string) bool {
@@ -76,19 +96,25 @@ func isShellLike(via string) bool {
 	}
 }
 
-func buildInvocation(interpreter string) (string, string, error) {
+func buildInvocation(binary string, language string) (string, string, error) {
 	// If no interpreter, just save the file.
-	if interpreter == "" {
+	if binary == "" {
 		return "", "", nil
 	}
 
-	abs, err := exec.LookPath(interpreter)
+	abs, err := exec.LookPath(binary)
+
+	// Ignore not found errors
+	if lpErr, ok := err.(*exec.Error); ok && lpErr.Err == exec.ErrNotFound {
+		err = nil
+		abs = binary
+	}
 
 	if err != nil {
 		return "", "", err
 	}
 
-	switch interpreter {
+	switch language {
 	case "bash":
 		return abs, "set -euo pipefail", nil
 	case "sh":

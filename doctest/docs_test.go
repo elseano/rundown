@@ -127,6 +127,7 @@ type DocTestSpinner struct {
 	w          io.Writer
 	m          string
 	mLastStamp string
+	substep    string
 }
 
 func NewDocTestSpinner(w io.Writer) *DocTestSpinner {
@@ -146,6 +147,10 @@ func (s *DocTestSpinner) Stop() {
 }
 
 func (s *DocTestSpinner) Success(message string) {
+	if s.substep != "" {
+		s.w.Write([]byte(fmt.Sprintf("  %s %s\n", spinner.TICK, s.substep)))
+	}
+
 	s.w.Write([]byte(fmt.Sprintf("%s %s\n", spinner.TICK, s.m)))
 }
 
@@ -162,7 +167,13 @@ func (s *DocTestSpinner) SetMessage(message string) {
 }
 
 func (s *DocTestSpinner) NewStep(message string) {
+	if s.substep != "" {
+		s.w.Write([]byte(fmt.Sprintf("  %s %s\n", spinner.TICK, s.substep)))
+	} else {
+		s.w.Write([]byte(fmt.Sprintf("%s %s\n", spinner.DASH, s.m)))
+	}
 
+	s.substep = message
 }
 
 func (s *DocTestSpinner) HideAndExecute(f func()) {

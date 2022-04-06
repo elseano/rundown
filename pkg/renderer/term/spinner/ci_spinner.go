@@ -11,6 +11,7 @@ type CISpinner struct {
 	out            io.Writer
 	currentHeading string
 	stampedHeading string
+	substep        string
 	colors         aurora.Aurora
 }
 
@@ -27,34 +28,34 @@ func (s *CISpinner) Start() {}
 func (s *CISpinner) Stop() {}
 
 func (s *CISpinner) StampShadow() {
-	if s.stampedHeading != s.currentHeading {
+	if s.substep == "" && s.stampedHeading != s.currentHeading {
 		s.out.Write([]byte(s.colors.Faint(fmt.Sprintf("↓ %s\r\n", s.currentHeading)).String()))
 		s.stampedHeading = s.currentHeading
+	} else if s.substep != "" && s.stampedHeading != s.substep {
+		s.out.Write([]byte(s.colors.Faint(fmt.Sprintf("  ↓ %s\r\n", s.substep)).String()))
+		s.stampedHeading = s.substep
 	}
+}
+
+func (s *CISpinner) closeSpinner(indicator string) {
+	if s.substep != "" {
+		s.out.Write([]byte(fmt.Sprintf("  %s %s\n", indicator, s.substep)))
+	}
+
+	s.out.Write([]byte(fmt.Sprintf("%s %s\n", indicator, s.CurrentHeading())))
+
 }
 
 func (s *CISpinner) Success(message string) {
-	if message != "" {
-		message = s.colors.Faint(fmt.Sprintf("(%s)", message)).String()
-	}
-
-	s.out.Write([]byte(fmt.Sprintf("%s %s %s\n", s.colors.Green(TICK), s.CurrentHeading(), message)))
+	s.closeSpinner(s.colors.Green(TICK).String())
 }
 
 func (s *CISpinner) Error(message string) {
-	if message != "" {
-		message = s.colors.Faint(fmt.Sprintf("(%s)", message)).String()
-	}
-
-	s.out.Write([]byte(fmt.Sprintf("%s %s %s\n", s.colors.Red(CROSS), s.CurrentHeading(), message)))
+	s.closeSpinner(s.colors.Red(CROSS).String())
 }
 
 func (s *CISpinner) Skip(message string) {
-	if message != "" {
-		message = s.colors.Faint(fmt.Sprintf("(%s)", message)).String()
-	}
-
-	s.out.Write([]byte(fmt.Sprintf("%s %s %s\n", s.colors.Yellow(SKIP), s.CurrentHeading(), message)))
+	s.closeSpinner(s.colors.Yellow(SKIP).String())
 }
 
 func (s *CISpinner) SetMessage(message string) {
@@ -62,7 +63,13 @@ func (s *CISpinner) SetMessage(message string) {
 }
 
 func (s *CISpinner) NewStep(message string) {
-	s.SetMessage(message)
+	if s.substep != "" {
+		s.out.Write([]byte(fmt.Sprintf("  %s %s\n", s.colors.Green(TICK), s.substep)))
+	} else {
+		s.out.Write([]byte(fmt.Sprintf("%s %s\n", s.colors.Faint(DASH), s.CurrentHeading())))
+	}
+
+	s.substep = message
 }
 
 func (s *CISpinner) HideAndExecute(f func()) {

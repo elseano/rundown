@@ -48,7 +48,6 @@ func (m *ScriptManager) AddScript(name, invocation string, contents []byte) (*Sc
 	script := &Script{
 		AbsolutePath:     "",
 		Contents:         contents,
-		Invocation:       invocation,
 		EnvReferenceName: strings.ToUpper("SCRIPT_" + name),
 		Name:             name,
 		ShellScript:      isShellLike(invocation),

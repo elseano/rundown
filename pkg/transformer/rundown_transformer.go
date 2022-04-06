@@ -499,6 +499,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		executionBlock.ReplaceProcess = node.HasAttr("borg")
 		executionBlock.SkipOnSuccess = node.HasAttr("skip-on-success")
 		executionBlock.SkipOnFailure = node.HasAttr("skip-on-failure")
+		executionBlock.Language = string(fcb.Info.Text(reader.Source()))
 
 		if envCapture := node.GetAttr("capture-env"); envCapture.Valid {
 			executionBlock.CaptureEnvironment = strings.Split(envCapture.String, ",")
@@ -511,18 +512,20 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		if spinnerName := node.GetAttr("spinner"); spinnerName.Valid {
 			executionBlock.SpinnerName = spinnerName.String
 			executionBlock.SpinnerMode = ast.SpinnerModeVisible
-		} else if node.HasAttr("nospin") {
+		}
+
+		if node.HasAttr("nospin") {
 			executionBlock.SpinnerMode = ast.SpinnerModeHidden
 		} else if node.HasAttr("named") {
 			executionBlock.SpinnerMode = ast.SpinnerModeInlineFirst
-		} else if node.HasAttr("named-all") {
+		} else if node.HasAttr("sub-spinners") || node.HasAttr("named-all") {
 			executionBlock.SpinnerMode = ast.SpinnerModeInlineAll
 		}
 
 		if withVal := node.GetAttr("with"); withVal.Valid {
 			executionBlock.With = withVal.String
 		} else {
-			executionBlock.With = string(fcb.Info.Text(reader.Source()))
+			executionBlock.With = executionBlock.Language
 		}
 
 		// Execution block goes after the fenced code block, in case we're displaying the source.

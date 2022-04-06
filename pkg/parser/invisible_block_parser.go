@@ -1,12 +1,11 @@
-// This parser should add a Modifier block element to the AST.
-
-package markdown
+package parser
 
 import (
 	"bytes"
 	"fmt"
 	"regexp"
 
+	rdutil "github.com/elseano/rundown/pkg/util"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/parser"
@@ -25,10 +24,10 @@ var InvisibleBlocks = &invisibleBlocks{}
 func (e *invisibleBlocks) Extend(m goldmark.Markdown) {
 	m.Parser().AddOptions(
 		parser.WithBlockParsers(
-			util.Prioritized(NewInvisibleBlockParser(m), 1),
+			util.Prioritized(NewInvisibleBlockParser(m), 100),
 		),
 		parser.WithASTTransformers(
-			util.Prioritized(NewInvisibleBlockASTTransformer(), 1),
+			util.Prioritized(NewInvisibleBlockASTTransformer(), 100),
 		),
 	)
 }
@@ -80,18 +79,21 @@ func (b *invisibleBlockParser) Open(parent ast.Node, reader text.Reader, pc pars
 		return nil, parser.NoChildren
 	}
 
-	text := string(line)
-	fmt.Sprintln(text)
+	rdutil.Logger.Debug().Msgf("In invisible block maybe: %s", string(line))
 
 	// Invisible Blocks are truely invisible in the AST. We just skip the opening and closing.
 
 	if start := htmlBlockType2OpenRegexp.FindIndex(line); start != nil && !bytes.Contains(line, htmlBlockType2Close) {
+		rdutil.Logger.Debug().Msgf("In invisible block on multiple lines.")
+
 		// reader.AdvanceLine()
 		pc.Set(invisibleBlockInfoKey, true)
 		return &invisibleBlockMarker{}, parser.Close
 	}
 
 	if bytes.Contains(line, htmlBlockType2Close) && pc.Get(invisibleBlockInfoKey) == true {
+		rdutil.Logger.Debug().Msgf("In end of invisible block.")
+
 		// reader.AdvanceLine()
 
 		line, _ := reader.PeekLine()

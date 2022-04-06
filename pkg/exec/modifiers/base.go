@@ -1,6 +1,7 @@
 package modifiers
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/elseano/rundown/pkg/bus"
@@ -34,6 +35,18 @@ func NewExecutionModifiers() *ExecutionModifiers {
 
 func (m *ExecutionModifiers) AddModifier(modifier ExecutionModifier) {
 	m.mods = append(m.mods, modifier)
+}
+
+func (m *ExecutionModifiers) HandleOSC(command string) {
+	for _, m := range m.mods {
+		if h, ok := m.(OSCHandler); ok {
+			if h.HandleOSC(command) {
+				return
+			}
+		}
+	}
+
+	fmt.Printf("Unhandled command: %s", command)
 }
 
 func (m *ExecutionModifiers) PrepareScripts(scripts *scripts.ScriptManager) {

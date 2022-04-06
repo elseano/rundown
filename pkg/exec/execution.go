@@ -84,33 +84,15 @@ func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
 		baseEnv[k] = v
 	}
 
-	// If we're replacing the process, we don't need to worry about the RPC interface.
-	if !i.ReplaceProcess {
-		rpcEndpoint, err := rpc.Start()
-		if err != nil {
-			return nil, err
-		}
-
-		defer rpcEndpoint.Close()
-
-		baseEnv[rpc.EnvironmentVariableName] = rpcEndpoint.Path
-	}
-
 	var content = scripts.NewScriptManager()
 	content.SetBaseScript(i.Via, i.Script)
-	defer content.RemoveAll()
 
-	// var modRunners = modifiers.NewExecutionModifiers()
-	// i.modifiers.AddModifier(modifiers.NewEnvironmentCapture())
-	// modRunners.AddModifier(modifiers.NewTrackProgress())
-	// modRunners.AddModifier(modifiers.NewStdout())
+	defer content.RemoveAll()
 
 	util.Logger.Trace().Msgf("Process: %s", i.Via)
 	util.Logger.Trace().Msgf("Script: %s", i.Script)
 
 	i.modifiers.PrepareScripts(content)
-
-	// modRunners.PrepareScripts(content)
 
 	if i.ReplaceProcess {
 		lastScript, err := content.Write()

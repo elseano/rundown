@@ -22,11 +22,9 @@ type ErrorDetails struct {
 	ErrorSource *ErrorSource
 }
 
-func ParseError(scripts *scripts.ScriptManager, stdout string) *ErrorDetails {
-	for _, script := range scripts.AllScripts() {
-		if index := strings.Index(stdout, script.AbsolutePath); index != -1 {
-			return parseError(stdout, index, script)
-		}
+func ParseError(script *scripts.Script, stdout string) *ErrorDetails {
+	if index := strings.Index(stdout, script.AbsolutePath); index != -1 {
+		return parseError(stdout, index, script)
 	}
 
 	return &ErrorDetails{
@@ -47,14 +45,14 @@ func parseError(stdout string, errorIndex int, source *scripts.Script) *ErrorDet
 			line, _ = strconv.Atoi(matches[3])
 		}
 
-		line -= (lineOffset(source) + 1)
+		line -= lineOffset(source)
 
 		errText := matches[4]
 
 		return &ErrorDetails{
 			Error: errText,
 			ErrorSource: &ErrorSource{
-				Source: source.Contents,
+				Source: source.OriginalContents,
 				Line:   line,
 			},
 		}
@@ -97,5 +95,5 @@ func lineOffset(script *scripts.Script) int {
 		return 0
 	}
 
-	return bytes.Count(script.Prefix, []byte("\n")) + 2
+	return bytes.Count(script.Prefix, []byte("\n"))
 }

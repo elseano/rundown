@@ -6,6 +6,7 @@ import (
 	"path"
 
 	"github.com/elseano/rundown/pkg/ast"
+	rundown_parser "github.com/elseano/rundown/pkg/parser"
 	"github.com/elseano/rundown/pkg/renderer"
 	emoji "github.com/yuin/goldmark-emoji"
 
@@ -97,7 +98,7 @@ func loadBytes(source []byte, filename string, context *renderer.Context) (*Load
 			}),
 		),
 		goldmark.WithRendererOptions(renderer),
-		goldmark.WithExtensions(emoji.New()),
+		goldmark.WithExtensions(emoji.New(), rundown_parser.InvisibleBlocks),
 	)
 
 	doc := gm.Parser().Parse(text.NewReader(source))

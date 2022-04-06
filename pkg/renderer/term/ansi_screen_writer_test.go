@@ -13,8 +13,8 @@ func TestAnsiWritesBasicPrintable(t *testing.T) {
 
 	output := bytes.Buffer{}
 
-	w := NewAnsiScreenWriter(&input, &output)
-	w.Process()
+	w := NewAnsiScreenWriter(&output)
+	w.Write(input.Bytes())
 
 	assert.Equal(t, "Hi there", output.String())
 }
@@ -25,7 +25,7 @@ func TestAnsiFlushCallbacks(t *testing.T) {
 
 	output := bytes.Buffer{}
 
-	w := NewAnsiScreenWriter(&input, &output)
+	w := NewAnsiScreenWriter(&output)
 	w.BeforeFlush(func() {
 		output.WriteString("B")
 	})
@@ -33,7 +33,7 @@ func TestAnsiFlushCallbacks(t *testing.T) {
 		output.WriteString("A")
 	})
 
-	w.Process()
+	w.Write(input.Bytes())
 
 	assert.Equal(t, "BHi thereA", output.String())
 }
@@ -44,9 +44,9 @@ func TestAnsiWritesIndentedSimple(t *testing.T) {
 
 	output := bytes.Buffer{}
 
-	w := NewAnsiScreenWriter(&input, &output)
+	w := NewAnsiScreenWriter(&output)
 	w.PrefixEachLine("  ")
-	w.Process()
+	w.Write(input.Bytes())
 
 	assert.Equal(t, "  Hi there\n  And indent this too.", output.String())
 }
@@ -57,9 +57,9 @@ func TestAnsiWritesIndentedWithCR(t *testing.T) {
 
 	output := bytes.Buffer{}
 
-	w := NewAnsiScreenWriter(&input, &output)
+	w := NewAnsiScreenWriter(&output)
 	w.PrefixEachLine("  ")
-	w.Process()
+	w.Write(input.Bytes())
 
 	assert.Equal(t, "  Hi there\n  And indent this too.\r  Should still be indented.", output.String())
 }
@@ -70,9 +70,25 @@ func TestAnsiWritesIndentedWithCursorUp(t *testing.T) {
 
 	output := bytes.Buffer{}
 
-	w := NewAnsiScreenWriter(&input, &output)
+	w := NewAnsiScreenWriter(&output)
 	w.PrefixEachLine("  ")
-	w.Process()
+	w.Write(input.Bytes())
 
 	assert.Equal(t, "  Hi there\n  And indent this too.\033[1A  Indent again.", output.String())
+}
+
+func TestAnsiWritesWithCommandPreservingOrder(t *testing.T) {
+	input := bytes.Buffer{}
+	input.WriteString("Hi there\nAnd indent this\033]SomeCommand\a too.\033[1AIndent again.")
+
+	output := bytes.Buffer{}
+
+	w := NewAnsiScreenWriter(&output)
+	w.CommandHandler = func(s string) {
+		output.WriteString("**" + s + "**")
+	}
+	w.PrefixEachLine("  ")
+	w.Write(input.Bytes())
+
+	assert.Equal(t, "  Hi there\n  And indent this**SomeCommand** too.\033[1A  Indent again.", output.String())
 }

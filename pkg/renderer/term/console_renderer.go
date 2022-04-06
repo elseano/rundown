@@ -1,13 +1,14 @@
 package term
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
 	"regexp"
+	"sync"
 	"time"
 
 	icolor "image/color"
@@ -35,13 +36,15 @@ import (
 	rundown_ast "github.com/elseano/rundown/pkg/ast"
 	"github.com/elseano/rundown/pkg/errs"
 	"github.com/elseano/rundown/pkg/exec"
-	"github.com/elseano/rundown/pkg/exec/modifiers"
 	rundown_renderer "github.com/elseano/rundown/pkg/renderer"
 	"github.com/elseano/rundown/pkg/renderer/term/spinner"
 	"github.com/elseano/rundown/pkg/text"
 	emoji_ast "github.com/yuin/goldmark-emoji/ast"
 
 	rdutil "github.com/elseano/rundown/pkg/util"
+
+	"github.com/muesli/reflow/indent"
+	"github.com/muesli/reflow/wordwrap"
 )
 
 type consoleRendererExt struct {
@@ -219,6 +222,8 @@ type Renderer struct {
 	Context           *rundown_renderer.Context
 	exitCode          int
 	skipUntil         ast.Node
+	wrappingWriter    *wordwrap.WordWrap
+	nonWrappingWriter util.BufWriter
 }
 
 // NewRenderer returns a new Renderer with given options.
@@ -374,7 +379,7 @@ func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(ast.KindHTMLBlock, r.supportSkipping(r.blockCommon(r.renderHTMLBlock)))
 	reg.Register(ast.KindList, r.supportSkipping(r.blockCommon(r.renderList)))
 	reg.Register(ast.KindListItem, r.supportSkipping(r.blockCommon(r.renderListItem)))
-	reg.Register(ast.KindParagraph, r.supportSkipping(r.blockCommon(r.renderParagraph)))
+	reg.Register(ast.KindParagraph, r.wrapBlock(r.supportSkipping(r.blockCommon(r.renderParagraph))))
 	reg.Register(ast.KindTextBlock, r.supportSkipping(r.blockCommon(r.renderTextBlock)))
 	reg.Register(ast.KindThematicBreak, r.supportSkipping(r.blockCommon(r.renderThematicBreak)))
 	// reg.Register(rundown_ast.KindRundownBlock, r.blockCommon(r.renderRundownBlock))
@@ -383,27 +388,27 @@ func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 
 	// inlines
 
-	reg.Register(ast.KindAutoLink, r.renderAutoLink)
-	reg.Register(ast.KindCodeSpan, r.renderCodeSpan)
-	reg.Register(extast.KindStrikethrough, r.renderStrikethrough)
-	reg.Register(ast.KindEmphasis, r.renderEmphasis)
+	reg.Register(ast.KindAutoLink, r.wrapInline(r.renderAutoLink))
+	reg.Register(ast.KindCodeSpan, r.wrapInline(r.renderCodeSpan))
+	reg.Register(extast.KindStrikethrough, r.wrapInline(r.renderStrikethrough))
+	reg.Register(ast.KindEmphasis, r.wrapInline(r.renderEmphasis))
 	reg.Register(ast.KindImage, r.renderImage)
-	reg.Register(ast.KindLink, r.renderLink)
+	reg.Register(ast.KindLink, r.wrapInline(r.renderLink))
 	reg.Register(ast.KindRawHTML, r.renderHollow)
-	reg.Register(ast.KindText, r.renderText)
-	reg.Register(ast.KindString, r.renderString)
+	reg.Register(ast.KindText, r.wrapInline(r.renderText))
+	reg.Register(ast.KindString, r.wrapInline(r.renderString))
 
-	reg.Register(emoji_ast.KindEmoji, r.renderEmoji)
+	reg.Register(emoji_ast.KindEmoji, r.wrapInline(r.renderEmoji))
 
 	// other
 	reg.Register(rundown_ast.KindDescriptionBlock, r.supportSkipping(r.renderHollow))
-	reg.Register(rundown_ast.KindEnvironmentSubstitution, r.supportSkipping(r.renderEnvironmentSubstitution))
+	reg.Register(rundown_ast.KindEnvironmentSubstitution, r.wrapInline(r.supportSkipping(r.renderEnvironmentSubstitution)))
 	// reg.Register(rundown_ast.KindExecutionBlock, r.renderTodo))
 	reg.Register(rundown_ast.KindIgnoreBlock, r.supportSkipping(r.renderTodo("Ignore")))
 	reg.Register(rundown_ast.KindOnFailure, r.supportSkipping(r.renderNothing))
 	reg.Register(rundown_ast.KindRundownBlock, r.supportSkipping(r.renderTodo("Rundown")))
 	reg.Register(rundown_ast.KindSaveCodeBlock, r.supportSkipping(r.renderSaveCodeBlock))
-	reg.Register(rundown_ast.KindSectionEnd, r.supportSkipping(r.renderTodo("SectionEnd")))
+	reg.Register(rundown_ast.KindSectionEnd, r.supportSkipping(r.renderNothing))
 	reg.Register(rundown_ast.KindSectionOption, r.supportSkipping(r.renderHollow))
 	reg.Register(rundown_ast.KindSectionPointer, r.supportSkipping(r.renderHollow))
 	reg.Register(rundown_ast.KindStopFail, r.supportSkipping(r.renderStopFail))
@@ -483,22 +488,37 @@ func runIfScript(ctx *rundown_renderer.Context, ifScript string) (bool, error) {
 	// Allow unset variables here, typically the script will be checking for these.
 	ifScript = fmt.Sprintf("set +u\n%s\n", ifScript)
 
-	intent, err := exec.NewExecution("bash", []byte(ifScript), path.Dir(ctx.RundownFile))
-	intent.ImportEnv(ctx.Env)
+	runner := exec.NewRunner()
+	runner.ImportEnv(ctx.Env)
 
-	rdutil.Logger.Debug().Msgf("Running with env: %#v", ctx.Env)
-
-	if err != nil {
-		return false, err
-	}
-
-	result, err := intent.Execute()
+	_, err := runner.SetScript("sh", "sh", []byte(ifScript))
 
 	if err != nil {
 		return false, err
 	}
 
-	return result.ExitCode == 0, nil
+	process, err := runner.Prepare()
+	if err != nil {
+		return false, err
+	}
+
+	err = process.Start()
+
+	if err != nil {
+		return false, err
+	}
+
+	exitCode, _, err := process.Wait()
+
+	if err != nil {
+		rdutil.Logger.Debug().Msgf("Error: %#v", err)
+
+		return false, err
+	}
+
+	rdutil.Logger.Debug().Msgf("If Script Result: %d", exitCode)
+
+	return exitCode == 0, err
 }
 
 func (r *Renderer) renderStopFail(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -640,112 +660,124 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 	contentReader := text.NewNodeReaderFromSource(executionBlock.CodeBlock, source)
 
-	script, err := ioutil.ReadAll(contentReader)
+	scriptContents, err := ioutil.ReadAll(contentReader)
 	if err != nil {
 		return ast.WalkStop, err
 	}
 
-	intent, err := exec.NewExecution(executionBlock.With, script, path.Dir(r.Context.RundownFile))
+	rdutil.Logger.Debug().Msgf("Command to run script is: %s", executionBlock.With)
+	rdutil.Logger.Debug().Msgf("Script is: %s", executionBlock.With)
+
+	runner := exec.NewRunner()
+	script, err := runner.SetScript(executionBlock.With, executionBlock.Language, scriptContents)
 	if err != nil {
 		return ast.WalkStop, err
 	}
 
-	progress := modifiers.NewTrackProgress()
-	intent.AddModifier(progress)
+	runner.ImportEnv(r.Context.Env)
 
-	intent.ImportEnv(r.Context.Env)
+	/***** SPINNERS *****/
+	var theSpinner Spinner
 
-	intent.ReplaceProcess = executionBlock.ReplaceProcess
-
-	// If we're replacing the rundown process, then we don't need to setup spinners, etc.
-	// Just execute and check for an error, terminating early.
-	if intent.ReplaceProcess {
-		_, err := intent.Execute()
-
-		if err != nil {
-			return ast.WalkStop, nil
-		}
-	}
-
-	// intent.AddModifier(modifiers.NewStdout())
-
-	rdutil.Logger.Debug().Msgf("Spinner mode %d", executionBlock.SpinnerMode)
-
-	var spinner *modifiers.SpinnerConstant = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, spinner.NewNullSpinner())
-
-	defer func() {
-		if spinner != nil {
-			spinner.Spinner.Stop()
-		}
-	}()
+	rdutil.Logger.Debug().Msgf("Spinner mode: %d", executionBlock.SpinnerMode)
 
 	switch executionBlock.SpinnerMode {
-	case rundown_ast.SpinnerModeInlineAll:
-		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, createSpinner(w, r.Context.Env))
-		intent.AddModifier(spinner)
-
-		rdutil.Logger.Debug().Msg("Inline all mode")
-		spinnerDetector := modifiers.NewSpinnerFromScript(true, spinner)
-		intent.AddModifier(spinnerDetector)
-
+	case rundown_ast.SpinnerModeHidden:
+		theSpinner = spinner.NewNullSpinner()
 	case rundown_ast.SpinnerModeVisible:
-		rdutil.Logger.Debug().Msg("Normal spinner mode")
-		spinner = modifiers.NewSpinnerConstant(executionBlock.SpinnerName, createSpinner(w, r.Context.Env))
-		intent.AddModifier(spinner)
-
-	default:
-		intent.AddModifier(spinner)
-
+		theSpinner = createSpinner(w, r.Context.Env)
+	case rundown_ast.SpinnerModeInlineAll:
+		theSpinner = createSpinner(w, r.Context.Env)
+		rdutil.Logger.Debug().Msgf("Stepped spinners.")
+		script.Contents = exec.ChangeCommentsToSpinnerCommands(executionBlock.Language, script.Contents)
 	}
 
-	var output *AnsiScreenWriter
+	theSpinner.SetMessage(executionBlock.SpinnerName)
+	theSpinner.Start()
+
+	/***** ENVIRONMENT CAPTURE *****/
+	if executionBlock.CaptureEnvironment != nil {
+		exec.AddEnvironmentCapture(executionBlock.Language, script, executionBlock.CaptureEnvironment)
+	}
+
+	/***** RUN COMMAND *****/
+	process, err := runner.Prepare()
+	if err != nil {
+		return ast.WalkStop, err
+	}
+
+	/***** OUTPUT HANDLING *****/
+	outputWaiter := sync.WaitGroup{}
+	outputStream := process.Stdout
+	stderrBuffer := bytes.Buffer{}
+
+	// The output buffer is for showing the STDOUT/STDERR results on error.
+	outputBuffer := NewStdoutBuffer()
+	outputTargets := []io.Writer{outputBuffer}
+
+	stdoutDisplayTarget := io.Discard
 
 	if executionBlock.ShowStdout {
-		rdutil.Logger.Trace().Msg("Streaming STDOUT")
+		stdoutDisplayTarget = indent.NewWriterPipe(w, 4, nil)
+	}
 
-		outputCapture := modifiers.NewStdoutStream()
-		intent.AddModifier(outputCapture)
+	// Setup the screen writer. It also controls RPC functions as some of them affect output, such as spinners.
+	screenWriter := NewAnsiScreenWriter(stdoutDisplayTarget)
+	outputTargets = append(outputTargets, screenWriter)
 
-		output = NewAnsiScreenWriter(outputCapture.Reader, w)
-		output.PrefixEachLine("    ")
+	if executionBlock.ShowStdout {
+		screenWriter.BeforeFlush(func() { theSpinner.Stop(); theSpinner.StampShadow() })
+		screenWriter.AfterFlush(theSpinner.Start)
+	}
 
-		if spinner != nil {
-			output.BeforeFlush(func() {
-				rdutil.Logger.Debug().Msg("Stopping spinner for output")
+	screenWriter.CommandHandler = HandleCommands(theSpinner, r.Context)
 
-				spinner.Spinner.Stop()
-				spinner.Spinner.StampShadow()
-			})
-			output.AfterFlush(func() { spinner.Spinner.Start() })
+	// With the output handlers setup, spin up a multiwriter to write to them.
+	outputWriters := io.MultiWriter(outputTargets...)
+	outputWaiter.Add(1)
+	go func() {
+		io.Copy(outputWriters, outputStream)
+		outputWaiter.Done()
+	}()
+
+	// Capture stderr into a buffer too
+	outputWaiter.Add(1)
+	go func() {
+		io.Copy(&stderrBuffer, process.Stderr)
+		outputWaiter.Done()
+	}()
+
+	/***** WAIT FOR PROCESS TO COMPLETE *****/
+	err = process.Start()
+	if err != nil {
+		return ast.WalkStop, err
+	}
+
+	outputWaiter.Wait() // Wait for the process's STDOUT to close.
+	exitCode, duration, err := process.Wait()
+
+	if err != nil {
+		rdutil.Logger.Debug().Msgf("Execution failed with %#v", err)
+		return ast.WalkStop, err
+	}
+
+	// Flush any remaining writes.
+	type flushable interface{ Flush() error }
+	for _, t := range outputTargets {
+		if flusher, ok := t.(flushable); ok {
+			flusher.Flush()
 		}
-
-		go output.Process()
 	}
 
-	errorCapture := modifiers.NewStdoutStream()
-	intent.AddModifier(errorCapture)
-
-	if executionBlock.CaptureEnvironment != nil {
-		envCapture := modifiers.NewEnvironmentCapture(executionBlock.CaptureEnvironment)
-		intent.AddModifier(envCapture)
-	}
-
-	rdutil.Logger.Trace().Msg("Executing intent")
-	result, err := intent.Execute()
-
-	if output != nil {
-		output.Flush()
-	}
+	/***** ERROR HANDLING *****/
 
 	if executionBlock.SkipOnSuccess {
-		if err != nil || result.ExitCode != 0 {
-			if spinner != nil {
-				spinner.Spinner.Error(fmt.Sprintf("%s - Continue", friendlyDuration(progress.GetDuration())))
-			}
+		if err != nil || exitCode != 0 {
+			theSpinner.Error(fmt.Sprintf("%s - Continue", friendlyDuration(duration)))
 
 			return ast.WalkContinue, nil
 		} else {
-			spinner.Spinner.Skip(fmt.Sprintf("%s - Skip on Success", friendlyDuration(progress.GetDuration())))
+			theSpinner.Skip(fmt.Sprintf("%s - Skip on Success", friendlyDuration(duration)))
 
 			// FIXME - How to skip to the next heading?
 			return ast.WalkContinue, nil
@@ -753,40 +785,44 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 	}
 
 	if executionBlock.SkipOnFailure {
-		if err != nil || result.ExitCode != 0 {
-			if spinner != nil {
-				spinner.Spinner.Skip(fmt.Sprintf("%s - Skip on Failure (%d)", friendlyDuration(progress.GetDuration()), result.ExitCode))
-			}
+		if err != nil || exitCode != 0 {
+			theSpinner.Skip(fmt.Sprintf("%s - Skip on Failure (%d)", friendlyDuration(duration), exitCode))
 
 			return ast.WalkStop, nil
 		}
 	}
 
 	if err != nil {
+		rdutil.Logger.Debug().Msgf("Error: %s", err.Error())
 		return ast.WalkStop, err
 	}
 
-	if result.ExitCode != 0 {
-		if spinner != nil {
-			spinner.Spinner.Error("Failed")
-		}
+	if exitCode != 0 {
+		output := outputBuffer.String()
+		output += "\n\n" + string(process.StderrOutput)
+		output += "\n\n" + string(stderrBuffer.String())
 
-		r.exitCode = result.ExitCode
+		output = strings.TrimSpace(output)
 
-		// output := result.Output
-		output, _ := ioutil.ReadAll(errorCapture.Reader)
+		rdutil.Logger.Debug().Msgf("Exit Code is error: %d", exitCode)
+		rdutil.Logger.Debug().Msgf("Output is: %s", output)
+
+		theSpinner.Error("Failed")
+
+		r.exitCode = exitCode
 
 		w.WriteString("\n")
+
 		w.WriteString(Aurora.Red("Script Failed:\n").String())
 
-		resultErr := exec.ParseError(result.Scripts, string(output))
+		resultErr := exec.ParseError(script, output)
 		r.writeLinesWithPrefix("  ", string(resultErr.String(Aurora)), w)
 
 		// Find on failure nodes
 		failureNodes := rundown_ast.GetOnFailureNodes(node)
 		insertAfterNode := node
 		for _, f := range failureNodes {
-			if f.MatchesError(output) {
+			if f.MatchesError([]byte(output)) {
 				newNode := f.ConvertToParagraph()
 				node.Parent().InsertAfter(node.Parent(), insertAfterNode, newNode)
 				insertAfterNode = newNode
@@ -800,24 +836,12 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 		return ast.WalkContinue, nil
 	}
 
-	if result.Env != nil {
-		rdutil.Logger.Debug().Msgf("Received environment: %#v", result.Env)
-
-		for _, name := range executionBlock.CaptureEnvironment {
-			r.Context.ImportEnv(map[string]string{name: result.Env[name]})
-		}
-	}
-
-	if spinner != nil {
-		spinner.Spinner.Success(friendlyDuration(progress.GetDuration()))
-	}
-
 	if executionBlock.CaptureStdoutInto != "" {
-		output, _ := ioutil.ReadAll(errorCapture.Reader)
-		outputTrimmed := strings.TrimSpace(string(output))
-
+		outputTrimmed := strings.TrimSpace(outputBuffer.String())
 		r.Context.AddEnv(executionBlock.CaptureStdoutInto, outputTrimmed)
 	}
+
+	theSpinner.Success(friendlyDuration(duration))
 
 	return ast.WalkContinue, nil
 }
@@ -888,6 +912,45 @@ func (r *Renderer) writeString(w util.BufWriter, s string) {
 	_, _ = w.WriteString(s)
 }
 
+// Wraps all block outputs.
+func (r *Renderer) wrapBlock(renderFunc renderer.NodeRendererFunc) renderer.NodeRendererFunc {
+	return func(writer util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if entering && r.wrappingWriter == nil {
+			r.nonWrappingWriter = writer
+			r.wrappingWriter = wordwrap.NewWriter(120)
+		}
+
+		bufWriter := bufio.NewWriter(r.wrappingWriter)
+
+		status, err := renderFunc(bufWriter, source, n, entering)
+
+		if !entering {
+			r.nonWrappingWriter.WriteString(r.wrappingWriter.String())
+			r.nonWrappingWriter.Flush()
+			r.wrappingWriter = nil
+			r.nonWrappingWriter = nil
+		}
+
+		bufWriter.Flush()
+
+		return status, err
+	}
+}
+
+func (r *Renderer) wrapInline(renderFunc renderer.NodeRendererFunc) renderer.NodeRendererFunc {
+	return func(writer util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if r.wrappingWriter != nil {
+			bufWriter := bufio.NewWriter(r.wrappingWriter)
+			status, err := renderFunc(bufWriter, source, n, entering)
+			bufWriter.Flush()
+
+			return status, err
+		}
+
+		return renderFunc(writer, source, n, entering)
+	}
+}
+
 func (r *Renderer) supportSkipping(renderFunc renderer.NodeRendererFunc) renderer.NodeRendererFunc {
 	return func(writer util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if r.skipUntil != nil {
@@ -905,7 +968,6 @@ func (r *Renderer) supportSkipping(renderFunc renderer.NodeRendererFunc) rendere
 		}
 
 		result, err := r.checkIfScript(n)
-		rdutil.Logger.Debug().Msgf("Result of %T is %d", n, result)
 
 		if result == ast.WalkSkipChildren {
 			rdutil.Logger.Debug().Msgf("%T", n)

@@ -46,6 +46,10 @@ func (f *StdoutBuffer) SubscribeToFlush() chan bool {
 	return f.flushChan
 }
 
+func (f *StdoutBuffer) Write(data []byte) (int, error) {
+	return f.parser.Parse(data)
+}
+
 func (f *StdoutBuffer) Process(inStream io.Reader) {
 	for {
 		buffer := make([]byte, 4096)
@@ -312,7 +316,10 @@ func (f *StdoutBuffer) IND() error {
 // Reverse Index
 func (f *StdoutBuffer) RI() error {
 	return fmt.Errorf("not implemented: ReverseIndex")
+}
 
+func (f *StdoutBuffer) OSC([]byte) error {
+	return nil
 }
 
 // Flush updates from previous commands
@@ -328,6 +335,6 @@ func (f *StdoutBuffer) AnythingToFlush() bool {
 	return f.anythingToFlush
 }
 
-func (f *StdoutBuffer) String() (string, int) {
-	return f.buffer.String(), len(f.buffer.lines)
+func (f *StdoutBuffer) String() string {
+	return f.buffer.String()
 }

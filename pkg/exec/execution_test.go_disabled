@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExecutionBasic(t *testing.T) {
@@ -41,7 +42,7 @@ func TestExecutionFailure(t *testing.T) {
 
 		result, err := intent.Execute()
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 127, result.ExitCode)
 		assert.Equal(t, "SCRIPT: line 3: some_invalid_command: command not found\n", string(result.Output))
 	}

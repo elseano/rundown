@@ -135,7 +135,7 @@ I will be rendered.
 OK=false
 ~~~
 
-<r stop-ok if='test "$OK" -eq "true"'>I will be rendered in Markdown only.</r>
+<r stop-ok if='test "$OK" == "true"'>I will be rendered in Markdown only.</r>
 
 I will be rendered too.
 ```

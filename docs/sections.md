@@ -103,3 +103,43 @@ Running from the `thing` command.
 
 This will only appear when running `sub-thing` directly.
 ```
+
+## Ending the branch <r section="branching:ending"/>
+
+In situations where you need to do either (A) or (B), and then always do (C), you can end a branch with an invisible heading. These also work embedded inside invisible blocks.
+
+``` markdown
+## Do a thing <r section="thing"/>
+
+I'll be rendered.
+
+### Don't do a thing <r if="false"/>
+
+I won't be rendered.
+
+### Do another thing <r if="true"/>
+
+I will be rendered.
+
+<!--~
+
+###
+
+I will be rendered whatever happens.
+
+-->
+```
+
+Will result in:
+
+``` expected
+## Do a thing
+
+I'll be rendered.
+
+### Do another thing
+
+I will be rendered.
+
+I will be rendered whatever happens.
+```

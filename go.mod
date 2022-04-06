@@ -2,6 +2,8 @@ module github.com/elseano/rundown
 
 go 1.15
 
+replace github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 => github.com/elseano/go-ansiterm v0.0.0-20220406061920-d6b43c07a79c
+
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1
 	// github.com/alecthomas/chroma v0.8.0
@@ -19,7 +21,7 @@ require (
 	github.com/manifoldco/promptui v0.8.0
 	github.com/mattn/go-isatty v0.0.14
 	github.com/microcosm-cc/bluemonday v1.0.14 // indirect
-	github.com/muesli/reflow v0.3.0 // indirect
+	github.com/muesli/reflow v0.3.0
 	github.com/muesli/termenv v0.9.0
 	github.com/rs/zerolog v1.22.0
 	github.com/spf13/cobra v1.1.3

@@ -2,6 +2,7 @@ package term
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,9 +14,9 @@ func TestColourOutput(t *testing.T) {
 
 	buffer := NewStdoutBuffer()
 	buffer.Process(reader)
-	output, lines := buffer.String()
+	output := buffer.String()
 
-	if !assert.Equal(t, 9, lines) {
+	if !assert.Equal(t, 9, strings.Count(output, "\n")) {
 		t.Logf("%#v", output)
 	}
 }
@@ -26,9 +27,9 @@ func TestIndicatorOutput(t *testing.T) {
 
 	buffer := NewStdoutBuffer()
 	buffer.Process(reader)
-	output, lines := buffer.String()
+	output := buffer.String()
 
-	if !assert.Equal(t, 2, lines) {
+	if !assert.Equal(t, 2, strings.Count(output, "\n")) {
 		t.Logf("%#v", output)
 	}
 }
@@ -39,9 +40,9 @@ func TestIndicatorOutput2(t *testing.T) {
 
 	buffer := NewStdoutBuffer()
 	buffer.Process(reader)
-	output, lines := buffer.String()
+	output := buffer.String()
 
-	if !assert.Equal(t, 2, lines) {
+	if !assert.Equal(t, 2, strings.Count(output, "\n")) {
 		t.Logf("%#v", output)
 	}
 }

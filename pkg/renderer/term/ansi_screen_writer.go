@@ -10,16 +10,63 @@ import (
 	"github.com/elseano/rundown/pkg/util"
 )
 
+type flushable struct {
+	command *strings.Builder
+	print   *bytes.Buffer
+}
+
+type flushBuffer []*flushable
+
+func (f *flushBuffer) WritePrintable(b byte) error {
+	realF := *f
+
+	if len(realF) == 0 {
+		*f = append(*f, &flushable{print: &bytes.Buffer{}})
+	} else if realF[len(realF)-1].print == nil {
+		*f = append(*f, &flushable{print: &bytes.Buffer{}})
+	}
+
+	realF = *f
+
+	return realF[len(realF)-1].print.WriteByte(b)
+}
+
+func (f *flushBuffer) WritePrintableString(s string) (int, error) {
+	realF := *f
+
+	if len(realF) == 0 {
+		*f = append(*f, &flushable{print: &bytes.Buffer{}})
+	} else if realF[len(realF)-1].print == nil {
+		*f = append(*f, &flushable{print: &bytes.Buffer{}})
+	}
+
+	realF = *f
+
+	return realF[len(realF)-1].print.WriteString(s)
+}
+
+func (f *flushBuffer) WriteCommand(b []byte) error {
+	realF := *f
+
+	*f = append(*f, &flushable{command: &strings.Builder{}})
+
+	realF = *f
+
+	_, err := realF[len(realF)-1].command.Write(b)
+	return err
+}
+
 // Writes terminal output to the screen, while allowing for per-line alterations.
 type AnsiScreenWriter struct {
 	parser           *a.AnsiParser
 	currentRunOutput io.Writer
 	reader           io.Reader
 	stats            *ansiOutputStats
-	flushBuffer      bytes.Buffer
+	flushBuffer      *flushBuffer
 	prefix           string
 	beforeFlush      func()
 	afterFlush       func()
+	CommandHandler   func(string)
 }
 
 type ansiOutputStats struct {
@@ -38,12 +85,11 @@ type lineInfo struct {
 	hasIndent bool
 }
 
-func NewAnsiScreenWriter(reader io.Reader, writer io.Writer) *AnsiScreenWriter {
+func NewAnsiScreenWriter(writer io.Writer) *AnsiScreenWriter {
 	formatter := &AnsiScreenWriter{
 		stats:            &ansiOutputStats{cursor: &cursorInfo{}},
-		flushBuffer:      bytes.Buffer{},
+		flushBuffer:      &flushBuffer{},
 		currentRunOutput: writer,
-		reader:           reader,
 	}
 	formatter.parser = a.CreateParser("Ground", formatter)
 	return formatter
@@ -59,6 +105,10 @@ func (f *AnsiScreenWriter) BeforeFlush(cb func()) {
 
 func (f *AnsiScreenWriter) AfterFlush(cb func()) {
 	f.afterFlush = cb
+}
+
+func (f *AnsiScreenWriter) Write(data []byte) (int, error) {
+	return f.parser.Parse(data)
 }
 
 func (f *AnsiScreenWriter) Process() {
@@ -96,12 +146,12 @@ func (f *AnsiScreenWriter) Print(b byte) error {
 	f.allocLineStat(line)
 
 	if !f.stats.lines[line].hasIndent {
-		f.flushBuffer.WriteString(f.prefix)
+		f.flushBuffer.WritePrintableString(f.prefix)
 		f.stats.lines[line].hasVisibleChars = true
 		f.stats.lines[line].hasIndent = true
 	}
 
-	return f.flushBuffer.WriteByte(b)
+	return f.flushBuffer.WritePrintable(b)
 }
 
 // Execute C0 commands
@@ -109,7 +159,7 @@ func (f *AnsiScreenWriter) Execute(b byte) error {
 	line := f.stats.cursor.line
 	f.allocLineStat(line)
 
-	f.flushBuffer.WriteByte(b)
+	f.flushBuffer.WritePrintable(b)
 
 	switch b {
 	case 10: // CR+LF, or CR unix
@@ -148,7 +198,7 @@ func (f *AnsiScreenWriter) CUU(count int) error {
 	util.Logger.Trace().Msgf("Cursor up by %d. Was line %d, now on line %d, diff: %d", count, oldLine, line, line-oldLine)
 
 	if oldLine-line > 0 {
-		f.flushBuffer.WriteString(fmt.Sprintf("\033[%dA", oldLine-line))
+		f.flushBuffer.WritePrintableString(fmt.Sprintf("\033[%dA", oldLine-line))
 	}
 
 	return nil
@@ -161,7 +211,7 @@ func (f *AnsiScreenWriter) CUD(count int) error {
 
 	util.Logger.Trace().Msgf("Cursor down by %d. Was line %d, now on line %d", count, oldLine, f.stats.cursor.line)
 
-	f.flushBuffer.WriteString(fmt.Sprintf("\033[%dB", count))
+	f.flushBuffer.WritePrintableString(fmt.Sprintf("\033[%dB", count))
 	return nil
 }
 
@@ -210,7 +260,7 @@ func (f *AnsiScreenWriter) CHA(pos int) error {
 	f.stats.lines[f.stats.cursor.line].hasIndent = false
 	util.Logger.Trace().Msgf("Cursor Horizontal to %d", pos)
 
-	f.flushBuffer.WriteString(fmt.Sprintf("\033[%dG", pos))
+	f.flushBuffer.WritePrintableString(fmt.Sprintf("\033[%dG", pos))
 
 	return nil
 }
@@ -239,10 +289,10 @@ func (f *AnsiScreenWriter) HVP(x int, y int) error {
 // Text Cursor Enable Mode
 func (f *AnsiScreenWriter) DECTCEM(enable bool) error {
 	if enable {
-		_, err := f.flushBuffer.WriteString("\033[?25h")
+		_, err := f.flushBuffer.WritePrintableString("\033[?25h")
 		return err
 	} else {
-		_, err := f.flushBuffer.WriteString("\033[?25l")
+		_, err := f.flushBuffer.WritePrintableString("\033[?25l")
 		return err
 	}
 }
@@ -297,15 +347,15 @@ func (f *AnsiScreenWriter) DCH(count int) error {
 
 // Set Graphics Rendition
 func (f *AnsiScreenWriter) SGR(values []int) error {
-	f.flushBuffer.WriteString("\033[")
+	f.flushBuffer.WritePrintableString("\033[")
 
 	formatting := []string{}
 	for _, v := range values {
 		formatting = append(formatting, fmt.Sprintf("%d", v))
 	}
 
-	f.flushBuffer.WriteString(strings.Join(formatting, ";"))
-	f.flushBuffer.WriteString("m")
+	f.flushBuffer.WritePrintableString(strings.Join(formatting, ";"))
+	f.flushBuffer.WritePrintableString("m")
 
 	return nil
 }
@@ -343,32 +393,50 @@ func (f *AnsiScreenWriter) IND() error {
 // Reverse Index
 func (f *AnsiScreenWriter) RI() error {
 	return fmt.Errorf("not implemented: ReverseIndex")
+}
 
+func (f *AnsiScreenWriter) OSC(b []byte) error {
+	return f.flushBuffer.WriteCommand(b)
 }
 
 // Flush updates from previous commands
 func (f *AnsiScreenWriter) Flush() error {
-	if f.flushBuffer.Len() > 0 {
-		if f.beforeFlush != nil {
-			f.beforeFlush()
-		}
+	printed := false
 
-		util.Logger.Trace().Msgf("Flushing: %#v", f.flushBuffer.Bytes())
-		f.currentRunOutput.Write(f.flushBuffer.Bytes())
-		f.flushBuffer.Reset()
+	for _, ff := range *f.flushBuffer {
+		switch {
+		case ff.command != nil:
+			if f.CommandHandler != nil {
+				f.CommandHandler(ff.command.String())
+			}
+		case ff.print != nil:
+			if !printed {
+				if f.beforeFlush != nil {
+					f.beforeFlush()
+				}
+				printed = true
+			}
 
-		type flushable interface {
-			Flush() error
-		}
-
-		if flushWriter, ok := f.currentRunOutput.(flushable); ok {
-			flushWriter.Flush()
-		}
-
-		if f.afterFlush != nil {
-			f.afterFlush()
+			f.currentRunOutput.Write(ff.print.Bytes())
+			f.flushWriter()
 		}
 	}
 
+	if f.afterFlush != nil && printed {
+		f.afterFlush()
+	}
+
+	f.flushBuffer = &flushBuffer{}
+
 	return nil
+}
+
+func (f *AnsiScreenWriter) flushWriter() {
+	type flushable interface {
+		Flush() error
+	}
+
+	if flushWriter, ok := f.currentRunOutput.(flushable); ok {
+		flushWriter.Flush()
+	}
 }

@@ -1,40 +1,43 @@
 package exec
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/elseano/rundown/pkg/exec/scripts"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestErrorParseBash(t *testing.T) {
-	output := "/var/folders/9y/pdzh2ryj5dj0w96wq08bt3l40000gn/T/rd-base-507761123: line 5: DOCKER_BUILD_TAG: unbound variable"
 
-	sm := scripts.NewScriptManager()
-	sm.SetBaseScript("bash", []byte("one\ntwo\nthree\nfour\nfive\nsix"))
-	sm.AllScripts()[0].AbsolutePath = "/var/folders/9y/pdzh2ryj5dj0w96wq08bt3l40000gn/T/rd-base-507761123"
+	sm, err := scripts.NewScript("bash", "bash", []byte("one\ntwo\nthree\nfour\nfive\nsix"))
+	require.NoError(t, err)
 
-	err := ParseError(sm, output)
+	output := fmt.Sprintf("%s: line 5: DOCKER_BUILD_TAG: unbound variable", sm.AbsolutePath)
 
-	if assert.NotNil(t, err.ErrorSource) {
-		if assert.Equal(t, 4, err.ErrorSource.Line) {
-			assert.Equal(t, "DOCKER_BUILD_TAG: unbound variable", err.Error)
+	parsed := ParseError(sm, output)
+
+	if assert.NotNil(t, parsed.ErrorSource) {
+		if assert.Equal(t, 5, parsed.ErrorSource.Line) {
+			assert.Equal(t, "DOCKER_BUILD_TAG: unbound variable", parsed.Error)
 		}
 	}
 }
 
 func TestErrorParseBashAdjustsForPrefix(t *testing.T) {
-	output := "/var/folders/9y/pdzh2ryj5dj0w96wq08bt3l40000gn/T/rd-base-507761123: line 5: DOCKER_BUILD_TAG: unbound variable"
 
-	sm := scripts.NewScriptManager()
-	script, _ := sm.SetBaseScript("bash", []byte("one\ntwo\nthree\nfour\nfive\nsix"))
-	script.AbsolutePath = "/var/folders/9y/pdzh2ryj5dj0w96wq08bt3l40000gn/T/rd-base-507761123"
-	script.Prefix = []byte("Some\nPre\nLines")
-	err := ParseError(sm, output)
+	sm, err := scripts.NewScript("bash", "bash", []byte("one\ntwo\nthree\nfour\nfive\nsix"))
+	sm.Prefix = []byte("Some\nPre\nLines\n")
+	require.NoError(t, err)
 
-	if assert.NotNil(t, err.ErrorSource) {
-		if assert.Equal(t, 0, err.ErrorSource.Line) {
-			assert.Equal(t, "DOCKER_BUILD_TAG: unbound variable", err.Error)
+	output := fmt.Sprintf("%s: line 5: DOCKER_BUILD_TAG: unbound variable", sm.AbsolutePath)
+
+	parsed := ParseError(sm, output)
+
+	if assert.NotNil(t, parsed.ErrorSource) {
+		if assert.Equal(t, 2, parsed.ErrorSource.Line) {
+			assert.Equal(t, "DOCKER_BUILD_TAG: unbound variable", parsed.Error)
 		}
 	}
 }

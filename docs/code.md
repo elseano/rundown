@@ -172,7 +172,60 @@ Script Failed:
   Line 2: this_command_doesnt_exist: command not found
 ```
 
-### Example 7 - Dynamic spinners <r-disabled section="dynamic-spinner"/>
+## Spinners
+
+By default, the spinner message is set as "Running...", however this can be changed a few ways.
+
+
+### Renaming the Spinner <r section="spinner:rename"/>
+
+The most common is to provide new spinner text using the `spinner` attribute.
+
+~~~ markdown
+<r spinner="Doing stuff..." />
+
+``` bash
+echo "Doing some stuff..."
+```
+~~~
+
+Will render:
+
+~~~ expected
+✔ Doing stuff...
+~~~
+
+### Multi-step spinners <r section="spinner:multi"/>
+
+When using `bash` or `sh` scripts, you can turn comments into spinners. Each comment creates a new sub-spinner.
+
+For example:
+
+~~~ markdown
+<r spinner="Building..." sub-spinners />
+
+``` bash
+# Beating eggs
+echo "Beat the eggs"
+
+# Cooking eggs
+echo "Cook the eggs"
+
+# Eating omlette
+echo "Eat delicious omlette"
+~~~
+
+Creates nested spinners:
+
+``` expected
+- Building...
+  ✔ Beating eggs
+  ✔ Cooking eggs
+  ✔ Eating omlette
+✔ Building...
+```
+
+### Dynamic spinners <r-disabled section="spinner:dynamic"/>
 
 Sometimes you'd like to have your spinners be a bit more descriptive. Rundown expands environment variables in spinner names:
 
@@ -198,3 +251,31 @@ Will render:
     Hi from a dynamic spinner
 ✔ Some title...
 ~~~
+
+## Hidden code <r section="hidden"/>
+
+This should be used rarely.
+
+~~~ markdown
+I will be read.
+
+<!--~
+I will only appear in Rundown.
+
+<r spinner="Running"/>
+
+``` bash
+echo "Hi"
+```
+-->
+~~~
+
+Results in:
+
+``` expected
+I will be read.
+
+I will only appear in Rundown.
+
+✔ Running
+```

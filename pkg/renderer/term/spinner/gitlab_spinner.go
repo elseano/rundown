@@ -4,17 +4,29 @@ import (
 	"fmt"
 	"io"
 	"time"
+
+	"github.com/elseano/rundown/pkg/util"
 )
+
+type section struct {
+	codeName string
+	title    string
+}
 
 type GitlabSpinner struct {
 	out            io.Writer
-	section        string
+	section        []section
+	sectionPrefix  string
 	sectionCounter int
-	currentHeading string
 }
 
 func NewGitlabSpinner(out io.Writer) *GitlabSpinner {
-	return &GitlabSpinner{out: out}
+	return &GitlabSpinner{
+		out:            out,
+		sectionPrefix:  util.RandomString(),
+		sectionCounter: 0,
+		section:        []section{},
+	}
 }
 
 func (s *GitlabSpinner) Active() bool {
@@ -26,21 +38,27 @@ func (s *GitlabSpinner) Start() {}
 func (s *GitlabSpinner) Stop() {}
 
 func (s *GitlabSpinner) StampShadow() {
+	// No need, as we've opened a section already during the SetMessage call.
+}
+
+func (s *GitlabSpinner) closeSpinner(indicator string) {
+	for len(s.section) > 0 {
+		currentSection := s.section[len(s.section)-1]
+		s.out.Write([]byte(fmt.Sprintf("%s %s", indicator, currentSection.title)))
+		s.closeSection()
+	}
 }
 
 func (s *GitlabSpinner) Success(message string) {
-	s.closeSection()
-	s.out.Write([]byte(fmt.Sprintf("  %s %s (%s)", TICK, s.CurrentHeading(), message)))
+	s.closeSpinner(TICK)
 }
 
 func (s *GitlabSpinner) Error(message string) {
-	s.closeSection()
-	s.out.Write([]byte(fmt.Sprintf("  %s %s (%s)", CROSS, s.CurrentHeading(), message)))
+	s.closeSpinner(CROSS)
 }
 
 func (s *GitlabSpinner) Skip(message string) {
-	s.closeSection()
-	s.out.Write([]byte(fmt.Sprintf("  %s %s (%s)", SKIP, s.CurrentHeading(), message)))
+	s.closeSpinner(SKIP)
 }
 
 func (s *GitlabSpinner) SetMessage(message string) {
@@ -49,7 +67,13 @@ func (s *GitlabSpinner) SetMessage(message string) {
 }
 
 func (s *GitlabSpinner) NewStep(message string) {
-	s.SetMessage(message)
+	if len(s.section) > 1 {
+		currentSection := s.section[len(s.section)-1]
+		s.out.Write([]byte(fmt.Sprintf("%s %s", TICK, currentSection.title)))
+		s.closeSection()
+	}
+
+	s.openSection(message)
 }
 
 func (s *GitlabSpinner) HideAndExecute(f func()) {
@@ -57,22 +81,23 @@ func (s *GitlabSpinner) HideAndExecute(f func()) {
 }
 
 func (s *GitlabSpinner) CurrentHeading() string {
-	return s.currentHeading
+	return ""
 }
 
 func (s *GitlabSpinner) closeSection() {
-	if s.section != "" {
+	if len(s.section) > 0 {
+		currentSection := s.section[len(s.section)-1]
 		nowStr := time.Now().Unix()
-		s.out.Write([]byte(fmt.Sprintf("\033[0Ksection_end:%d:%s\r\033[0K\r\n", nowStr, s.section)))
-		s.section = ""
-		s.currentHeading = ""
+		s.out.Write([]byte(fmt.Sprintf("\n\033[0Ksection_end:%d:%s\r\033[0K\r\n", nowStr, currentSection.codeName)))
+		s.section = s.section[0 : len(s.section)-1]
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
 func (s *GitlabSpinner) openSection(name string) {
 	s.sectionCounter++
-	s.section = fmt.Sprintf("sec%d", s.sectionCounter)
+	currentSection := fmt.Sprintf("sec_%s_%d", s.sectionPrefix, s.sectionCounter)
+	s.section = append(s.section, section{codeName: currentSection, title: name})
 	nowStr := time.Now().Unix()
-	s.out.Write([]byte(fmt.Sprintf("\033[0Ksection_start:%d:%s\r\033[0K%s\r\n", nowStr, s.section, name)))
-	s.currentHeading = name
+	s.out.Write([]byte(fmt.Sprintf("\033[0Ksection_start:%d:%s\r\033[0K%s\r\n", nowStr, currentSection, name)))
 }

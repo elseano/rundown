@@ -46,16 +46,21 @@ echo "Hi"
 
 ## Test spinner change <r section="test:spin-change"/>
 
-<r named-all stdout/>
+<r spinner="Running..." named-all stdout />
 
 ``` bash
 # Doing the hi
 sleep 1
 echo "Hi"
 
+
 # Doing something else
 sleep 1
 echo "Bye"
+
+# And again
+sleep 1
+echo "Cya!"
 ```
 
 ## Test curl response <r section="test:curl"/>
@@ -69,6 +74,10 @@ curl http://example.org
 ```
 
 :rocket: Test completed successfully.
+
+### Do seomthing else <r if="false" section="test:curl:done"/>
+
+Blah
 
 ## Test curl response <r section="test:ls"/>
 

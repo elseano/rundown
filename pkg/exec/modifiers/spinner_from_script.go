@@ -1,6 +1,8 @@
 package modifiers
 
 import (
+	"encoding/base64"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -28,14 +30,21 @@ func NewSpinnerFromScript(CommentsAsSpinnerTitles bool, spinner *SpinnerConstant
 }
 
 var commentDetector = regexp.MustCompile(`#+\s+(.*)`)
-var spinnerRpcUpdate = []byte("echo SETSPINNER $1 >> $$RDRPC")
+
+const marker = "R;SETSPINNER "
 
 func (m *SpinnerFromScript) PrepareScripts(scripts *scripts.ScriptManager) {
 	if m.CommentsAsSpinnerTitles {
 		script := scripts.GetBase()
 
 		if script.ShellScript {
-			script.Contents = commentDetector.ReplaceAll(script.Contents, spinnerRpcUpdate)
+			script.Contents = commentDetector.ReplaceAllFunc(script.Contents, func(b []byte) []byte {
+				matches := commentDetector.FindAllSubmatch(b, 1)
+
+				// Base64 encode
+				result := base64.StdEncoding.EncodeToString(matches[0][1])
+				return []byte(fmt.Sprintf("echo -n -e \"\x1b]R;SETSPINNER %s\x9c\"", result))
+			})
 		}
 	}
 
@@ -46,6 +55,29 @@ func (m *SpinnerFromScript) GetResult(int) []ModifierResult {
 	bus.Unsubscribe(m)
 
 	return []ModifierResult{}
+}
+
+type OSCHandler interface {
+	HandleOSC(string) bool
+}
+
+func (m *SpinnerFromScript) HandleOSC(osc string) bool {
+	if strings.HasPrefix(osc, marker) {
+		title64 := osc[len(marker):]
+		title, _ := base64.StdEncoding.DecodeString(title64)
+		spinnerTitle := string(title)
+
+		if m.nameHasBeenSet {
+			m.Spinner.Spinner.NewStep(spinnerTitle)
+		} else {
+			m.Spinner.Spinner.SetMessage(spinnerTitle)
+			m.nameHasBeenSet = true
+		}
+
+		return true
+	}
+
+	return false
 }
 
 func (m *SpinnerFromScript) ReceiveEvent(event bus.Event) {

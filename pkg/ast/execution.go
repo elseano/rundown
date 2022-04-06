@@ -35,6 +35,7 @@ type ExecutionBlock struct {
 	SpinnerName           string
 	SpinnerMode           SpinnerMode
 	With                  string
+	Language              string
 	ReplaceProcess        bool
 	SkipOnSuccess         bool
 	SkipOnFailure         bool
@@ -74,6 +75,7 @@ func (n *ExecutionBlock) Dump(source []byte, level int) {
 		"SpinnerName":           n.SpinnerName,
 		"SpinnerMode":           fmt.Sprintf("%#v", n.SpinnerMode),
 		"With":                  n.With,
+		"Language":              n.Language,
 		"SkipOnSuccess":         boolToStr(n.SkipOnSuccess),
 	}, nil)
 }

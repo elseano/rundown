@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"path"
 
 	rundown "github.com/elseano/rundown/pkg"
 	"github.com/elseano/rundown/pkg/ast"
@@ -89,6 +90,9 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 			}
 
 			fmt.Printf("Running %s in %s...\n\n", sectionPointer.SectionName, section.Document.Filename)
+
+			executionContext.ImportEnv(map[string]string{"PWD": path.Dir(executionContext.RundownFile)})
+
 
 			err := gm.Renderer().Render(os.Stdout, source, doc)
 
