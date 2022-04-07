@@ -491,6 +491,9 @@ func runIfScript(ctx *rundown_renderer.Context, ifScript string) (bool, error) {
 	runner := exec.NewRunner()
 	runner.ImportEnv(ctx.Env)
 
+	outputBuffer := bytes.Buffer{}
+	outputWait := sync.WaitGroup{}
+
 	_, err := runner.SetScript("sh", "sh", []byte(ifScript))
 
 	if err != nil {
@@ -502,13 +505,22 @@ func runIfScript(ctx *rundown_renderer.Context, ifScript string) (bool, error) {
 		return false, err
 	}
 
+	outputWait.Add(1)
+	go func() {
+		io.Copy(&outputBuffer, process.Stderr)
+		outputWait.Done()
+	}()
+
 	err = process.Start()
 
 	if err != nil {
 		return false, err
 	}
 
+	outputWait.Wait()
 	exitCode, _, err := process.Wait()
+
+	rdutil.Logger.Debug().Msgf("Process output: %s", outputBuffer.String())
 
 	if err != nil {
 		rdutil.Logger.Debug().Msgf("Error: %#v", err)
