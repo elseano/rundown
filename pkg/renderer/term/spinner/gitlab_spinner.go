@@ -43,8 +43,11 @@ func (s *GitlabSpinner) StampShadow() {
 
 func (s *GitlabSpinner) closeSpinner(indicator string) {
 	for len(s.section) > 0 {
-		currentSection := s.section[len(s.section)-1]
-		s.out.Write([]byte(fmt.Sprintf("%s %s", indicator, currentSection.title)))
+		if indicator == CROSS {
+			currentSection := s.section[len(s.section)-1]
+			s.out.Write([]byte(fmt.Sprintf("%s %s", indicator, currentSection.title)))
+		}
+
 		s.closeSection()
 	}
 }
