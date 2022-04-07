@@ -118,7 +118,8 @@ func buildInvocation(binary string, language string) (string, string, error) {
 	case "bash":
 		return abs, "set -euo pipefail", nil
 	case "sh":
-		return abs, "set -euo pipefail", nil
+		// pipefail on Ubuntu's SH fails, so don't set it here.
+		return abs, "set -eu", nil
 	default:
 		return abs, "", nil
 	}
