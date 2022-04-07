@@ -49,8 +49,6 @@ func TestDocumentation(t *testing.T) {
 
 			ast.PruneDocumentToSection(section.Document.Document, s.Pointer.SectionName)
 
-			section.Document.Document.Dump(section.Document.Source, 0)
-
 			// Get markdown section
 			source := ast.FindNode(section.Document.Document, func(n gold_ast.Node) bool {
 				if fcb, ok := n.(*gold_ast.FencedCodeBlock); ok && fcb.Info != nil {
