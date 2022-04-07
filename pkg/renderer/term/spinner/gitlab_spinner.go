@@ -71,8 +71,6 @@ func (s *GitlabSpinner) SetMessage(message string) {
 
 func (s *GitlabSpinner) NewStep(message string) {
 	if len(s.section) > 1 {
-		currentSection := s.section[len(s.section)-1]
-		s.out.Write([]byte(fmt.Sprintf("%s %s", TICK, currentSection.title)))
 		s.closeSection()
 	}
 
