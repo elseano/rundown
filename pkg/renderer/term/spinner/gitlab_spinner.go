@@ -3,6 +3,7 @@ package spinner
 import (
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/elseano/rundown/pkg/util"
@@ -100,8 +101,15 @@ func (s *GitlabSpinner) closeSection() {
 
 func (s *GitlabSpinner) openSection(name string) {
 	s.sectionCounter++
+
+	nameDepth := len(s.section)
+	nameDepthPrefix := strings.Repeat("-", nameDepth)
+	if nameDepthPrefix != "" {
+		nameDepthPrefix = " " + nameDepthPrefix + " "
+	}
+
 	currentSection := fmt.Sprintf("sec_%s_%d", s.sectionPrefix, s.sectionCounter)
 	s.section = append(s.section, section{codeName: currentSection, title: name})
 	nowStr := time.Now().Unix()
-	s.out.Write([]byte(fmt.Sprintf("\033[0Ksection_start:%d:%s\r\033[0K%s\r\n", nowStr, currentSection, s.colors.BrightCyan(name).String())))
+	s.out.Write([]byte(fmt.Sprintf("\033[0Ksection_start:%d:%s\r\033[0K%s%s\r\n", nowStr, currentSection, s.colors.Faint(nameDepthPrefix).String(), s.colors.BrightCyan(name).String())))
 }
