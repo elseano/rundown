@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elseano/rundown/pkg/util"
+	"github.com/logrusorgru/aurora"
 )
 
 type section struct {
@@ -18,14 +19,16 @@ type GitlabSpinner struct {
 	section        []section
 	sectionPrefix  string
 	sectionCounter int
+	colors         aurora.Aurora
 }
 
-func NewGitlabSpinner(out io.Writer) *GitlabSpinner {
+func NewGitlabSpinner(out io.Writer, colors aurora.Aurora) *GitlabSpinner {
 	return &GitlabSpinner{
 		out:            out,
 		sectionPrefix:  util.RandomString(),
 		sectionCounter: 0,
 		section:        []section{},
+		colors:         colors,
 	}
 }
 
@@ -100,5 +103,5 @@ func (s *GitlabSpinner) openSection(name string) {
 	currentSection := fmt.Sprintf("sec_%s_%d", s.sectionPrefix, s.sectionCounter)
 	s.section = append(s.section, section{codeName: currentSection, title: name})
 	nowStr := time.Now().Unix()
-	s.out.Write([]byte(fmt.Sprintf("\033[0Ksection_start:%d:%s\r\033[0K%s\r\n", nowStr, currentSection, name)))
+	s.out.Write([]byte(fmt.Sprintf("\033[0Ksection_start:%d:%s\r\033[0K%s\r\n", nowStr, currentSection, s.colors.BrightCyan(name).String())))
 }
