@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -26,14 +27,24 @@ func NewDocRootCmd(args []string) *cobra.Command {
 
 	loaded, err := rundown.Load(rundownFile)
 	if err != nil {
-		fmt.Printf("Error: %s\n", err.Error())
-		os.Exit(1)
+		if errors.Is(err, os.ErrNotExist) {
+			if flagFilename != "" {
+				fmt.Fprintf(os.Stderr, "Error: Couldn't load file %s. File doesn't exist.\n\n", flagFilename)
+			} else {
+				fmt.Fprintf(os.Stderr, "Error: No RUNDOWN.md file found in current path or parents.\n\n")
+			}
+		} else {
+			fmt.Printf("Error: %s\n", err.Error())
+			os.Exit(1)
+		}
 	}
 
-	for _, section := range loaded.GetSections() {
-		cmd := ports.BuildCobraCommand(rundownFile, section, flagDebug)
-		if cmd != nil {
-			docRoot.AddCommand(cmd)
+	if loaded != nil {
+		for _, section := range loaded.GetSections() {
+			cmd := ports.BuildCobraCommand(rundownFile, section, flagDebug)
+			if cmd != nil {
+				docRoot.AddCommand(cmd)
+			}
 		}
 	}
 
@@ -58,7 +69,7 @@ func NewRootCmd() *cobra.Command {
 
 			if len(rundownFile) == 0 {
 				if len(flagFilename) == 0 {
-					println("Could not find RUNDOWN.md or README.md in current or parent directories.")
+					// Error already written.
 				} else {
 					println("Could not read file ", flagFilename)
 				}

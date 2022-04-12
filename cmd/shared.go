@@ -18,5 +18,5 @@ func RundownFile(fileFlag string) string {
 		return abs
 	}
 
-	return util.FindFile([]string{"RUNDOWN.md", "README.md"})
+	return util.FindFile([]string{"RUNDOWN.md"})
 }
