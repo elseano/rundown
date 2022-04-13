@@ -1,6 +1,7 @@
 package transformer
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/elseano/rundown/pkg/ast"
@@ -24,14 +25,13 @@ type NodeProcessor interface {
 }
 
 type rundownASTTransformer struct {
+	Errors []error
 }
-
-var defaultRundownASTTransformer = &rundownASTTransformer{}
 
 // Rundown AST Transformer converts Rundown Elements in the markdown tree
 // into proper rundown nodes, and applies any effects.
-func NewRundownASTTransformer() parser.ASTTransformer {
-	return defaultRundownASTTransformer
+func NewRundownASTTransformer() *rundownASTTransformer {
+	return &rundownASTTransformer{Errors: []error{}}
 }
 
 type OpenTags struct {
@@ -104,7 +104,7 @@ func createRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc parse
 func (a *rundownASTTransformer) Transform(doc *goldast.Document, reader goldtext.Reader, pc parser.Context) {
 	createRundownBlocks(doc, reader, pc)
 	mergeTextBlocks(doc, reader, pc)
-	convertRundownBlocks(doc, reader, pc)
+	a.convertRundownBlocks(doc, reader, pc)
 }
 
 // Merges sequential text nodes into a single text block. This makes subsequent processing easier.
@@ -130,7 +130,7 @@ func mergeTextBlocks(doc *goldast.Document, reader goldtext.Reader, pc parser.Co
 
 }
 
-func convertRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc parser.Context) {
+func (a *rundownASTTransformer) convertRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc parser.Context) {
 	var treatments *Treatment = NewTreatment(reader)
 	var activeProcessors = []NodeProcessor{}
 
@@ -142,7 +142,11 @@ func convertRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc pars
 		switch node := node.(type) {
 
 		case *ast.RundownBlock:
-			processor := ConvertToRundownNode(node, reader, treatments)
+			processor, err := ConvertToRundownNode(node, reader, treatments)
+
+			if err != nil {
+				a.Errors = append(a.Errors, err)
+			}
 
 			if processor != nil {
 				processor.Begin(node)
@@ -208,7 +212,7 @@ func convertRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc pars
 	util.Logger.Trace().Msgf("Sections populated\n")
 }
 
-func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatments *Treatment) NodeProcessor {
+func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatments *Treatment) (NodeProcessor, error) {
 	var nodeToReplace goldast.Node = node
 	nextNode := node.NextSibling()
 	parentNode := nodeToReplace.Parent()
@@ -233,7 +237,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		}
 
 		treatments.ReplaceWithChildren(node, importBlock, node)
-		return nil
+		return nil, nil
 	}
 
 	if node.HasAttr("label", "section") {
@@ -277,7 +281,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 			}
 		}
 
-		return nil
+		return nil, nil
 	} else if h, ok := node.Parent().(*goldast.Heading); ok {
 		// Check if there's a conditional...
 
@@ -373,7 +377,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 			}
 		}
 
-		return nil
+		return nil, nil
 	}
 
 	if node.HasAttr("opt") {
@@ -393,24 +397,25 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 			opt.OptionType = ast.BuildOptionType("string")
 		}
 
+		if opt.OptionType == nil {
+			return nil, fmt.Errorf("unknown option type %s for option %s", opt.OptionTypeString, opt.OptionName)
+		}
+
 		if node.HasAttr("default") {
 			defaultVal := node.GetAttr("default")
 			if defaultVal.Valid {
-				if opt.OptionType == nil {
-					panic("Unknown option type " + opt.OptionTypeString)
-				}
 				if opt.OptionType.Validate(defaultVal.String) == nil {
 					def := opt.OptionType.Normalise(defaultVal.String)
 					opt.OptionDefault = null.StringFrom(def)
 				} else {
-					// ERROR: Default value isn't valid.
+					return nil, fmt.Errorf("default option type \"%s\" is invalid for option \"%s\"", defaultVal.String, opt.OptionName)
 				}
 			}
 		}
 
 		treatments.Replace(nodeToReplace, opt)
 
-		return nil
+		return nil, nil
 	}
 
 	if node.HasAttr("desc") {
@@ -426,7 +431,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 			panic("Bad desc node")
 		}
 
-		return nil
+		return nil, nil
 	}
 
 	if node.HasAttr("help") {
@@ -436,7 +441,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 			treatments.ReplaceWithChildren(node, helpNode, node)
 		}
 
-		return nil
+		return nil, nil
 	}
 
 	if node.HasAttr("stop-fail") {
@@ -453,7 +458,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		}
 
 		treatments.ReplaceWithChildren(nodeToReplace, stop, node)
-		return nil
+		return nil, nil
 	}
 
 	if node.HasAttr("stop-ok") {
@@ -470,12 +475,12 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		}
 
 		treatments.ReplaceWithChildren(nodeToReplace, stop, node)
-		return nil
+		return nil, nil
 	}
 
 	if node.HasAttr("ignore") {
 		treatments.Remove(nodeToReplace)
-		return nil
+		return nil, nil
 	}
 
 	if node.HasAttr("on-failure") {
@@ -484,7 +489,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 
 		treatments.ReplaceWithChildren(nodeToReplace, fail, node)
 
-		return nil
+		return nil, nil
 	}
 
 	if fcb, ok := nextNode.(*goldast.FencedCodeBlock); ok && node.HasAttr("with", "spinner", "stdout", "subenv", "sub-env", "capture-env", "replace", "borg", "reveal", "reveal-only", "skip-on-success") {
@@ -556,7 +561,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 
 		}
 
-		return nil
+		return nil, nil
 	}
 
 	if node.HasAttr("subenv", "sub-env") {
@@ -576,5 +581,5 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		treatments.DissolveRundownBlock(node)
 	}
 
-	return nil
+	return nil, nil
 }

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"path"
+	"strings"
 
 	rundown "github.com/elseano/rundown/pkg"
 	"github.com/elseano/rundown/pkg/ast"
@@ -26,7 +26,7 @@ type optVal struct {
 
 func (o optVal) String() string {
 	if o.Str != nil {
-		return *o.Str
+		return o.Option.OptionType.Normalise(*o.Str)
 	}
 
 	if o.Bool != nil {
@@ -73,12 +73,31 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 			executionContext.RundownFile = section.Document.Filename
 
 			for k, v := range optionEnv {
-				if err := v.Option.OptionType.Validate(v.String()); err != nil {
+				optionValue := v.Option.OptionType.Normalise(v.String())
+
+				if rt, ok := v.Option.OptionType.(ast.OptionTypeRuntime); ok {
+					wd, err := os.Getwd()
+					if err != nil {
+						return err
+					}
+
+					ov, err := rt.NormaliseToPath(v.String(), wd)
+
+					if err != nil {
+						return err
+					}
+
+					optionValue = ov
+				}
+
+				fmt.Printf("%s is %s from %s\n", k, optionValue, v)
+
+				if err := v.Option.OptionType.Validate(optionValue); err != nil {
 					return fmt.Errorf("%s: %w", v.Option.OptionName, err)
 				}
 
 				executionContext.ImportEnv(map[string]string{
-					k: fmt.Sprintf("%v", v.String()),
+					k: fmt.Sprintf("%v", optionValue),
 				})
 			}
 
@@ -92,7 +111,6 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 			fmt.Printf("Running %s in %s...\n\n", sectionPointer.SectionName, section.Document.Filename)
 
 			executionContext.ImportEnv(map[string]string{"PWD": path.Dir(executionContext.RundownFile)})
-
 
 			err := gm.Renderer().Render(os.Stdout, source, doc)
 

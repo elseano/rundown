@@ -2,6 +2,8 @@ package ast
 
 import (
 	"fmt"
+	"path"
+	"path/filepath"
 	"strings"
 
 	goldast "github.com/yuin/goldmark/ast"
@@ -12,6 +14,10 @@ type OptionType interface {
 	Validate(input string) error
 	Normalise(input string) string
 	Describe() string
+}
+
+type OptionTypeRuntime interface {
+	NormaliseToPath(input string, path string) (string, error)
 }
 
 type TypeBoolean struct{}
@@ -74,10 +80,10 @@ func (n *SectionOption) Dump(source []byte, level int) {
 func BuildOptionType(optionType string) OptionType {
 	optType := strings.ToLower(optionType)
 
-	if strings.HasPrefix(optType, "enum|") {
-		options := strings.Split(optType, "|")
+	if strings.HasPrefix(optType, "enum:") {
+		options := strings.Split(strings.Replace(optType, "enum:", "", 1), "|")
 		return &TypeEnum{
-			ValidValues: options[1:],
+			ValidValues: options,
 		}
 	}
 
@@ -89,8 +95,12 @@ func BuildOptionType(optionType string) OptionType {
 		return &TypeBoolean{}
 	}
 
-	if strings.HasPrefix(optType, "file-exists") {
-		return &TypeFilename{MustExist: true}
+	if strings.HasPrefix(optType, "file:") {
+		fileOp := strings.Replace(optType, "file:", "", 1)
+
+		return &TypeFilename{MustExist: fileOp == "exist", MustNotExist: fileOp == "not-exist"}
+	} else if optType == "file" {
+		return &TypeFilename{}
 	}
 
 	return nil
@@ -103,19 +113,19 @@ func (t *TypeEnum) Validate(input string) error {
 		}
 	}
 
-	return fmt.Errorf("must be one of: %s", strings.Join(t.ValidValues, ", "))
+	return fmt.Errorf("\"%s\" must be one of: %s", input, strings.Join(t.ValidValues, ", "))
 }
 
-func (t *TypeEnum) Normalise(string) string {
-	return ""
+func (t *TypeEnum) Normalise(input string) string {
+	return input
 }
 
 func (t *TypeString) Validate(string) error {
 	return nil
 }
 
-func (t *TypeString) Normalise(string) string {
-	return ""
+func (t *TypeString) Normalise(input string) string {
+	return input
 }
 
 func (t *TypeBoolean) Validate(string) error {
@@ -152,4 +162,10 @@ func (t *TypeFilename) Validate(string) error {
 
 func (t *TypeFilename) Normalise(input string) string {
 	return input
+}
+
+// Takes the path provided in the option, and treats it as relative to the pwd, returning the absolute path.
+func (t *TypeFilename) NormaliseToPath(input string, pwd string) (string, error) {
+	rel := path.Join(pwd, input)
+	return filepath.Abs(rel)
 }
