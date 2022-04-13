@@ -492,7 +492,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		return nil, nil
 	}
 
-	if fcb, ok := nextNode.(*goldast.FencedCodeBlock); ok && node.HasAttr("with", "spinner", "stdout", "subenv", "sub-env", "capture-env", "replace", "borg", "reveal", "reveal-only", "skip-on-success") {
+	if fcb, ok := nextNode.(*goldast.FencedCodeBlock); ok && node.HasAttr("if", "with", "spinner", "stdout", "subenv", "sub-env", "capture-env", "replace", "borg", "reveal", "reveal-only", "skip-on-success") {
 		executionBlock := ast.NewExecutionBlock(fcb)
 
 		executionBlock.CaptureStdoutInto = node.GetAttr("stdout-into").String
@@ -505,6 +505,10 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		executionBlock.SkipOnSuccess = node.HasAttr("skip-on-success")
 		executionBlock.SkipOnFailure = node.HasAttr("skip-on-failure")
 		executionBlock.Language = string(fcb.Info.Text(reader.Source()))
+
+		if ifScript := node.GetAttr("if"); ifScript.Valid {
+			executionBlock.SetIfScript(ifScript.String)
+		}
 
 		if envCapture := node.GetAttr("capture-env"); envCapture.Valid {
 			executionBlock.CaptureEnvironment = strings.Split(envCapture.String, ",")
