@@ -77,6 +77,10 @@ func cascadeLoad(parentDocument *LoadedDocument) (*LoadedDocuments, error) {
 			for _, section := range importedDoc.GetSections() {
 				section.SectionName = fmt.Sprintf("%s:%s", directive.ImportPrefix, section.SectionName)
 			}
+
+			for _, invoke := range importedDoc.GetInvokes() {
+				invoke.Invoke = fmt.Sprintf("%s:%s", directive.ImportPrefix, invoke.Invoke)
+			}
 		}
 
 		collection.ImportedDocuments = append(collection.ImportedDocuments, importedDoc)

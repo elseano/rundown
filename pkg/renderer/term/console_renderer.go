@@ -224,6 +224,7 @@ type Renderer struct {
 	skipUntil         ast.Node
 	wrappingWriter    *wordwrap.WordWrap
 	nonWrappingWriter util.BufWriter
+	lastRendered      ast.Node
 }
 
 // NewRenderer returns a new Renderer with given options.
@@ -414,6 +415,7 @@ func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(rundown_ast.KindStopFail, r.supportSkipping(r.renderStopFail))
 	reg.Register(rundown_ast.KindStopOk, r.supportSkipping(r.renderStopOk))
 	reg.Register(rundown_ast.KindSubEnvBlock, r.supportSkipping(r.renderHollow))
+	reg.Register(rundown_ast.KindInvokeBlock, r.supportSkipping(r.renderInvokeBlock))
 
 	// Conditional blocks are transparent, they shouldn't render.
 	reg.Register(rundown_ast.KindConditionalStart, r.supportSkipping(r.renderHollow))
@@ -475,6 +477,10 @@ func (r *Renderer) renderDocument(w util.BufWriter, source []byte, node ast.Node
 	return ast.WalkContinue, nil
 }
 
+func (r *Renderer) StartAt(node ast.Node) {
+	r.skipUntil = node
+}
+
 func (r *Renderer) renderHollow(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	return ast.WalkContinue, nil
 }
@@ -482,6 +488,43 @@ func (r *Renderer) renderHollow(w util.BufWriter, source []byte, node ast.Node, 
 func (r *Renderer) renderNothing(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	// nothing to do
 	return ast.WalkSkipChildren, nil
+}
+
+func (r *Renderer) renderInvokeBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	invoke := node.(*rundown_ast.InvokeBlock)
+
+	if entering {
+		// If this is a dependency invoke, and it's already been run, then skip it.
+		if complete, present := r.Context.DepsCompleted[invoke.Invoke]; complete && present && invoke.AsDependency {
+			return ast.WalkSkipChildren, nil
+		}
+
+		// Otherwise, snapshot the environment, and reset it for the invoked code.
+		invoke.PreviousEnv = r.Context.Env
+		r.Context.ResetEnv()
+
+		section := rundown_ast.FindSectionInDocument(node.OwnerDocument(), invoke.Invoke)
+		if section == nil {
+			return ast.WalkStop, fmt.Errorf("invalid section: %s", invoke.Invoke)
+		}
+
+		env, err := section.ParseOptions(invoke.Args)
+		if err != nil {
+			return ast.WalkStop, err
+		}
+
+		r.Context.ImportEnv(env)
+	} else {
+		r.Context.ResetEnv()
+		r.Context.ImportEnv(invoke.PreviousEnv)
+		invoke.PreviousEnv = nil
+
+		if invoke.AsDependency {
+			r.Context.DepsCompleted[invoke.Invoke] = true
+		}
+	}
+
+	return ast.WalkContinue, nil
 }
 
 func runIfScript(ctx *rundown_renderer.Context, ifScript string) (bool, error) {
@@ -706,6 +749,8 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 	theSpinner.SetMessage(executionBlock.SpinnerName)
 	theSpinner.Start()
+
+	r.lastRendered = node
 
 	/***** ENVIRONMENT CAPTURE *****/
 	if executionBlock.CaptureEnvironment != nil {
@@ -941,6 +986,7 @@ func (r *Renderer) wrapBlock(renderFunc renderer.NodeRendererFunc) renderer.Node
 			r.nonWrappingWriter.Flush()
 			r.wrappingWriter = nil
 			r.nonWrappingWriter = nil
+
 		}
 
 		bufWriter.Flush()
@@ -1035,6 +1081,10 @@ func (r *Renderer) renderHeading(w util.BufWriter, source []byte, node ast.Node,
 	}
 
 	if entering {
+		if _, execBlock := r.lastRendered.(*rundown_ast.ExecutionBlock); execBlock {
+			r.writeString(w, "\n")
+		}
+
 		style := r.inlineStyles.Push(Color(aurora.CyanFg | aurora.BoldFm))
 		r.writeString(w, style.Begin())
 
@@ -1047,6 +1097,7 @@ func (r *Renderer) renderHeading(w util.BufWriter, source []byte, node ast.Node,
 	} else {
 		r.inlineStyles.Pop()
 		r.writeString(w, "\n\n")
+		r.lastRendered = n
 	}
 	return ast.WalkContinue, nil
 }
@@ -1061,6 +1112,7 @@ func (r *Renderer) renderBlockquote(w util.BufWriter, source []byte, n ast.Node,
 		r.blockStyles.Push(NewBulletSequence(Aurora.Blue(" >").String(), paddingForLevel(r.currentLevel)))
 	} else {
 		r.blockStyles.Pop()
+		r.lastRendered = n
 	}
 	return ast.WalkContinue, nil
 }
@@ -1122,6 +1174,7 @@ func (r *Renderer) renderCodeBlock(w util.BufWriter, source []byte, n ast.Node, 
 		r.levelLinesWithPrefix("", strings.TrimSpace(r.nodeLinesToString(source, n)), w)
 	} else {
 		_, _ = w.WriteString("\r\n") // Block level element, add blank line.
+		r.lastRendered = n
 	}
 	return ast.WalkContinue, nil
 }
@@ -1160,6 +1213,7 @@ func (r *Renderer) renderFencedCodeBlock(w util.BufWriter, source []byte, node a
 		}
 	} else {
 		_, _ = w.WriteString("\r\n") // Block level element, add blank line.
+		r.lastRendered = n
 	}
 
 	return ast.WalkContinue, nil
@@ -1255,6 +1309,7 @@ func (r *Renderer) renderList(w util.BufWriter, source []byte, node ast.Node, en
 		// }
 		r.blockStyles.Pop()
 		r.SetLevel(r.currentLevel - 1)
+		r.lastRendered = n
 	}
 	return ast.WalkContinue, nil
 }
@@ -1347,6 +1402,8 @@ func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, n ast.Node, 
 			// then we'll make sure that block element is on it's own line.
 			_, _ = w.WriteString("\n")
 		}
+
+		r.lastRendered = n
 	}
 	return ast.WalkContinue, nil
 }
@@ -1362,6 +1419,7 @@ func (r *Renderer) renderTextBlock(w util.BufWriter, source []byte, n ast.Node, 
 		}
 
 		// Otherwise, just let the parent ListItem handle the line breaks.
+		r.lastRendered = n
 	}
 	return ast.WalkContinue, nil
 }
@@ -1383,6 +1441,7 @@ func (r *Renderer) renderThematicBreak(w util.BufWriter, source []byte, n ast.No
 	line := strings.Repeat("-", r.Config.ConsoleWidth-4)
 
 	_, _ = w.WriteString(fmt.Sprintf("  %s  \r\n\r\n", Aurora.Faint(line).String()))
+	r.lastRendered = n
 
 	return ast.WalkContinue, nil
 }
@@ -1586,11 +1645,15 @@ func (r *Renderer) renderRawHTML(w util.BufWriter, source []byte, node ast.Node,
 }
 
 func (r *Renderer) renderText(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	n := node.(*ast.Text)
 	if !entering {
+		if n.SoftLineBreak() {
+			r.writeString(w, " ") // Add a space.
+		}
+
 		return ast.WalkContinue, nil
 	}
 
-	n := node.(*ast.Text)
 	segment := n.Segment
 
 	if style := r.inlineStyles.Peek(); style != nil {

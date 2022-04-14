@@ -1,6 +1,8 @@
 package ast
 
 import (
+	"fmt"
+	"os"
 	"strings"
 
 	goldast "github.com/yuin/goldmark/ast"
@@ -16,6 +18,9 @@ type SectionPointer struct {
 	DescriptionShort string
 	DescriptionLong  *DescriptionBlock
 	End              *SectionEnd
+	Silent           bool
+
+	Dependencies []*SectionPointer
 }
 
 type SectionEnd struct {
@@ -59,6 +64,61 @@ func (n *SectionPointer) AddOption(option *SectionOption) {
 
 func (n *SectionPointer) GetEndSkipNode(node goldast.Node) goldast.Node {
 	return n.End
+}
+
+func (n *SectionPointer) FirstContentNode() goldast.Node {
+	for node := n.NextSibling(); node != nil; node = node.NextSibling() {
+		if node.Kind() != goldast.KindHeading {
+			return node
+		}
+	}
+
+	return nil
+}
+
+func (n *SectionPointer) GetOption(name string) *SectionOption {
+	for _, o := range n.Options {
+		if o.OptionName == name {
+			return o
+		}
+	}
+
+	return nil
+}
+
+func (n *SectionPointer) ParseOptions(options map[string]string) (map[string]string, error) {
+	result := map[string]string{}
+
+	for k, v := range options {
+		option := n.GetOption(k)
+
+		if option != nil {
+			optionValue := option.OptionType.Normalise(v)
+
+			if rt, ok := option.OptionType.(OptionTypeRuntime); ok {
+				wd, err := os.Getwd()
+				if err != nil {
+					return nil, err
+				}
+
+				ov, err := rt.NormaliseToPath(v, wd)
+
+				if err != nil {
+					return nil, err
+				}
+
+				optionValue = ov
+			}
+
+			if err := option.OptionType.Validate(optionValue); err != nil {
+				return nil, fmt.Errorf("%s: %w", option.OptionName, err)
+			}
+
+			result[k] = fmt.Sprintf("%v", optionValue)
+		}
+	}
+
+	return result, nil
 }
 
 // Kind implements Node.Kind.
@@ -160,7 +220,7 @@ func PruneSectionFromNode(node goldast.Node) {
 	PruneSectionFromNode(parent)
 }
 
-// Reduces the document to just the requested section.
+// Reduces the document to just the requested section and it's dependencies.
 func PruneDocumentToSection(doc goldast.Node, sectionName string) {
 	var sectionPointer *SectionPointer = nil
 

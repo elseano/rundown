@@ -247,6 +247,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		}
 
 		start := ast.NewSectionPointer(name.String)
+		start.Silent = node.HasAttr("silent")
 
 		if name.Valid {
 			if heading, ok := parentNode.(*goldast.Heading); ok {
@@ -440,6 +441,25 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		if node.ChildCount() > 0 {
 			treatments.ReplaceWithChildren(node, helpNode, node)
 		}
+
+		return nil, nil
+	}
+
+	if node.HasAttr("dep", "invoke") {
+		invoke := ast.NewInvokeBlock()
+
+		if dep := node.GetAttr("dep"); dep.Valid {
+			invoke.Invoke = dep.String
+			invoke.AsDependency = true
+		} else if name := node.GetAttr("invoke"); name.Valid {
+			invoke.Invoke = name.String
+		}
+
+		for _, attr := range node.Attrs {
+			invoke.Args[attr.Key] = attr.Val
+		}
+
+		treatments.Replace(nodeToReplace, invoke)
 
 		return nil, nil
 	}

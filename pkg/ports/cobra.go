@@ -72,47 +72,35 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 			executionContext.ImportRawEnv(os.Environ())
 			executionContext.RundownFile = section.Document.Filename
 
+			optionEnvStr := map[string]string{}
 			for k, v := range optionEnv {
-				optionValue := v.Option.OptionType.Normalise(v.String())
-
-				if rt, ok := v.Option.OptionType.(ast.OptionTypeRuntime); ok {
-					wd, err := os.Getwd()
-					if err != nil {
-						return err
-					}
-
-					ov, err := rt.NormaliseToPath(v.String(), wd)
-
-					if err != nil {
-						return err
-					}
-
-					optionValue = ov
-				}
-
-				fmt.Printf("%s is %s from %s\n", k, optionValue, v)
-
-				if err := v.Option.OptionType.Validate(optionValue); err != nil {
-					return fmt.Errorf("%s: %w", v.Option.OptionName, err)
-				}
-
-				executionContext.ImportEnv(map[string]string{
-					k: fmt.Sprintf("%v", optionValue),
-				})
+				optionEnvStr[k] = v.String()
 			}
 
-			ast.PruneDocumentToSection(doc, sectionPointer.SectionName)
+			parsed, err := sectionPointer.ParseOptions(optionEnvStr)
+
+			if err != nil {
+				return err
+			}
+
+			executionContext.ImportEnv(parsed)
+
+			if err := ast.FillInvokeBlocks(doc, 10); err != nil {
+				return err
+			}
+
+			doc = ast.SkipTo(doc, sectionPointer)
 			sectionPointer.SetIfScript("") // Ensure the requested section runs.
 
 			if val, err := cmd.Flags().GetBool("dump"); err == nil && val {
 				doc.Dump(source, 1)
 			}
 
-			fmt.Printf("Running %s in %s...\n\n", sectionPointer.SectionName, section.Document.Filename)
+			rdutil.Logger.Info().Msgf("Running %s in %s...\n\n", sectionPointer.SectionName, section.Document.Filename)
 
 			executionContext.ImportEnv(map[string]string{"PWD": path.Dir(executionContext.RundownFile)})
 
-			err := gm.Renderer().Render(os.Stdout, source, doc)
+			err = gm.Renderer().Render(os.Stdout, source, doc)
 
 			switch {
 			case errors.Is(err, errs.ErrStopOk):

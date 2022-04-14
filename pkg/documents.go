@@ -62,6 +62,18 @@ func (doc *LoadedDocument) GetSections() []*ast.SectionPointer {
 	return result
 }
 
+func (doc *LoadedDocument) GetInvokes() []*ast.InvokeBlock {
+	result := []*ast.InvokeBlock{}
+
+	for child := doc.Document.FirstChild(); child != nil; child = child.NextSibling() {
+		if section, ok := child.(*ast.InvokeBlock); ok {
+			result = append(result, section)
+		}
+	}
+
+	return result
+}
+
 func (d *LoadedDocument) Render(outputStream io.Writer) error {
 	return d.Goldmark.Renderer().Render(outputStream, d.Source, d.Document)
 }
