@@ -292,7 +292,7 @@ Once a script has been run, any captured variable can be rendered in the markdow
 <r capture-env="GREETING" />
 
 ``` bash
-GREETING=Hi there
+GREETING="Hi there"
 ```
 
 The greeting is: <r sub-env>$GREETING</r>.
@@ -329,7 +329,22 @@ Then see whats in it:
 <r stdout/>
 
 ``` bash
-ls -la docs | grep index
+ls -x1 docs | grep index
 ```
+
+~~~
+
+Should result in:
+
+~~~ expected
+First, change to the desired directory:
+
+✔ Running...
+
+Then see whats in it:
+
+↓ Running...
+    index.md
+✔ Running...
 
 ~~~

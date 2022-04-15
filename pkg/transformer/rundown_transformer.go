@@ -130,79 +130,55 @@ func mergeTextBlocks(doc *goldast.Document, reader goldtext.Reader, pc parser.Co
 
 }
 
-func (a *rundownASTTransformer) convertRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc parser.Context) {
-	var treatments *Treatment = NewTreatment(reader)
-	var activeProcessors = []NodeProcessor{}
+func (a *rundownASTTransformer) convertRundownBlocks(doc goldast.Node, reader goldtext.Reader, pc parser.Context) {
+	util.Logger.Debug().Msg(util.CaptureStdout(func() {
+		doc.Dump(reader.Source(), 0)
+	}))
 
-	goldast.Walk(doc, func(node goldast.Node, entering bool) (goldast.WalkStatus, error) {
-		if !entering {
-			return goldast.WalkContinue, nil
-		}
+	// Because the AST will change significantly, we can't use the goldmark Walk function.
+	for node := doc.FirstChild(); node != nil; {
+		util.Logger.Debug().Msgf("Converting loop on %T", node)
 
-		switch node := node.(type) {
+		switch n := node.(type) {
 
 		case *ast.RundownBlock:
-			processor, err := ConvertToRundownNode(node, reader, treatments)
+			var err error
+			node, err = ConvertToRundownNode(n, reader)
 
 			if err != nil {
 				a.Errors = append(a.Errors, err)
 			}
 
-			if processor != nil {
-				processor.Begin(node)
-				activeProcessors = append(activeProcessors, processor)
-			}
+			util.Logger.Debug().Msgf("AST is now: \n%s", util.CaptureStdout(func() {
+				doc.Dump(reader.Source(), 0)
+			}))
 
-			// Don't leave the Rundown Element in the document tree.
-			// treatments.Remove(node)
-
-		case *goldast.FencedCodeBlock:
-			// if !treatments.IsIgnored(node) {
-			// 	eb := ast.NewExecutionBlock(node)
-			// 	if with := node.Info; with != nil {
-			// 		eb.With = string(with.Text(reader.Source()))
-			// 	}
-			// 	treatments.Replace(node, eb)
-			// }
-
+			util.Logger.Debug().Msgf("Returned node is %T", node)
 		}
 
-		nodesToProcess := append(treatments.NewNodes(), node)
-
-		for _, ntp := range nodesToProcess {
-
-			newActiveProcessors := []NodeProcessor{}
-
-			for i := 0; i < len(activeProcessors); i++ {
-				if !activeProcessors[i].Process(ntp, reader, treatments) {
-					newActiveProcessors = append(newActiveProcessors, activeProcessors[i])
-				}
+		if node != nil {
+			if node.ChildCount() > 0 {
+				node = node.FirstChild()
+			} else if node.NextSibling() != nil {
+				node = node.NextSibling()
+			} else if node.Parent() != nil {
+				node = node.Parent().NextSibling()
+			} else {
+				node = nil
 			}
-
-			activeProcessors = newActiveProcessors
 		}
 
-		return goldast.WalkContinue, nil
-	})
+		util.Logger.Debug().Msgf("Next node is now: %T", node)
 
-	// Close out any active processors.
-	for _, p := range activeProcessors {
-		p.End(nil, reader, treatments)
 	}
-
-	// util.Logger.Trace().Msgf("Unprocessed doc is:\n")
-	// doc.Dump(reader.Source(), 2)
-	treatments.Process(reader)
-	// util.Logger.Trace().Msgf("Processed doc is:\n")
-	// doc.Dump(reader.Source(), 2)
 
 	// Populate sections
 	goldast.Walk(doc, func(n goldast.Node, entering bool) (goldast.WalkStatus, error) {
 		if !entering {
-			if end, ok := n.(*ast.SectionEnd); ok {
+			if section, ok := n.(*ast.SectionPointer); ok {
 				util.Logger.Trace().Msgf("Found section end\n")
-				section := end.SectionPointer
-				PopulateSectionMetadata(section, end, reader)
+				ast.FillInvokeBlocks(section, 10)
+				PopulateSectionMetadata(section, reader)
 			}
 		}
 
@@ -212,7 +188,8 @@ func (a *rundownASTTransformer) convertRundownBlocks(doc *goldast.Document, read
 	util.Logger.Trace().Msgf("Sections populated\n")
 }
 
-func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatments *Treatment) (NodeProcessor, error) {
+// Converts a RundownBlock into a proper instruction node. Returns the node to continue iterating from, or an error.
+func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader) (goldast.Node, error) {
 	var nodeToReplace goldast.Node = node
 	nextNode := node.NextSibling()
 	parentNode := nodeToReplace.Parent()
@@ -236,8 +213,8 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 			importBlock.ImportPrefix = prefix.String
 		}
 
-		treatments.ReplaceWithChildren(node, importBlock, node)
-		return nil, nil
+		ReplaceWithChildren(node, importBlock, node)
+		return importBlock, nil
 	}
 
 	if node.HasAttr("label", "section") {
@@ -251,6 +228,8 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 
 		if name.Valid {
 			if heading, ok := parentNode.(*goldast.Heading); ok {
+				util.Logger.Debug().Msgf("New Section: %s", start.SectionName)
+
 				start.StartNode = heading
 				start.DescriptionShort = strings.Trim(string(heading.Text(reader.Source())), " ")
 
@@ -260,29 +239,30 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 					start.SetIfScript(ifScript.String)
 				}
 
-				util.Logger.Debug().Msgf("FindEndOfSection: %s", start.SectionName)
 				end := FindEndOfSection(heading)
-				if end != nil {
-					end.Parent().InsertBefore(end.Parent(), end, start.End)
-				} else {
-					node.OwnerDocument().AppendChild(node.OwnerDocument(), start.End)
+				util.Logger.Debug().Msgf("FindEndOfSection %s is %T", start.SectionName, end)
+
+				for child := start.StartNode; child != nil; {
+					nextChild := child.NextSibling()
+
+					util.Logger.Debug().Msgf("Adding %T to section %s", child, start.SectionName)
+
+					AppendChild(start, child)
+
+					if child == end {
+						break
+					}
+
+					child = nextChild
 				}
 
-				treatments.Remove(node)
-			} else {
-				// Section is not attached to a heading. Surround the Rundown Block with the section markers,
-				// and dissolve the Rundown Block.
-				start.StartNode = node.NextSibling()
-				start.DescriptionShort = node.GetAttr("desc").ValueOrZero()
+				Remove(node, reader)
 
-				node.Parent().InsertBefore(node.Parent(), node, start)
-				node.Parent().InsertAfter(node.Parent(), node, start.End)
-
-				treatments.DissolveRundownBlock(node)
+				return start, nil
 			}
 		}
 
-		return nil, nil
+		return node, nil
 	} else if h, ok := node.Parent().(*goldast.Heading); ok {
 		// Check if there's a conditional...
 
@@ -309,18 +289,18 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 				return false
 			})
 
-			// Make sure the conditional end stays inside the section.
+			// // Make sure the conditional end stays inside the section.
 			if nextHeading != nil {
-				if n, ok := nextHeading.PreviousSibling().(*ast.SectionEnd); ok {
-					nextHeading = n
-				}
+				// 	if n, ok := nextHeading.PreviousSibling().(*ast.SectionEnd); ok {
+				// 		nextHeading = n
+				// 	}
 
 				nextHeading.Parent().InsertBefore(nextHeading.Parent(), nextHeading, cond.End)
 			} else {
 				h.OwnerDocument().AppendChild(h.OwnerDocument(), cond.End)
 			}
-
-			treatments.Remove(node)
+			Remove(node, reader)
+			return cond, nil
 		}
 	}
 
@@ -372,13 +352,13 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 					}
 				}
 
-				treatments.Ignore(node)
-				treatments.Replace(nodeToReplace, executionBlock)
-				treatments.Remove(fcb) // SaveCodeBlock looks after it's own rendering.
+				Replace(nodeToReplace, executionBlock)
+				Remove(fcb, reader)
+				return executionBlock, nil // SaveCodeBlock looks after it's own rendering.
 			}
 		}
 
-		return nil, nil
+		return node, nil
 	}
 
 	if node.HasAttr("opt") {
@@ -399,7 +379,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		}
 
 		if opt.OptionType == nil {
-			return nil, fmt.Errorf("unknown option type %s for option %s", opt.OptionTypeString, opt.OptionName)
+			return node, fmt.Errorf("unknown option type %s for option %s", opt.OptionTypeString, opt.OptionName)
 		}
 
 		if node.HasAttr("default") {
@@ -409,40 +389,38 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 					def := opt.OptionType.Normalise(defaultVal.String)
 					opt.OptionDefault = null.StringFrom(def)
 				} else {
-					return nil, fmt.Errorf("default option type \"%s\" is invalid for option \"%s\"", defaultVal.String, opt.OptionName)
+					return node, fmt.Errorf("default option type \"%s\" is invalid for option \"%s\"", defaultVal.String, opt.OptionName)
 				}
 			}
 		}
 
-		treatments.Replace(nodeToReplace, opt)
+		Replace(nodeToReplace, opt)
 
-		return nil, nil
+		return opt, nil
 	}
 
 	if node.HasAttr("desc") {
 		descNode := ast.NewDescriptionBlock()
 
 		if node.ChildCount() > 0 {
-			treatments.ReplaceWithChildren(node, descNode, node)
+			ReplaceWithChildren(node, descNode, node)
 		} else if msg := node.GetAttr("desc"); msg.String != "" {
 			util.Logger.Trace().Msgf("Desc: %s\n", msg.String)
 			node.AppendChild(node, goldast.NewString([]byte(msg.String)))
-			treatments.ReplaceWithChildren(nodeToReplace, descNode, node)
+			ReplaceWithChildren(nodeToReplace, descNode, node)
 		} else {
 			panic("Bad desc node")
 		}
 
-		return nil, nil
+		return descNode, nil
 	}
 
 	if node.HasAttr("help") {
 		helpNode := ast.NewDescriptionBlock()
 
-		if node.ChildCount() > 0 {
-			treatments.ReplaceWithChildren(node, helpNode, node)
-		}
+		ReplaceWithChildren(node, helpNode, node)
 
-		return nil, nil
+		return helpNode, nil
 	}
 
 	if node.HasAttr("dep", "invoke") {
@@ -459,9 +437,9 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 			invoke.Args[attr.Key] = attr.Val
 		}
 
-		treatments.Replace(nodeToReplace, invoke)
+		Replace(nodeToReplace, invoke)
 
-		return nil, nil
+		return invoke, nil
 	}
 
 	if node.HasAttr("stop-fail") {
@@ -477,8 +455,8 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 			stop.SetIfScript(ifScript.String)
 		}
 
-		treatments.ReplaceWithChildren(nodeToReplace, stop, node)
-		return nil, nil
+		ReplaceWithChildren(nodeToReplace, stop, node)
+		return stop, nil
 	}
 
 	if node.HasAttr("stop-ok") {
@@ -494,22 +472,21 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 			stop.SetIfScript(ifScript.String)
 		}
 
-		treatments.ReplaceWithChildren(nodeToReplace, stop, node)
-		return nil, nil
+		ReplaceWithChildren(nodeToReplace, stop, node)
+		return stop, nil
 	}
 
 	if node.HasAttr("ignore") {
-		treatments.Remove(nodeToReplace)
-		return nil, nil
+		return Remove(nodeToReplace, reader), nil
 	}
 
 	if node.HasAttr("on-failure") {
 		fail := ast.NewOnFailure()
 		fail.FailureMessageRegexp = node.GetAttr("on-failure").String
 
-		treatments.ReplaceWithChildren(nodeToReplace, fail, node)
+		ReplaceWithChildren(nodeToReplace, fail, node)
 
-		return nil, nil
+		return fail, nil
 	}
 
 	if fcb, ok := nextNode.(*goldast.FencedCodeBlock); ok && node.HasAttr("if", "with", "spinner", "stdout", "subenv", "sub-env", "capture-env", "replace", "borg", "reveal", "reveal-only", "skip-on-success") {
@@ -561,7 +538,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		if executionBlock.Execute {
 			fcb.Parent().InsertAfter(fcb.Parent(), fcb, executionBlock)
 		}
-		treatments.Remove(nodeToReplace)
+		Remove(nodeToReplace, reader)
 
 		// util.Logger.Trace().Msgf("Created execution block.\n")
 		// executionBlock.Dump(reader.Source(), 5)
@@ -573,7 +550,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 
 		if !executionBlock.Reveal {
 			util.Logger.Trace().Msgf("Removing the fenced code block, as we're not displaying it.\n")
-			treatments.Remove(fcb)
+			Remove(fcb, reader)
 		} else {
 			if node.HasAttr("sub-env") {
 				wrapper := ast.NewSubEnvBlock(fcb)
@@ -581,11 +558,9 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 				wrapper.AppendChild(wrapper, fcb)
 			}
 
-			treatments.Ignore(fcb)
-
 		}
 
-		return nil, nil
+		return executionBlock, nil
 	}
 
 	if node.HasAttr("subenv", "sub-env") {
@@ -602,8 +577,10 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader, treatm
 		})
 		t.Process(reader)
 
-		treatments.DissolveRundownBlock(node)
+		from := node.PreviousSibling()
+		DissolveRundownBlock(node)
+		return from, nil
 	}
 
-	return nil, nil
+	return node, nil
 }

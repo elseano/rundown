@@ -15,6 +15,8 @@ type InvokeBlock struct {
 	Args         map[string]string
 
 	PreviousEnv map[string]string
+
+	Target *SectionPointer
 }
 
 // NewRundownBlock returns a new RundownBlock node.
@@ -55,6 +57,8 @@ func FillInvokeBlocks(node goldast.Node, maxRecursion int) error {
 				return goldast.WalkStop, fmt.Errorf("cannot find section \"%s\"", invoke.Invoke)
 			}
 
+			invoke.Target = section
+
 			heading := FindNodeBackwards(invoke, func(n goldast.Node) bool {
 				_, isHeading := n.(*goldast.Heading)
 				return isHeading
@@ -71,7 +75,7 @@ func FillInvokeBlocks(node goldast.Node, maxRecursion int) error {
 			count := 0
 
 			var child2 goldast.Node
-			for child2 = section.FirstContentNode(); child2 != nil && child2.Kind() != KindSectionEnd; child2 = child2.NextSibling() {
+			for child2 = section.FirstChild(); child2 != nil; child2 = child2.NextSibling() {
 				copied := CopyNode(child2)
 
 				if heading, ok := copied.(*goldast.Heading); ok {

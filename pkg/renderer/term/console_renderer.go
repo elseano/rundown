@@ -409,7 +409,6 @@ func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(rundown_ast.KindOnFailure, r.supportSkipping(r.renderNothing))
 	reg.Register(rundown_ast.KindRundownBlock, r.supportSkipping(r.renderTodo("Rundown")))
 	reg.Register(rundown_ast.KindSaveCodeBlock, r.supportSkipping(r.renderSaveCodeBlock))
-	reg.Register(rundown_ast.KindSectionEnd, r.supportSkipping(r.renderNothing))
 	reg.Register(rundown_ast.KindSectionOption, r.supportSkipping(r.renderHollow))
 	reg.Register(rundown_ast.KindSectionPointer, r.supportSkipping(r.renderHollow))
 	reg.Register(rundown_ast.KindStopFail, r.supportSkipping(r.renderStopFail))
@@ -503,15 +502,19 @@ func (r *Renderer) renderInvokeBlock(w util.BufWriter, source []byte, node ast.N
 		invoke.PreviousEnv = r.Context.Env
 		r.Context.ResetEnv()
 
-		section := rundown_ast.FindSectionInDocument(node.OwnerDocument(), invoke.Invoke)
+		section := invoke.Target
 		if section == nil {
 			return ast.WalkStop, fmt.Errorf("invalid section: %s", invoke.Invoke)
 		}
 
-		env, err := section.ParseOptions(invoke.Args)
+		rdutil.Logger.Debug().Msgf("Invoking %s with: %+v", invoke.Invoke, invoke.Args)
+
+		env, err := section.ParseOptionsWithResolution(invoke.Args, r.Context.Env)
 		if err != nil {
 			return ast.WalkStop, err
 		}
+
+		rdutil.Logger.Debug().Msgf("Parsed options are: %#v", env)
 
 		r.Context.ImportEnv(env)
 	} else {

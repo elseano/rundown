@@ -143,3 +143,98 @@ I will be rendered.
 
 I will be rendered whatever happens.
 ```
+
+## Dependencies <r section="deps" />
+
+Dependencies can be specified using the `dep` attribute. The same dependency encountered multiple times will only run once. For example:
+
+~~~ markdown
+
+# Run Me <r section="run" />
+
+<r dep="dep1">I depend on 1.</r>
+
+<r dep="dep2">I depend on 2.</r>
+
+Now I'm doing my thing.
+
+# Dependency 1 <r section="dep1" />
+
+<r dep="dep3">I depend on 3.</r>
+
+Dependency 1.
+
+# Dependency 2 <r section="dep2" />
+
+<r dep="dep3">I depend on 3.</r>
+
+Dependency 2.
+
+# Dependency 3 <r section="dep3" />
+
+I'm dependency 3.
+
+~~~
+
+Running with `rundown run` will have the following flow:
+
+1. First `run` is started, and the heading is written.
+2. `dep1` is encountered, and begins running.
+3. `dep3` is encountered inside `dep1`, and begins running.
+4. `dep3` finishes, and `dep1` resumes.
+5. `dep1` finishes, and `run` resumes.
+6. `dep2` is encountered, and begins running.
+7. `dep3` is encountered, but has been run already, so is skipped.
+8. `dep2` finishes, and `run` resumes.
+
+The output will appear as follows:
+
+~~~ expected
+# Run Me
+
+I'm dependency 3.
+
+Dependency 1.
+
+Dependency 2.
+
+Now I'm doing my thing.
+~~~
+
+Note that other sections won't have their headings displayed. This is because it can cause confusing output, where the contents of `run` would appear under the `dep2` heading.
+
+## Invocations <r section="invokes"/>
+
+Invocations operate the same as dependencies, however will always be run no matter how many times it's encountered. Because of this, invocations support options. For example:
+
+~~~ markdown
+
+# Run me <r section="run"/>
+
+<r spinner="Calculating things..." capture-env="ARG" />
+
+``` bash
+ARG="Some arg"
+```
+
+The arg is: <r sub-env>$ARG</r>.
+
+<r invoke="print-thing" text="$ARG">See [Printing](#printing) for an example on how to print</r>
+
+# Printing <r section="print-thing" silent />
+
+<r opt="text" as="TEXT" type="string" required />
+
+The result is: <r sub-env>$TEXT</r>.
+
+~~~
+
+When run with `rundown run` results in:
+
+~~~ expected
+# Run me
+
+✔ Calculating things...
+
+The result is: Some arg.
+~~~

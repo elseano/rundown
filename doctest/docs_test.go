@@ -18,6 +18,7 @@ import (
 	"github.com/elseano/rundown/testutil"
 	"github.com/logrusorgru/aurora"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	gold_ast "github.com/yuin/goldmark/ast"
 )
 
@@ -29,7 +30,12 @@ func TestDocumentation(t *testing.T) {
 
 	assert.NoError(t, err)
 
-	for _, s := range r.GetSections() {
+	sections := r.GetSections()
+
+	util.RedirectLogger(testutil.NewTestWriter(t))
+	t.Logf("Sections: %#v", sections)
+
+	for _, s := range sections {
 		t.Run(s.Pointer.SectionName, func(t *testing.T) {
 			util.RedirectLogger(devNull)
 
@@ -47,7 +53,7 @@ func TestDocumentation(t *testing.T) {
 				}
 			}
 
-			ast.PruneDocumentToSection(section.Document.Document, s.Pointer.SectionName)
+			ast.PruneDocumentToSection(section.Document.Document, section.Pointer.SectionName)
 
 			// Get markdown section
 			source := ast.FindNode(section.Document.Document, func(n gold_ast.Node) bool {
@@ -58,11 +64,21 @@ func TestDocumentation(t *testing.T) {
 				return false
 			})
 
+			// Get expected section
 			expected := ast.FindNode(section.Document.Document, func(n gold_ast.Node) bool {
 				if fcb, ok := n.(*gold_ast.FencedCodeBlock); ok && fcb.Info != nil {
 					info := string(fcb.Info.Text(section.Document.Source))
 
 					return info == "expected" || info == "expected-err"
+				}
+
+				return false
+			})
+
+			// See if there's a specific invocation mentioned.
+			invocation := ast.FindNodeBackwardsDeeply(expected, func(n gold_ast.Node) bool {
+				if code, ok := n.(*gold_ast.CodeSpan); ok {
+					return strings.Contains(string(code.Text(section.Document.Source)), "rundown ")
 				}
 
 				return false
@@ -92,6 +108,17 @@ func TestDocumentation(t *testing.T) {
 							return NewDocTestSpinner(w)
 						}
 
+						require.NoError(t, ast.FillInvokeBlocks(rd.MasterDocument.Document, 10))
+
+						if invocation != nil {
+							invocationStr := string(invocation.Text(section.Document.Source))
+							sectionName := strings.Replace(invocationStr, "rundown ", "", 1)
+
+							t.Logf("Executing section %s", sectionName)
+
+							ast.PruneDocumentToSection(rd.MasterDocument.Document, sectionName)
+						}
+
 						out := util.CaptureStdout(func() {
 							rd.MasterDocument.Document.Dump(sourceText, 0)
 						})
@@ -102,6 +129,9 @@ func TestDocumentation(t *testing.T) {
 						err := rd.MasterDocument.Goldmark.Renderer().Render(&output, sourceText, rd.MasterDocument.Document)
 
 						info := string(fcbExpected.Info.Text(section.Document.Source))
+
+						t.Log("Result:\n")
+						t.Log(output.String())
 
 						if (info == "expected" && assert.NoError(t, err)) || (info == "expected-err" && assert.Error(t, err)) {
 							assert.Equal(t, cleanString(string(expectedText)), cleanString(output.String()))

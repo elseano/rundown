@@ -2,12 +2,15 @@ package transformer
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"golang.org/x/net/html"
 
 	"github.com/elseano/rundown/pkg/ast"
+	rdutil "github.com/elseano/rundown/pkg/util"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yuin/goldmark"
 	goldast "github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/parser"
@@ -285,11 +288,54 @@ blah
 		sp := target.(*ast.SectionPointer)
 
 		assert.Equal(t, "SomeSection", sp.SectionName)
-		assert.Equal(t, target.NextSibling(), sp.StartNode)
+		require.Equal(t, 3, target.ChildCount())
+		assert.Equal(t, target.FirstChild().Kind(), goldast.KindHeading)
 		assert.Equal(t, "This is a heading", sp.DescriptionShort)
 		assert.Equal(t, "This is a longer description", string(sp.DescriptionLong.FirstChild().(*goldast.String).Value))
 	}
 
+}
+
+func TestSectionTermination(t *testing.T) {
+	source := []byte(`
+# This is a heading <r section="SomeSection"/>
+
+I'm SomeSection.
+
+## SubSection <r section="SomeSection:Sub"/>
+
+I'm a sub section inside SomSection.
+
+# Another heading <r section="SomeOtherSection"/>
+
+I'm SomeOtherSection.
+
+`)
+
+	gm := goldmark.New(
+		goldmark.WithParserOptions(
+			parser.WithASTTransformers(util.PrioritizedValue{
+				Value:    NewRundownASTTransformer(),
+				Priority: 0,
+			}),
+		),
+	)
+
+	doc := gm.Parser().Parse(text.NewReader(source))
+
+	t.Logf("RESULT:\n")
+
+	t.Logf("AST: %s", rdutil.CaptureStdout(func() {
+		doc.Dump(source, 0)
+	}))
+
+	sections := ast.GetSections(doc)
+
+	require.Equal(t, 3, len(sections))
+
+	require.Equal(t, 2, sections[0].ChildCount())
+	require.Equal(t, 2, sections[1].ChildCount())
+	require.Equal(t, 2, sections[2].ChildCount())
 }
 
 func TestSectionOption(t *testing.T) {
@@ -333,7 +379,7 @@ blah
 
 func TestSectionOptionInsideSection(t *testing.T) {
 	source := []byte(`
-<r section="test">
+## Blah <r section="test">
 
 <r opt="skip-production" type="bool" default="true"/>
 
@@ -357,25 +403,118 @@ blah
 
 	doc.Dump(source, 0)
 
-	target := doc.FirstChild()
+	target := ast.FindSectionInDocument(doc, "test")
 
-	if assert.NotNil(t, target) && assert.Equal(t, "SectionPointer", target.Kind().String()) {
-
-		sp := target.(*ast.SectionPointer)
-
-		assert.Len(t, sp.Options, 1)
-
-		target = target.NextSibling()
-
-		if assert.NotNil(t, target) && assert.Equal(t, "SectionOption", target.Kind().String()) {
-
-			sp := target.(*ast.SectionOption)
-
-			assert.Equal(t, "skip-production", sp.OptionName)
-		}
-
+	if assert.NotNil(t, target) {
+		require.Len(t, target.Options, 1)
+		assert.Equal(t, "skip-production", target.Options[0].OptionName)
 	}
 
+}
+
+func TestSectionDependencies(t *testing.T) {
+	source := []byte(`
+
+## Some dep <r section="dep1" />
+
+<r spinner="Something"/>
+
+~~~ bash
+echo "Hi"
+~~~
+
+<r invoke="dep2" title="Blah" />
+
+## Blah <r section="test"/>
+
+<r dep="dep1"/>
+
+<r spinner="Blah..."/>
+
+~~~ go
+blah
+~~~
+
+# Dep2 <r section="dep2"/>
+
+<r opt="title" type="string" required desc="title"/>
+
+Some secondary dep.
+
+`)
+
+	gm := goldmark.New(
+		goldmark.WithParserOptions(
+			parser.WithASTTransformers(util.PrioritizedValue{
+				Value:    NewRundownASTTransformer(),
+				Priority: 0,
+			}),
+		),
+	)
+
+	doc := gm.Parser().Parse(text.NewReader(source))
+
+	ast.PruneDocumentToSection(doc, "test")
+	target := ast.FindSectionInDocument(doc, "test")
+
+	doc.Dump(source, 0)
+
+	if assert.NotNil(t, target) {
+		require.Len(t, target.Dependencies, 2)
+		assert.Equal(t, "dep1", target.Dependencies[0].SectionName)
+		assert.Equal(t, "dep2", target.Dependencies[1].SectionName)
+
+		require.Len(t, target.Dependencies[1].Options, 1)
+		assert.Equal(t, "title", target.Dependencies[1].Options[0].OptionName)
+
+		require.Equal(t, 3, target.Dependencies[0].ChildCount())
+		assert.Equal(t, "Heading", target.Dependencies[0].FirstChild().Kind().String())
+		assert.Equal(t, "ExecutionBlock", target.Dependencies[0].FirstChild().NextSibling().Kind().String())
+		assert.Equal(t, "InvokeBlock", target.Dependencies[0].FirstChild().NextSibling().NextSibling().Kind().String())
+
+		assertTree(t, target, []string{
+			"SectionPointer",
+			" Heading",
+			" InvokeBlock",
+			"  Heading",
+			"  ExecutionBlock",
+			"  InvokeBlock",
+			"   Heading",
+			"   Paragraph",
+			" ExecutionBlock",
+		})
+	}
+}
+
+func assertTree(t *testing.T, node goldast.Node, tree []string) {
+	b := strings.Builder{}
+
+	type inline interface{ Inline() }
+
+	goldast.Walk(node, func(n goldast.Node, entering bool) (goldast.WalkStatus, error) {
+		if !entering {
+			return goldast.WalkContinue, nil
+		}
+
+		if _, isInline := n.(inline); isInline {
+			return goldast.WalkContinue, nil
+		}
+
+		i := 0
+		if n != node {
+			for p := node.Parent(); p != nil && p != node; p = p.Parent() {
+				i++
+			}
+		}
+
+		b.WriteString(strings.Repeat(" ", i))
+		b.WriteString(n.Kind().String())
+		b.WriteString("\n")
+
+		return goldast.WalkContinue, nil
+	})
+
+	assert.Equal(t, strings.Join(tree, "\n"), b.String())
 }
 
 func TestDescriptionAttr(t *testing.T) {

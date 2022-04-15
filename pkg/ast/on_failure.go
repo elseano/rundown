@@ -70,9 +70,9 @@ func GetOnFailureNodes(node goldast.Node) []*OnFailure {
 				result = append(result, failure)
 			}
 
-			if n.Kind() == KindSectionEnd {
-				return goldast.WalkStop, nil
-			}
+			// if n.Kind() == KindSectionEnd {
+			// 	return goldast.WalkStop, nil
+			// }
 		} else {
 			if n == section {
 				sectionReached = true

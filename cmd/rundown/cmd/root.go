@@ -31,9 +31,11 @@ func NewDocRootCmd(args []string) *cobra.Command {
 	}
 
 	for _, section := range loaded.GetSections() {
-		cmd := ports.BuildCobraCommand(rundownFile, section, flagDebug)
-		if cmd != nil {
-			docRoot.AddCommand(cmd)
+		if !section.Pointer.Silent {
+			cmd := ports.BuildCobraCommand(rundownFile, section, flagDebug)
+			if cmd != nil {
+				docRoot.AddCommand(cmd)
+			}
 		}
 	}
 
