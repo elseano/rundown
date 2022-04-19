@@ -989,7 +989,6 @@ func (r *Renderer) wrapBlock(renderFunc renderer.NodeRendererFunc) renderer.Node
 			r.nonWrappingWriter.Flush()
 			r.wrappingWriter = nil
 			r.nonWrappingWriter = nil
-
 		}
 
 		bufWriter.Flush()
@@ -1356,24 +1355,10 @@ var ParagraphAttributeFilter = GlobalAttributeFilter
 
 func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
-		var prevBlock ast.Node = n.PreviousSibling()
-		if _, ok := n.Parent().(*rundown_ast.StopFail); ok {
-			prevBlock = n.Parent().PreviousSibling()
-		}
-		if _, ok := n.Parent().(*rundown_ast.StopOk); ok {
-			prevBlock = n.Parent().PreviousSibling()
-		}
 		// If we're following an execution block, add a extra line.
-		switch prevBlock.(type) {
+		switch r.lastRendered.(type) {
 		case *rundown_ast.ExecutionBlock:
 			w.WriteString("\n")
-		case *rundown_ast.StopFail, *rundown_ast.StopOk:
-			rdutil.Logger.Debug().Msgf("This para is after a Stop block which didn't render. The block before it is %T", prevBlock.PreviousSibling())
-			// If prev is stop, then the if check failed, look further back.
-			switch prevBlock.PreviousSibling().(type) {
-			case *rundown_ast.ExecutionBlock:
-				w.WriteString("\n")
-			}
 		}
 
 		link, ok := n.FirstChild().(*ast.Link)
