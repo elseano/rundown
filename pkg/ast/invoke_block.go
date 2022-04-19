@@ -88,7 +88,6 @@ func FillInvokeBlocks(node goldast.Node, maxRecursion int) error {
 					}
 
 					// Move the headings to be sub-headings under the call point's current heading level.
-					fmt.Printf("Invoke at level %d, coming into heading level %d\n", heading.Level, currentLevel)
 					heading.Level = heading.Level - invokeHeadingLevel + currentLevel + 1
 				}
 
