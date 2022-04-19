@@ -158,11 +158,20 @@ func (a *rundownASTTransformer) convertRundownBlocks(doc goldast.Node, reader go
 
 		if node != nil {
 			if node.ChildCount() > 0 {
+				// If there are children on this node, lets dive into them.
 				node = node.FirstChild()
 			} else if node.NextSibling() != nil {
+				// Otherwise, if theres a next sibling, examine that.
 				node = node.NextSibling()
 			} else if node.Parent() != nil {
-				node = node.Parent().NextSibling()
+				// If no next sibling, walk up the parents until there's a next sibling there.
+				for node != nil && node.NextSibling() == nil {
+					node = node.Parent()
+				}
+
+				if node != nil {
+					node = node.NextSibling()
+				}
 			} else {
 				node = nil
 			}

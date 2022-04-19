@@ -20,7 +20,7 @@ func ChangeCommentsToSpinnerCommands(sourceLang string, source []byte) []byte {
 		return source
 	}
 
-	var commentDetector = regexp.MustCompile(`#+\s+(.*)`)
+	var commentDetector = regexp.MustCompile(`(?m)^#+\>\s+(.*)$`)
 
 	return commentDetector.ReplaceAllFunc(source, func(match []byte) []byte {
 		submatches := commentDetector.FindAllSubmatch(match, 1)

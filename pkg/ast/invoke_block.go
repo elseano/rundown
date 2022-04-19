@@ -51,6 +51,10 @@ func FillInvokeBlocks(node goldast.Node, maxRecursion int) error {
 		}
 
 		if invoke, ok := child.(*InvokeBlock); ok {
+			// Continue if this invoke block is already copied.
+			if invoke.HasChildren() {
+				return goldast.WalkContinue, nil
+			}
 			section := FindSectionInDocument(node.OwnerDocument(), invoke.Invoke)
 
 			if section == nil {

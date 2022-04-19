@@ -199,19 +199,21 @@ Will render:
 
 When using `bash` or `sh` scripts, you can turn comments into spinners. Each comment creates a new sub-spinner.
 
+Comments must start with `#> ` instead of `#` to differentiate between regular comments and multi-step commands.
+
 For example:
 
 ~~~ markdown
 <r spinner="Building..." sub-spinners />
 
 ``` bash
-# Beating eggs
+#> Beating eggs
 echo "Beat the eggs"
 
-# Cooking eggs
+#> Cooking eggs
 echo "Cook the eggs"
 
-# Eating omlette
+#> Eating omlette
 echo "Eat delicious omlette"
 ~~~
 

@@ -89,12 +89,18 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 				return err
 			}
 
-			doc = ast.SkipTo(doc, sectionPointer)
+			ast.PruneDocumentToSection(doc, sectionPointer.SectionName)
 			sectionPointer.SetIfScript("") // Ensure the requested section runs.
 
 			if val, err := cmd.Flags().GetBool("dump"); err == nil && val {
 				doc.Dump(source, 1)
 			}
+
+			out := rdutil.CaptureStdout(func() {
+				doc.Dump(source, 0)
+			})
+
+			rdutil.Logger.Debug().Msg(out)
 
 			rdutil.Logger.Info().Msgf("Running %s in %s...\n\n", sectionPointer.SectionName, section.Document.Filename)
 
