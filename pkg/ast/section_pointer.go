@@ -75,6 +75,16 @@ func (n *SectionPointer) GetOption(name string) *SectionOption {
 	return nil
 }
 
+func (n *SectionPointer) GetOptionByEnvName(name string) *SectionOption {
+	for _, o := range n.Options {
+		if o.OptionAs == name {
+			return o
+		}
+	}
+
+	return nil
+}
+
 func (n *SectionPointer) ParseOptions(options map[string]string) (map[string]string, error) {
 	return n.ParseOptionsWithResolution(options, map[string]string{})
 }
@@ -83,12 +93,15 @@ func (n *SectionPointer) ParseOptionsWithResolution(options map[string]string, e
 	result := map[string]string{}
 
 	util.Logger.Debug().Msgf("Env is %+v", env)
+	util.Logger.Debug().Msgf("Options is %+v", options)
 
 	for k, v := range options {
-		option := n.GetOption(k)
+		option := n.GetOptionByEnvName(k)
 
 		if option != nil {
 			optionValue := option.OptionType.Normalise(v)
+
+			util.Logger.Debug().Msgf("Parsing option %s value %s", option.OptionName, optionValue)
 
 			if rt, ok := option.OptionType.(OptionTypeRuntime); ok {
 				wd, err := os.Getwd()

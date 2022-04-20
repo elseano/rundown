@@ -581,6 +581,7 @@ func runIfScript(ctx *rundown_renderer.Context, ifScript string) (bool, error) {
 
 func (r *Renderer) renderStopFail(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	if !entering {
+		r.inlineStyles.Pop()
 		w.WriteString("\n")
 		if r.exitCode != 0 {
 			return ast.WalkStop, &errs.ExecutionError{ExitCode: r.exitCode}
@@ -588,6 +589,12 @@ func (r *Renderer) renderStopFail(w util.BufWriter, source []byte, node ast.Node
 		w.Flush()
 		return ast.WalkStop, errs.ErrStopFail
 	} else {
+		r.inlineStyles.Push(Color(aurora.RedFg))
+
+		if node.ChildCount() > 0 {
+			w.WriteString(aurora.Red("✖ ").String())
+		}
+
 		return ast.WalkContinue, nil
 	}
 }

@@ -454,7 +454,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader) (golda
 	if node.HasAttr("stop-fail") {
 		stop := ast.NewStopFail()
 
-		if msg := node.GetAttr("stop-fail"); msg.Valid {
+		if msg := node.GetAttr("stop-fail"); msg.Valid && msg.String != "" {
 			para := goldast.NewParagraph()
 			para.AppendChild(para, goldast.NewString([]byte(msg.String)))
 			node.AppendChild(node, para)
@@ -471,7 +471,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader) (golda
 	if node.HasAttr("stop-ok") {
 		stop := ast.NewStopOk()
 
-		if msg := node.GetAttr("stop-ok"); msg.Valid {
+		if msg := node.GetAttr("stop-ok"); msg.Valid && msg.String != "" {
 			para := goldast.NewParagraph()
 			para.AppendChild(para, goldast.NewString([]byte(msg.String)))
 			node.AppendChild(node, para)
