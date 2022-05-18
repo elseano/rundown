@@ -81,7 +81,7 @@ func BuildOptionType(optionType string) OptionType {
 	optType := strings.ToLower(optionType)
 
 	if strings.HasPrefix(optType, "enum:") {
-		options := strings.Split(strings.Replace(optType, "enum:", "", 1), "|")
+		options := strings.Split(optionType[5:], "|")
 		return &TypeEnum{
 			ValidValues: options,
 		}
