@@ -25,8 +25,8 @@ import (
 	"github.com/yuin/goldmark/util"
 
 	"github.com/alecthomas/chroma"
-	formatters "github.com/alecthomas/chroma/formatters"
 	"github.com/alecthomas/chroma/lexers"
+	"github.com/alecthomas/chroma/quick"
 	"github.com/alecthomas/chroma/styles"
 
 	"github.com/logrusorgru/aurora"
@@ -41,6 +41,7 @@ import (
 	"github.com/elseano/rundown/pkg/text"
 	emoji_ast "github.com/yuin/goldmark-emoji/ast"
 
+	rundown_styles "github.com/elseano/rundown/pkg/renderer/styles"
 	rdutil "github.com/elseano/rundown/pkg/util"
 
 	"github.com/muesli/reflow/indent"
@@ -1136,9 +1137,7 @@ func (r *Renderer) syntaxHighlightBytes(w util.BufWriter, language string, sourc
 	lang := lexers.Get(language)
 
 	if subEnv {
-		for k, v := range r.Context.Env {
-			source = strings.ReplaceAll(source, fmt.Sprintf("$%s", k), v)
-		}
+		source = rdutil.SubEnv(r.Context.Env, source)
 	}
 
 	var buf bytes.Buffer
@@ -1147,17 +1146,48 @@ func (r *Renderer) syntaxHighlightBytes(w util.BufWriter, language string, sourc
 		lang = lexers.Analyse(source)
 	}
 
-	if lang != nil {
-		lexer := chroma.Coalesce(lexers.Get(language))
+	theme := "rundown"
+	styles.Register(chroma.MustNewStyle("rundown",
+		chroma.StyleEntries{
+			chroma.Text:                rundown_styles.Dark.Text,
+			chroma.Error:               rundown_styles.Dark.Error,
+			chroma.Comment:             rundown_styles.Dark.Comment,
+			chroma.CommentPreproc:      rundown_styles.Dark.CommentPreproc,
+			chroma.Keyword:             rundown_styles.Dark.Keyword,
+			chroma.KeywordReserved:     rundown_styles.Dark.KeywordReserved,
+			chroma.KeywordNamespace:    rundown_styles.Dark.KeywordNamespace,
+			chroma.KeywordType:         rundown_styles.Dark.KeywordType,
+			chroma.Operator:            rundown_styles.Dark.Operator,
+			chroma.Punctuation:         rundown_styles.Dark.Punctuation,
+			chroma.Name:                rundown_styles.Dark.Name,
+			chroma.NameBuiltin:         rundown_styles.Dark.NameBuiltin,
+			chroma.NameTag:             rundown_styles.Dark.NameTag,
+			chroma.NameAttribute:       rundown_styles.Dark.NameAttribute,
+			chroma.NameClass:           rundown_styles.Dark.NameClass,
+			chroma.NameConstant:        rundown_styles.Dark.NameConstant,
+			chroma.NameDecorator:       rundown_styles.Dark.NameDecorator,
+			chroma.NameException:       rundown_styles.Dark.NameException,
+			chroma.NameFunction:        rundown_styles.Dark.NameFunction,
+			chroma.NameOther:           rundown_styles.Dark.NameOther,
+			chroma.Literal:             rundown_styles.Dark.Literal,
+			chroma.LiteralNumber:       rundown_styles.Dark.LiteralNumber,
+			chroma.LiteralString:       rundown_styles.Dark.LiteralString,
+			chroma.LiteralStringEscape: rundown_styles.Dark.LiteralStringEscape,
+			chroma.GenericDeleted:      rundown_styles.Dark.GenericDeleted,
+			chroma.GenericEmph:         rundown_styles.Dark.GenericEmph,
+			chroma.GenericInserted:     rundown_styles.Dark.GenericInserted,
+			chroma.GenericStrong:       rundown_styles.Dark.GenericStrong,
+			chroma.GenericSubheading:   rundown_styles.Dark.GenericSubheading,
+		}))
 
-		formatter := formatters.TTY256
+	if lang != nil {
+		formatter := "terminal256"
 
 		if !ColorsEnabled {
-			formatter = formatters.NoOp
+			formatter = "noop"
 		}
 
-		iterator, _ := lexer.Tokenise(nil, source)
-		_ = formatter.Format(&buf, styles.Pygments, iterator) == nil
+		quick.Highlight(&buf, source, language, formatter, theme)
 	} else {
 		buf.WriteString(source)
 	}
