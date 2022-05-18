@@ -74,7 +74,7 @@ func (e *ErrorDetails) String(colors aurora.Aurora) string {
 			}
 
 			lineIndicator := " "
-			if e.ErrorSource.Line == i+1 {
+			if e.ErrorSource.Line == i {
 				lineIndicator = colors.Red("*").String()
 			}
 
