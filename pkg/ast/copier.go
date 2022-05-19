@@ -1,6 +1,10 @@
 package ast
 
-import goldast "github.com/yuin/goldmark/ast"
+import (
+	"fmt"
+
+	goldast "github.com/yuin/goldmark/ast"
+)
 
 func CopyNode(node goldast.Node) goldast.Node {
 	switch n := node.(type) {
@@ -73,6 +77,12 @@ func CopyNode(node goldast.Node) goldast.Node {
 		CopyChildren(n, new)
 		return new
 
+	case *goldast.CodeSpan:
+		new := goldast.NewCodeSpan()
+		CopySettings(n, new)
+		CopyChildren(n, new)
+		return new
+
 	case *DescriptionBlock:
 		new := NewDescriptionBlock()
 		CopySettings(n, new)
@@ -121,6 +131,7 @@ func CopyNode(node goldast.Node) goldast.Node {
 
 	}
 
+	fmt.Printf("Could not copy %T\n", node)
 	return nil
 }
 
