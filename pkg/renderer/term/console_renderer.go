@@ -866,9 +866,28 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 	}
 
 	if exitCode != 0 {
-		output := outputBuffer.String()
-		output += "\n\n" + string(process.StderrOutput)
-		output += "\n\n" + string(stderrBuffer.String())
+		output := ""
+
+		if !executionBlock.ShowStdout {
+			output = outputBuffer.String()
+		}
+
+		if string(process.StderrOutput) != "" {
+			if output != "" {
+				output += "\n\n"
+			}
+
+			output += string(process.StderrOutput)
+		} else {
+			stderrBuf := stderrBuffer.String()
+			if stderrBuf != "" {
+				if output != "" {
+					output += "\n\n"
+				}
+
+				output += stderrBuf
+			}
+		}
 
 		output = strings.TrimSpace(output)
 
