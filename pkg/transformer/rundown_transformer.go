@@ -40,8 +40,9 @@ type OpenTags struct {
 }
 
 func createRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc parser.Context) {
-	var treatments *Treatment = NewTreatment(reader)
 	var openNodes = []OpenTags{}
+
+	processed := []goldast.Node{}
 
 	// doc.Dump(reader.Source(), 0)
 
@@ -55,7 +56,8 @@ func createRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc parse
 		switch node := node.(type) {
 
 		case *goldast.RawHTML, *goldast.HTMLBlock:
-			if htmlNode := ExtractRundownElement(node, reader, ""); htmlNode != nil {
+			for _, htmlNode := range ExtractRundownElement(node, reader, "") {
+				fmt.Printf("Processing %+v\n", htmlNode)
 
 				if htmlNode.closed {
 					// No content.
@@ -63,8 +65,8 @@ func createRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc parse
 					rdb.Attrs = htmlNode.attrs
 					rdb.TagName = htmlNode.tag
 
-					treatments.Replace(node, rdb)
-					treatments.Remove(node)
+					node.Parent().InsertBefore(node.Parent(), node, rdb)
+					processed = append(processed, node)
 				} else if htmlNode.closer {
 					// Create block.
 					if len(openNodes) > 0 {
@@ -75,15 +77,20 @@ func createRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc parse
 						rdb.Attrs = openingElement.data.attrs
 						rdb.TagName = openingElement.data.tag
 
+						fmt.Printf("Found a closing node of a block\nMoving children into rdb")
+
 						// Move all nodes between start and end into rdb.
 						var nextChild goldast.Node
 						for child := openingElement.node.NextSibling(); child != nil && child != node; child = nextChild {
+							fmt.Printf("Adding %s\n", child.Kind().String())
 							nextChild = child.NextSibling()
 							rdb.AppendChild(rdb, child)
 						}
 
-						treatments.Replace(openingElement.node, rdb)
-						treatments.Remove(node)
+						fmt.Printf("Inserting before %s\n", openingElement.node.Kind().String())
+						openingElement.node.Parent().InsertBefore(openingElement.node.Parent(), openingElement.node, rdb)
+						processed = append(processed, openingElement.node)
+						processed = append(processed, node)
 					}
 				} else {
 					openNodes = append(openNodes, OpenTags{data: htmlNode, node: node})
@@ -95,10 +102,14 @@ func createRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc parse
 		return goldast.WalkContinue, nil
 	})
 
-	treatments.Process(reader)
+	for _, n := range processed {
+		if n.Parent() != nil {
+			n.Parent().RemoveChild(n.Parent(), n)
+		}
+	}
 
 	// util.Logger.Trace().Msgf("Rundown Blocks:\n")
-	// doc.Dump(reader.Source(), 0)
+	doc.Dump(reader.Source(), 0)
 }
 
 func (a *rundownASTTransformer) Transform(doc *goldast.Document, reader goldtext.Reader, pc parser.Context) {

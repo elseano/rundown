@@ -68,13 +68,13 @@ func TestHtmlExtractInlineOpening(t *testing.T) {
 
 	extracted := ExtractRundownElement(rawHtml, source, "")
 
-	assert.Equal(t, &RundownHtmlTag{
+	assert.Contains(t, extracted, &RundownHtmlTag{
 		tag: "r",
 		attrs: []html.Attribute{
 			{Namespace: "", Key: "subenv", Val: ""},
 		},
 		contents: "",
-	}, extracted)
+	})
 }
 
 func TestHtmlExtractNested(t *testing.T) {
@@ -84,13 +84,13 @@ func TestHtmlExtractNested(t *testing.T) {
 
 	extracted := ExtractRundownElement(rawHtml, source, "")
 
-	assert.Equal(t, &RundownHtmlTag{
+	assert.Contains(t, extracted, &RundownHtmlTag{
 		tag:      "r",
 		attrs:    nil,
 		contents: "",
 		closed:   false,
 		closer:   true,
-	}, extracted)
+	})
 }
 
 func TestHtmlExtractBlock(t *testing.T) {
@@ -100,14 +100,38 @@ func TestHtmlExtractBlock(t *testing.T) {
 
 	extracted := ExtractRundownElement(rawHtml, source, "")
 
-	assert.Equal(t, &RundownHtmlTag{
+	assert.Contains(t, extracted, &RundownHtmlTag{
 		tag: "r",
 		attrs: []html.Attribute{
 			{Namespace: "", Key: "subenv", Val: ""},
 		},
 		contents: "Context",
 		closed:   true,
-	}, extracted)
+	})
+}
+
+func TestHtmlExtractSequential(t *testing.T) {
+	rawHtml := goldast.NewHTMLBlock(goldast.HTMLBlockType1)
+	rawHtml.Lines().Append(text.NewSegment(0, 35))
+	source := text.NewReader([]byte("<r something /><r something-else />"))
+
+	extracted := ExtractRundownElement(rawHtml, source, "")
+
+	assert.Contains(t, extracted, &RundownHtmlTag{
+		tag: "r",
+		attrs: []html.Attribute{
+			{Namespace: "", Key: "something", Val: ""},
+		},
+		closed: true,
+	})
+
+	assert.Contains(t, extracted, &RundownHtmlTag{
+		tag: "r",
+		attrs: []html.Attribute{
+			{Namespace: "", Key: "something-else", Val: ""},
+		},
+		closed: true,
+	})
 }
 
 func TestExecutionBlockSpecified(t *testing.T) {
