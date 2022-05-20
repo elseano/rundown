@@ -10,6 +10,7 @@ import (
 	rundown "github.com/elseano/rundown/pkg"
 	"github.com/elseano/rundown/pkg/ast"
 	"github.com/elseano/rundown/pkg/errs"
+	"github.com/muesli/reflow/indent"
 	"gopkg.in/guregu/null.v4"
 
 	// glamrend "github.com/elseano/rundown/pkg/rundown/renderer/glamour"
@@ -52,8 +53,9 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 
 	if sectionPointer.DescriptionLong != nil {
 		str := strings.Builder{}
-		gm.Renderer().Render(&str, source, sectionPointer.DescriptionLong)
-		longDesc = str.String()
+		writer := indent.NewWriterPipe(&str, 2, nil)
+		gm.Renderer().Render(writer, source, sectionPointer.DescriptionLong)
+		longDesc = sectionPointer.DescriptionShort + "\n\n" + str.String()
 	}
 
 	command := cobra.Command{

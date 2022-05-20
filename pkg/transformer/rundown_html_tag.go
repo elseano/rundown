@@ -1,7 +1,6 @@
 package transformer
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/elseano/rundown/pkg/text"
@@ -20,8 +19,6 @@ type RundownHtmlTag struct {
 
 func ExtractRundownElement(node goldast.Node, reader goldtext.Reader, currentTag string) []*RundownHtmlTag {
 	z := html.NewTokenizerFragment(text.NewNodeReader(node, reader), currentTag)
-	// source := string(node.Text(reader.Source()))
-	// z := html.NewTokenizer(strings.NewReader(source))
 
 	var currentRundownTag *RundownHtmlTag
 	collectedTags := []*RundownHtmlTag{}
@@ -30,18 +27,18 @@ func ExtractRundownElement(node goldast.Node, reader goldtext.Reader, currentTag
 		ttype := z.Next()
 		token := z.Token()
 
-		switch ttype {
-		case html.StartTagToken:
-			fmt.Printf("StartTagToken: %v\n", token)
-		case html.SelfClosingTagToken:
-			fmt.Printf("SelfClosingTagToken: %v\n", token)
-		case html.TextToken:
-			fmt.Printf("TextToken: %v\n", token)
-		case html.EndTagToken:
-			fmt.Printf("EndTagToken: %v\n", token)
-		case html.ErrorToken:
-			fmt.Printf("ErrorToken: %v\n", token)
-		}
+		// switch ttype {
+		// case html.StartTagToken:
+		// 	fmt.Printf("StartTagToken: %v\n", token)
+		// case html.SelfClosingTagToken:
+		// 	fmt.Printf("SelfClosingTagToken: %v\n", token)
+		// case html.TextToken:
+		// 	fmt.Printf("TextToken: %v\n", token)
+		// case html.EndTagToken:
+		// 	fmt.Printf("EndTagToken: %v\n", token)
+		// case html.ErrorToken:
+		// 	fmt.Printf("ErrorToken: %v\n", token)
+		// }
 
 		switch ttype {
 		case html.StartTagToken, html.SelfClosingTagToken:
@@ -91,14 +88,11 @@ func ExtractRundownElement(node goldast.Node, reader goldtext.Reader, currentTag
 		// ErrorToken is expected for inline RawHTML nodes, as they don't contain the entire HTML element,
 		// instead there's a RawHTML for the opening, and a RawHTML for the closing tag.
 		case html.ErrorToken:
-			fmt.Printf("Err token: %s\n", z.Err().Error())
 			goto end
 		}
 	}
 
 end:
-
-	fmt.Printf("Collected tags: %v\n", collectedTags)
 
 	return collectedTags
 }

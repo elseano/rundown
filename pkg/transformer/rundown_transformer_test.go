@@ -134,6 +134,41 @@ func TestHtmlExtractSequential(t *testing.T) {
 	})
 }
 
+func TestRundownBlockFlattened(t *testing.T) {
+	source := []byte("<r import='blah'>[Something](./something.md)</r>")
+
+	gm := goldmark.New(
+		goldmark.WithParserOptions(
+			parser.WithASTTransformers(util.PrioritizedValue{
+				Value:    NewRundownASTTransformer(),
+				Priority: 0,
+			}),
+		),
+	)
+
+	doc := gm.Parser().Parse(text.NewReader(source))
+
+	assertTree(t, doc, []string{"Document", " ImportBlock"})
+}
+
+func TestRundownBlockComplex(t *testing.T) {
+	source := []byte("<r help>\n\nHere's `something`\n\nAnd another thing\n</r>\n\nAnd then some stuff.")
+
+	gm := goldmark.New(
+		goldmark.WithParserOptions(
+			parser.WithASTTransformers(util.PrioritizedValue{
+				Value:    NewRundownASTTransformer(),
+				Priority: 0,
+			}),
+		),
+	)
+
+	doc := gm.Parser().Parse(text.NewReader(source))
+	doc.Dump(source, 0)
+
+	assertTree(t, doc, []string{"Document", " DescriptionBlock", "  Paragraph", "  Paragraph", " Paragraph"})
+}
+
 func TestExecutionBlockSpecified(t *testing.T) {
 	source := []byte(`
 <r spinner="Some spinner name..." with="go run $FILE" stdout />

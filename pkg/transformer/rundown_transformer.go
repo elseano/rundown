@@ -35,12 +35,17 @@ func NewRundownASTTransformer() *rundownASTTransformer {
 }
 
 type OpenTags struct {
-	data *RundownHtmlTag
-	node goldast.Node
+	data              *RundownHtmlTag
+	node              goldast.Node
+	candidateChildren []goldast.Node
+}
+
+func newOpenTag(tag *RundownHtmlTag, node goldast.Node) *OpenTags {
+	return &OpenTags{data: tag, node: node, candidateChildren: []goldast.Node{}}
 }
 
 func createRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc parser.Context) {
-	var openNodes = []OpenTags{}
+	var openNodes = []*OpenTags{}
 
 	processed := []goldast.Node{}
 
@@ -57,7 +62,6 @@ func createRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc parse
 
 		case *goldast.RawHTML, *goldast.HTMLBlock:
 			for _, htmlNode := range ExtractRundownElement(node, reader, "") {
-				fmt.Printf("Processing %+v\n", htmlNode)
 
 				if htmlNode.closed {
 					// No content.
@@ -77,23 +81,28 @@ func createRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc parse
 						rdb.Attrs = openingElement.data.attrs
 						rdb.TagName = openingElement.data.tag
 
-						fmt.Printf("Found a closing node of a block\nMoving children into rdb")
+						// Sometimes the closer is inside a paragraph if the document spacing is a bit off.
+						// Move the closer out up and next until it's parent is the same as the opener.
+						if openingElement.node.Parent() == node.OwnerDocument() {
+							// This only works when the closer is nested deeper than the opener.
+							for parent := node.Parent(); parent != openingElement.node.Parent(); parent = node.Parent() {
+								parent.Parent().InsertAfter(parent.Parent(), parent, node)
+							}
+						}
 
 						// Move all nodes between start and end into rdb.
 						var nextChild goldast.Node
 						for child := openingElement.node.NextSibling(); child != nil && child != node; child = nextChild {
-							fmt.Printf("Adding %s\n", child.Kind().String())
 							nextChild = child.NextSibling()
 							rdb.AppendChild(rdb, child)
 						}
 
-						fmt.Printf("Inserting before %s\n", openingElement.node.Kind().String())
 						openingElement.node.Parent().InsertBefore(openingElement.node.Parent(), openingElement.node, rdb)
 						processed = append(processed, openingElement.node)
 						processed = append(processed, node)
 					}
 				} else {
-					openNodes = append(openNodes, OpenTags{data: htmlNode, node: node})
+					openNodes = append(openNodes, newOpenTag(htmlNode, node))
 				}
 
 			}
@@ -109,7 +118,7 @@ func createRundownBlocks(doc *goldast.Document, reader goldtext.Reader, pc parse
 	}
 
 	// util.Logger.Trace().Msgf("Rundown Blocks:\n")
-	doc.Dump(reader.Source(), 0)
+	// doc.Dump(reader.Source(), 0)
 }
 
 func (a *rundownASTTransformer) Transform(doc *goldast.Document, reader goldtext.Reader, pc parser.Context) {
@@ -233,7 +242,8 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader) (golda
 			importBlock.ImportPrefix = prefix.String
 		}
 
-		ReplaceWithChildren(node, importBlock, node)
+		ReplaceWithChildren(nodeToReplace, importBlock, node)
+
 		return importBlock, nil
 	}
 
