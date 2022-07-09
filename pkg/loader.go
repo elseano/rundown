@@ -4,20 +4,32 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
+	"strings"
 
 	"github.com/elseano/rundown/pkg/ast"
 	rundown_parser "github.com/elseano/rundown/pkg/parser"
 	"github.com/elseano/rundown/pkg/renderer"
+	"github.com/elseano/rundown/pkg/transformer"
 	emoji "github.com/yuin/goldmark-emoji"
 
 	termrend "github.com/elseano/rundown/pkg/renderer/term"
-	"github.com/elseano/rundown/pkg/transformer"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/parser"
 	goldrenderer "github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/text"
 	"github.com/yuin/goldmark/util"
 )
+
+type LoadErrors []error
+
+func (le *LoadErrors) Error() string {
+	s := strings.Builder{}
+	for _, e := range *le {
+		s.WriteString(fmt.Sprintf("%s\n", e.Error()))
+	}
+
+	return s.String()
+}
 
 func LoadString(data string, filename string) (*LoadedDocuments, error) {
 	context := renderer.NewContext(filename)
@@ -65,6 +77,10 @@ func cascadeLoad(parentDocument *LoadedDocument) (*LoadedDocuments, error) {
 			for _, section := range importedDoc.GetSections() {
 				section.SectionName = fmt.Sprintf("%s:%s", directive.ImportPrefix, section.SectionName)
 			}
+
+			for _, invoke := range importedDoc.GetInvokes() {
+				invoke.Invoke = fmt.Sprintf("%s:%s", directive.ImportPrefix, invoke.Invoke)
+			}
 		}
 
 		collection.ImportedDocuments = append(collection.ImportedDocuments, importedDoc)
@@ -78,7 +94,7 @@ func loadFile(filename string, context *renderer.Context) (*LoadedDocument, erro
 	source, err := ioutil.ReadFile(filename)
 
 	if err != nil {
-		return nil, err
+		return nil, &LoadErrors{err}
 	}
 
 	return loadBytes(source, filename, context)
@@ -90,10 +106,12 @@ func loadBytes(source []byte, filename string, context *renderer.Context) (*Load
 		util.Prioritized(consoleNodeRenderer, 0),
 	)
 
+	rdtransform := transformer.NewRundownASTTransformer()
+
 	gm := goldmark.New(
 		goldmark.WithParserOptions(
 			parser.WithASTTransformers(util.PrioritizedValue{
-				Value:    transformer.NewRundownASTTransformer(),
+				Value:    rdtransform,
 				Priority: 0,
 			}),
 		),
@@ -102,6 +120,11 @@ func loadBytes(source []byte, filename string, context *renderer.Context) (*Load
 	)
 
 	doc := gm.Parser().Parse(text.NewReader(source))
+
+	if len(rdtransform.Errors) > 0 {
+		errs := LoadErrors(rdtransform.Errors)
+		return nil, &errs
+	}
 
 	return &LoadedDocument{
 		Filename: filename,

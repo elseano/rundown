@@ -126,6 +126,8 @@ func (f *StdoutBuffer) Execute(b byte) error {
 		f.buffer.cursor.column = 0
 	case 13: // CR
 		f.buffer.cursor.column = 0
+	case 9:
+		f.Print(9)
 	default:
 		f.writeStringToBuffer(fmt.Sprintf("<EXEC %d>", b))
 		// return fmt.Errorf("not implemented: Execute %d", b)

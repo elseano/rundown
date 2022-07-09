@@ -4,12 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"path"
+	"strings"
 
 	rundown "github.com/elseano/rundown/pkg"
 	"github.com/elseano/rundown/pkg/ast"
 	"github.com/elseano/rundown/pkg/errs"
+	"github.com/muesli/reflow/indent"
 	"gopkg.in/guregu/null.v4"
 
 	// glamrend "github.com/elseano/rundown/pkg/rundown/renderer/glamour"
@@ -26,7 +27,7 @@ type optVal struct {
 
 func (o optVal) String() string {
 	if o.Str != nil {
-		return *o.Str
+		return o.Option.OptionType.Normalise(*o.Str)
 	}
 
 	if o.Bool != nil {
@@ -52,8 +53,9 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 
 	if sectionPointer.DescriptionLong != nil {
 		str := strings.Builder{}
-		gm.Renderer().Render(&str, source, sectionPointer.DescriptionLong)
-		longDesc = str.String()
+		writer := indent.NewWriterPipe(&str, 2, nil)
+		gm.Renderer().Render(writer, source, sectionPointer.DescriptionLong)
+		longDesc = sectionPointer.DescriptionShort + "\n\n" + str.String()
 	}
 
 	command := cobra.Command{
@@ -72,14 +74,21 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 			executionContext.ImportRawEnv(os.Environ())
 			executionContext.RundownFile = section.Document.Filename
 
+			optionEnvStr := map[string]string{}
 			for k, v := range optionEnv {
-				if err := v.Option.OptionType.Validate(v.String()); err != nil {
-					return fmt.Errorf("%s: %w", v.Option.OptionName, err)
-				}
+				optionEnvStr[k] = v.String()
+			}
 
-				executionContext.ImportEnv(map[string]string{
-					k: fmt.Sprintf("%v", v.String()),
-				})
+			parsed, err := sectionPointer.ParseOptions(optionEnvStr)
+
+			if err != nil {
+				return err
+			}
+
+			executionContext.ImportEnv(parsed)
+
+			if err := ast.FillInvokeBlocks(doc, 10); err != nil {
+				return err
 			}
 
 			ast.PruneDocumentToSection(doc, sectionPointer.SectionName)
@@ -89,12 +98,17 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 				doc.Dump(source, 1)
 			}
 
-			fmt.Printf("Running %s in %s...\n\n", sectionPointer.SectionName, section.Document.Filename)
+			out := rdutil.CaptureStdout(func() {
+				doc.Dump(source, 0)
+			})
+
+			rdutil.Logger.Debug().Msg(out)
+
+			rdutil.Logger.Info().Msgf("Running %s in %s...\n\n", sectionPointer.SectionName, section.Document.Filename)
 
 			executionContext.ImportEnv(map[string]string{"PWD": path.Dir(executionContext.RundownFile)})
 
-
-			err := gm.Renderer().Render(os.Stdout, source, doc)
+			err = gm.Renderer().Render(os.Stdout, source, doc)
 
 			switch {
 			case errors.Is(err, errs.ErrStopOk):

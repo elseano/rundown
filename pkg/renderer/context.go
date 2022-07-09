@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"regexp"
 	"strings"
 )
@@ -13,12 +14,15 @@ type Context struct {
 	Env         map[string]string
 	Output      io.Writer
 	RundownFile string
+
+	DepsCompleted map[string]bool
 }
 
 func NewContext(rundownFile string) *Context {
 	return &Context{
-		Env:         map[string]string{},
-		RundownFile: rundownFile,
+		Env:           map[string]string{},
+		RundownFile:   rundownFile,
+		DepsCompleted: map[string]bool{},
 	}
 }
 
@@ -41,6 +45,13 @@ func (c *Context) CreateTempFile(name string) (*os.File, error) {
 	c.Env[envName] = file.Name()
 
 	return file, nil
+}
+
+func (c *Context) ResetEnv() {
+	c.Env = map[string]string{}
+	c.ImportRawEnv(os.Environ())
+
+	c.Env["PWD"] = path.Dir(c.RundownFile)
 }
 
 func (c *Context) ImportEnv(env map[string]string) {

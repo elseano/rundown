@@ -2,6 +2,29 @@
 
 # Rundown's Rundown File
 
+## Check Current Ref <r section="check-ref" silent />
+
+Checks the current ref. This should appear twice.
+
+## Never run <r section="never-run" silent if="false" />
+
+I should not appear.
+
+## Invoke <r section="invoke"/>
+
+Invokes another function.
+
+<r invoke="never-run" />
+
+<r invoke="check-ref" />
+
+<r dep="check-ref">You won't see me in the output</r>
+
+<r dep="check-ref" />
+
+<r dep="check-ref" />
+
+Done.
 
 ## Release <r section="release"/>
 
@@ -141,7 +164,7 @@ End naturally.
 
 <r opt="name" type="string" desc="The name to greet" required/>
 
-<r opt="greet" type="enum|hi|formal" desc="The greeting style" required/>
+<r opt="greet" type="enum:hi|formal" desc="The greeting style" required/>
 
 <r stdout/>
 

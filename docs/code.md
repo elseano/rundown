@@ -199,19 +199,21 @@ Will render:
 
 When using `bash` or `sh` scripts, you can turn comments into spinners. Each comment creates a new sub-spinner.
 
+Comments must start with `#> ` instead of `#` to differentiate between regular comments and multi-step commands.
+
 For example:
 
 ~~~ markdown
 <r spinner="Building..." sub-spinners />
 
 ``` bash
-# Beating eggs
+#> Beating eggs
 echo "Beat the eggs"
 
-# Cooking eggs
+#> Cooking eggs
 echo "Cook the eggs"
 
-# Eating omlette
+#> Eating omlette
 echo "Eat delicious omlette"
 ~~~
 
@@ -279,3 +281,72 @@ I will only appear in Rundown.
 
 ✔ Running
 ```
+
+## Propogating Environment Variables
+
+Environment variables can be captured from scripts, and made available to both Rundown and subsequent scripts by using the `capture-env` attribute.
+
+### Using variable inside rundown <r section="env:markdown"/>
+
+Once a script has been run, any captured variable can be rendered in the markdown content by surrounding it with a `<r sub-env>` element.
+
+~~~ markdown
+<r capture-env="GREETING" />
+
+``` bash
+GREETING="Hi there"
+```
+
+The greeting is: <r sub-env>$GREETING</r>.
+~~~
+
+Will result in:
+
+~~~ expected
+✔ Running...
+
+The greeting is: Hi there.
+~~~
+
+### Saving the current working directory <r section="env:pwd" />
+
+All captured environment variables are provided to subsequent execution blocks. 
+
+A special case is the `PWD` variable, which can be used to set the working directory for subsequent scripts. By default, the initial `PWD` is always the directory containing the currently executing Rundown file. 
+
+For example:
+
+~~~ markdown
+
+First, change to the desired directory:
+
+<r capture-env="PWD"/>
+
+``` bash
+cd ..
+```
+
+Then see whats in it:
+
+<r stdout/>
+
+``` bash
+ls -x1 docs | grep index
+```
+
+~~~
+
+Should result in:
+
+~~~ expected
+First, change to the desired directory:
+
+✔ Running...
+
+Then see whats in it:
+
+↓ Running...
+    index.md
+✔ Running...
+
+~~~

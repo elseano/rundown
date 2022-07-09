@@ -38,7 +38,6 @@ func (r *RundownHtmlRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegiste
 	reg.Register(ast.KindOnFailure, r.renderTodo)
 	reg.Register(ast.KindRundownBlock, r.renderTodo)
 	reg.Register(ast.KindSaveCodeBlock, r.renderTodo)
-	reg.Register(ast.KindSectionEnd, r.renderNoop)
 	reg.Register(ast.KindSectionOption, r.renderOptionInput)
 	reg.Register(ast.KindSectionPointer, r.renderNoop)
 	reg.Register(ast.KindStopFail, r.renderStop)

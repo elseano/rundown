@@ -3,16 +3,19 @@ package spinner
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/logrusorgru/aurora"
 )
 
 type CISpinner struct {
-	out            io.Writer
-	currentHeading string
-	stampedHeading string
-	substep        string
-	colors         aurora.Aurora
+	out              io.Writer
+	currentHeading   string
+	stampedHeading   string
+	substep          string
+	startedAt        time.Time
+	substepStartedAt time.Time
+	colors           aurora.Aurora
 }
 
 func NewCISpinner(out io.Writer, colors aurora.Aurora) *CISpinner {
@@ -23,7 +26,11 @@ func (s *CISpinner) Active() bool {
 	return false
 }
 
-func (s *CISpinner) Start() {}
+func (s *CISpinner) Start() {
+	if s.startedAt.IsZero() {
+		s.startedAt = time.Now()
+	}
+}
 
 func (s *CISpinner) Stop() {}
 
@@ -39,11 +46,11 @@ func (s *CISpinner) StampShadow() {
 
 func (s *CISpinner) closeSpinner(indicator string) {
 	if s.substep != "" {
-		s.out.Write([]byte(fmt.Sprintf("  %s %s\n", indicator, s.substep)))
+		s.out.Write([]byte(fmt.Sprintf("  %s %s %s\n", indicator, s.substep, s.buildTimeString(s.substepStartedAt))))
 	}
 
-	s.out.Write([]byte(fmt.Sprintf("%s %s\n", indicator, s.CurrentHeading())))
-
+	s.out.Write([]byte(fmt.Sprintf("%s %s %s\n", indicator, s.CurrentHeading(), s.buildTimeString(s.startedAt))))
+	s.startedAt = time.Time{}
 }
 
 func (s *CISpinner) Success(message string) {
@@ -62,14 +69,20 @@ func (s *CISpinner) SetMessage(message string) {
 	s.currentHeading = message
 }
 
+func (s *CISpinner) buildTimeString(t time.Time) string {
+	d := time.Since(t)
+	return s.colors.Faint(fmt.Sprintf("(%s)", d)).String()
+}
+
 func (s *CISpinner) NewStep(message string) {
 	if s.substep != "" {
-		s.out.Write([]byte(fmt.Sprintf("  %s %s\n", s.colors.Green(TICK), s.substep)))
+		s.out.Write([]byte(fmt.Sprintf("  %s %s %s\n", s.colors.Green(TICK), s.substep, s.buildTimeString(s.substepStartedAt))))
 	} else {
 		s.out.Write([]byte(fmt.Sprintf("%s %s\n", s.colors.Faint(DASH), s.CurrentHeading())))
 	}
 
 	s.substep = message
+	s.substepStartedAt = time.Now()
 }
 
 func (s *CISpinner) HideAndExecute(f func()) {

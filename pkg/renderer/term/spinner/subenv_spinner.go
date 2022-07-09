@@ -1,8 +1,7 @@
 package spinner
 
 import (
-	"fmt"
-	"strings"
+	"github.com/elseano/rundown/pkg/util"
 )
 
 type wrappableSpinner interface {
@@ -82,9 +81,5 @@ func (s *SubenvSpinner) StampShadow() {
 }
 
 func (s *SubenvSpinner) SubEnv(message string) string {
-	for k, v := range s.env {
-		message = strings.ReplaceAll(message, fmt.Sprintf("$%s", k), v)
-	}
-
-	return message
+	return util.SubEnv(s.env, message)
 }

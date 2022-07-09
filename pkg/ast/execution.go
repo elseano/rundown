@@ -22,6 +22,8 @@ const DefaultSpinnerName string = "Running..."
 
 type ExecutionBlock struct {
 	goldast.BaseBlock
+	ConditionalImpl
+
 	CodeBlock *goldast.FencedCodeBlock
 
 	ID                    string

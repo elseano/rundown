@@ -89,23 +89,4 @@ func ProcessImportBlocks(doc goldast.Node) []*ImportBlock {
 	})
 
 	return importDirectives
-
-	// for _, directive := range importDirectives {
-
-	// 	currentPath := path.Dir(currentFile)
-	// 	filename := directive.GetFilename()
-
-	// 	source, err := ioutil.ReadFile(path.Join(currentPath, filename))
-
-	// 	if err != nil {
-	// 		fmt.Printf("Err: %s\n", err.Error())
-	// 		return err
-	// 	}
-
-	// 	importedDoc := gm.Parser().Parse(text.NewReader(source))
-
-	// 	directive.IngestChildren(importedDoc)
-	// }
-
-	// return nil
 }
