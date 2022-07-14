@@ -53,10 +53,10 @@ func TestDocumentation(t *testing.T) {
 				}
 			}
 
-			ast.PruneDocumentToSection(section.Document.Document, section.Pointer.SectionName)
+			doc := ast.PruneDocumentToSection(section.Document.Document, section.Pointer.SectionName)
 
 			// Get markdown section
-			source := ast.FindNode(section.Document.Document, func(n gold_ast.Node) bool {
+			source := ast.FindNode(doc, func(n gold_ast.Node) bool {
 				if fcb, ok := n.(*gold_ast.FencedCodeBlock); ok && fcb.Info != nil {
 					return string(fcb.Info.Text(section.Document.Source)) == "markdown"
 				}
@@ -65,7 +65,7 @@ func TestDocumentation(t *testing.T) {
 			})
 
 			// Get expected section
-			expected := ast.FindNode(section.Document.Document, func(n gold_ast.Node) bool {
+			expected := ast.FindNode(doc, func(n gold_ast.Node) bool {
 				if fcb, ok := n.(*gold_ast.FencedCodeBlock); ok && fcb.Info != nil {
 					info := string(fcb.Info.Text(section.Document.Source))
 

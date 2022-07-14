@@ -164,14 +164,14 @@ func ServeRundown(filename string, debug bool, port string) error {
 			if r.Method == "GET" {
 				gm, doc, source, _ := getDoc(filename)
 
-				ast.PruneDocumentToSection(doc, section.SectionName)
+				doc = ast.PruneDocumentToSection(doc, section.SectionName)
 				ast.PruneActions(doc)
 
 				renderDoc(w, r, gm, doc, source, sections)
 			} else if r.Method == "POST" {
 				gm, doc, source, context := getDoc(filename)
 
-				ast.PruneDocumentToSection(doc, section.SectionName)
+				doc = ast.PruneDocumentToSection(doc, section.SectionName)
 
 				r.ParseForm()
 

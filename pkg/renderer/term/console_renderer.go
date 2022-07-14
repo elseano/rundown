@@ -386,7 +386,7 @@ func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(ast.KindThematicBreak, r.supportSkipping(r.blockCommon(r.renderThematicBreak)))
 	// reg.Register(rundown_ast.KindRundownBlock, r.blockCommon(r.renderRundownBlock))
 	// reg.Register(KindSection, r.blockCommon(r.renderNothing))
-	reg.Register(rundown_ast.KindExecutionBlock, r.supportSkipping(r.blockCommon(r.renderExecutionBlock)))
+	reg.Register(rundown_ast.KindExecutionBlock, r.blockCommon(r.renderExecutionBlock))
 
 	// inlines
 
@@ -416,6 +416,7 @@ func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(rundown_ast.KindStopOk, r.supportSkipping(r.renderStopOk))
 	reg.Register(rundown_ast.KindSubEnvBlock, r.supportSkipping(r.renderHollow))
 	reg.Register(rundown_ast.KindInvokeBlock, r.supportSkipping(r.renderInvokeBlock))
+	reg.Register(rundown_ast.KindSkipBlock, r.renderSkipBlock)
 
 	// Conditional blocks are transparent, they shouldn't render.
 	reg.Register(rundown_ast.KindConditionalStart, r.supportSkipping(r.renderHollow))
@@ -714,11 +715,22 @@ func createSpinner(writer io.Writer, env map[string]string) Spinner {
 }
 
 func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	// Check if we're currently skipping
+	executionBlock := node.(*rundown_ast.ExecutionBlock)
+
+	if r.skipUntil != nil {
+		if executionBlock != r.skipUntil {
+			rdutil.Logger.Debug().Msgf("Skipping %T", executionBlock)
+			return ast.WalkSkipChildren, nil
+		} else {
+			rdutil.Logger.Debug().Msgf("Reached skip target. Rendering this one %T", executionBlock)
+			r.skipUntil = nil
+		}
+	}
+
 	if entering {
 		return ast.WalkContinue, nil
 	}
-
-	executionBlock := node.(*rundown_ast.ExecutionBlock)
 
 	if !executionBlock.Execute {
 		return ast.WalkContinue, nil
@@ -758,8 +770,25 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 		script.Contents = exec.ChangeCommentsToSpinnerCommands(executionBlock.Language, script.Contents)
 	}
 
+	/***** BORG MODE *****/
+	if executionBlock.ReplaceProcess {
+		return ast.WalkStop, runner.RunReplacingProcess()
+	}
+
 	theSpinner.SetMessage(executionBlock.SpinnerName)
 	theSpinner.Start()
+
+	ifResult, err := r.checkIfScript(executionBlock)
+
+	if err != nil {
+		theSpinner.Error("Error running precondition script")
+		return ast.WalkStop, err
+	}
+
+	if ifResult == ast.WalkSkipChildren {
+		theSpinner.Skip("Not required")
+		return ast.WalkContinue, err
+	}
 
 	r.lastRendered = node
 
@@ -822,7 +851,7 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 	}
 
 	outputWaiter.Wait() // Wait for the process's STDOUT to close.
-	exitCode, duration, err := process.Wait()
+	exitCode, _, err := process.Wait()
 
 	if err != nil {
 		rdutil.Logger.Debug().Msgf("Execution failed with %#v", err)
@@ -841,11 +870,11 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 	if executionBlock.SkipOnSuccess {
 		if err != nil || exitCode != 0 {
-			theSpinner.Error(fmt.Sprintf("%s - Continue", friendlyDuration(duration)))
+			theSpinner.Error("Continue")
 
 			return ast.WalkContinue, nil
 		} else {
-			theSpinner.Skip(fmt.Sprintf("%s - Skip on Success", friendlyDuration(duration)))
+			theSpinner.Skip("Skip on Success")
 
 			// FIXME - How to skip to the next heading?
 			return ast.WalkContinue, nil
@@ -854,9 +883,12 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 	if executionBlock.SkipOnFailure {
 		if err != nil || exitCode != 0 {
-			theSpinner.Skip(fmt.Sprintf("%s - Skip on Failure (%d)", friendlyDuration(duration), exitCode))
+			theSpinner.Skip(fmt.Sprintf("Skip on Failure (%d)", exitCode))
 
-			return ast.WalkStop, nil
+			skipTo := rundown_ast.GetNextSection(rundown_ast.GetSectionForNode(executionBlock))
+			r.skipUntil = skipTo
+
+			return ast.WalkContinue, nil
 		}
 	}
 
@@ -928,7 +960,7 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 		r.Context.AddEnv(executionBlock.CaptureStdoutInto, outputTrimmed)
 	}
 
-	theSpinner.Success(friendlyDuration(duration))
+	theSpinner.Success("")
 
 	return ast.WalkContinue, nil
 }
@@ -1057,9 +1089,12 @@ func (r *Renderer) supportSkipping(renderFunc renderer.NodeRendererFunc) rendere
 		result, err := r.checkIfScript(n)
 
 		if result == ast.WalkSkipChildren {
-			rdutil.Logger.Debug().Msgf("%T", n)
+			rdutil.Logger.Debug().Msgf("If script indicated failure %T", n)
 
 			r.skipUntil = n.NextSibling()
+			if r.skipUntil == nil {
+				r.skipUntil = n.OwnerDocument()
+			}
 
 			if far, ok := n.(rundown_ast.FarSkip); ok {
 				r.skipUntil = far.GetEndSkipNode(n)
@@ -1098,6 +1133,43 @@ func (r *Renderer) checkIfScript(node ast.Node) (ast.WalkStatus, error) {
 	}
 
 	return ast.WalkContinue, nil
+}
+
+// Skip blocks will render their children and then on exit setup to skip.
+// This is the reverse of the default skip flow, which skips before rendering children.
+func (r *Renderer) renderSkipBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	n := node.(*rundown_ast.SkipBlock)
+
+	if r.skipUntil != nil {
+		if n != r.skipUntil {
+			rdutil.Logger.Debug().Msgf("Skipping %T", n)
+			return ast.WalkSkipChildren, nil
+		} else {
+			rdutil.Logger.Debug().Msgf("Reached skip target. Rendering this one %T", n)
+			r.skipUntil = nil
+		}
+	}
+
+	if !entering {
+		if n.GetResult() {
+			r.skipUntil = n.GetEndSkipNode(n)
+			rdutil.Logger.Debug().Msgf("Skipping until %#v", r.skipUntil)
+		}
+
+		return ast.WalkContinue, nil
+	}
+
+	result, err := r.checkIfScript(n)
+
+	if result != ast.WalkSkipChildren {
+		rdutil.Logger.Debug().Msgf("If script indicated success %T, rendering", n)
+
+		return ast.WalkContinue, err
+	} else {
+		rdutil.Logger.Debug().Msgf("If script indicated failure %T, ignoring skip", n)
+		return ast.WalkSkipChildren, nil
+	}
+
 }
 
 func (r *Renderer) renderHeading(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {

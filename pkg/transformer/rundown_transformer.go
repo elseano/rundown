@@ -125,6 +125,7 @@ func (a *rundownASTTransformer) Transform(doc *goldast.Document, reader goldtext
 	createRundownBlocks(doc, reader, pc)
 	mergeTextBlocks(doc, reader, pc)
 	a.convertRundownBlocks(doc, reader, pc)
+	ast.PopulateSkipTargets(doc)
 }
 
 // Merges sequential text nodes into a single text block. This makes subsequent processing easier.
@@ -247,6 +248,17 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader) (golda
 		return importBlock, nil
 	}
 
+	if node.HasAttr("skip") {
+		skipBlock := ast.NewSkipBlock()
+		if ifScript := node.GetAttr("if"); ifScript.Valid {
+			skipBlock.SetIfScript(ifScript.String)
+		}
+
+		ReplaceWithChildren(nodeToReplace, skipBlock, node)
+
+		return skipBlock, nil
+	}
+
 	if node.HasAttr("label", "section") {
 		name := node.GetAttr("section")
 		if !name.Valid {
@@ -262,6 +274,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader) (golda
 
 				start.StartNode = heading
 				start.DescriptionShort = strings.Trim(string(heading.Text(reader.Source())), " ")
+				start.ParentSection = ast.FindParentSection(heading)
 
 				heading.Parent().InsertBefore(heading.Parent(), heading, start)
 

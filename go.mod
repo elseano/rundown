@@ -27,7 +27,7 @@ require (
 	github.com/spf13/cobra v1.1.3
 	github.com/stretchr/testify v1.7.0
 	github.com/thecodeteam/goodbye v0.0.0-20170927022442-a83968bda2d3
-	github.com/yuin/goldmark v1.3.8
+	github.com/yuin/goldmark v1.4.12
 	github.com/yuin/goldmark-emoji v1.0.1
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e

@@ -195,6 +195,24 @@ echo "Cya $OPT_MISC"
 sleep 1
 ```
 
+## Say Goodbye <r section="test:subs"/>
+
+Stuff.
+
+<r spinner="Working..." sub-spinners/>
+
+``` bash
+#> Bye
+sleep 1
+echo "Bye"
+#> Cya
+echo "Cya"
+#> Again
+ls
+#> Done
+sleep 1
+```
+
 
 ## Environment <r section="test:env" />
 

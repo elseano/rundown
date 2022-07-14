@@ -3,11 +3,14 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	shared "github.com/elseano/rundown/cmd"
 	rundown "github.com/elseano/rundown/pkg"
+	"github.com/elseano/rundown/pkg/ast"
 	"github.com/elseano/rundown/pkg/ports"
 	"github.com/elseano/rundown/pkg/util"
+	"github.com/muesli/reflow/indent"
 	"github.com/spf13/cobra"
 )
 
@@ -43,10 +46,25 @@ func NewDocRootCmd(args []string) *cobra.Command {
 }
 
 func NewRootCmd() *cobra.Command {
+
+	rundownFile = shared.RundownFile(flagFilename)
+
+	doc, err := rundown.Load(rundownFile)
+	longDesc := ""
+
+	if err == nil {
+		if help := ast.GetRootHelp(doc.MasterDocument.Document); help != nil {
+			str := strings.Builder{}
+			writer := indent.NewWriterPipe(&str, 2, nil)
+			doc.MasterDocument.Goldmark.Renderer().Render(writer, doc.MasterDocument.Source, help)
+			longDesc = "\n\n" + str.String()
+		}
+	}
+
 	rootCmd := &cobra.Command{
 		Use:           "rundown [command] [flags]...",
 		Short:         "Execute a markdown file",
-		Long:          `Rundown turns Markdown files into console scripts.`,
+		Long:          "Rundown turns Markdown files into console scripts." + longDesc,
 		SilenceUsage:  true,
 		SilenceErrors: false,
 		PreRun: func(cmd *cobra.Command, args []string) {

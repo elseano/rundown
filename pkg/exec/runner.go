@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"syscall"
 	"time"
 
 	go_exec "os/exec"
@@ -59,23 +60,40 @@ type Running struct {
 	Stderr       io.ReadCloser
 }
 
+func (r *Runner) RunReplacingProcess() error {
+	cmd, err := r.prepareCommand()
+	if err != nil {
+		return err
+	}
+
+	// When using syscall.Exec, the PWD env var doesn't work.
+	r.Script.Prefix = append(r.Script.Prefix, []byte(fmt.Sprintf("\ncd %s\n", r.env["PWD"]))...)
+
+	if err := r.Script.Write(); err != nil {
+		return err
+	}
+
+	cmd.Args = append(cmd.Args, r.Script.AbsolutePath)
+	for k, v := range r.env {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	cmd.Env = append(cmd.Env, fmt.Sprintf("SCRIPT_FILE=%s", r.Script.AbsolutePath))
+	cmd.Dir = r.env["PWD"]
+
+	rdutil.Logger.Debug().Msgf("Running with environment: %+v", cmd.Env)
+	rdutil.Logger.Debug().Msgf("Running in path: %s", cmd.Dir)
+	rdutil.Logger.Debug().Msgf("Running: %s %s", cmd.Path, cmd.Args[1])
+
+	return syscall.Exec(cmd.Path, []string{"-c", cmd.Args[1]}, cmd.Env)
+}
+
 func (r *Runner) Prepare() (*Running, error) {
-	wrapperScriptContents := r.Script.CommandLine
-
-	// Replace $SCRIPT_FILE otherwise it appears on the command line twice.
-	wrapperScriptContents = strings.ReplaceAll(wrapperScriptContents, "$SCRIPT_FILE", r.Script.AbsolutePath)
-
-	wrapperScript, err := scripts.NewScript("bash", "bash", []byte(wrapperScriptContents))
+	cmd, err := r.prepareCommand()
 	if err != nil {
 		return nil, err
 	}
-	wrapperScript.Write()
-	wrapperScript.MakeExecutable()
 
-	rdutil.Logger.Debug().Msgf("Wrapper script is %s", wrapperScript.AbsolutePath)
-	rdutil.Logger.Debug().Msgf("Provided script is %s", r.Script.AbsolutePath)
-
-	cmd := go_exec.Command(wrapperScript.BinaryPath, wrapperScript.AbsolutePath)
 	stdout, err := cmd.StdoutPipe()
 
 	if err != nil {
@@ -138,4 +156,30 @@ func (r *Running) Wait() (int, time.Duration, error) {
 	rdutil.Logger.Debug().Msgf("Process exited with %d", r.cmd.ProcessState.ExitCode())
 
 	return r.cmd.ProcessState.ExitCode(), time.Since(r.startedAt), nil
+}
+
+func (r *Runner) prepareCommand() (*go_exec.Cmd, error) {
+	if strings.Contains(r.Script.CommandLine, "$SCRIPT_FILE") {
+		wrapperScriptContents := r.Script.CommandLine
+
+		// Replace $SCRIPT_FILE otherwise it appears on the command line twice.
+		wrapperScriptContents = strings.ReplaceAll(wrapperScriptContents, "$SCRIPT_FILE", r.Script.AbsolutePath)
+
+		wrapperScript, err := scripts.NewScript("bash", "bash", []byte(wrapperScriptContents))
+		if err != nil {
+			return nil, err
+		}
+
+		wrapperScript.Write()
+		wrapperScript.MakeExecutable()
+
+		rdutil.Logger.Debug().Msgf("Wrapper script is %s", wrapperScript.AbsolutePath)
+		rdutil.Logger.Debug().Msgf("Provided script is %s", r.Script.AbsolutePath)
+
+		return go_exec.Command(wrapperScript.BinaryPath, wrapperScript.AbsolutePath), nil
+	} else {
+		rdutil.Logger.Debug().Msgf("Provided script is %s", r.Script.AbsolutePath)
+		return go_exec.Command(r.Script.BinaryPath, r.Script.AbsolutePath), nil
+	}
+
 }

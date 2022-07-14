@@ -91,7 +91,7 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 				return err
 			}
 
-			ast.PruneDocumentToSection(doc, sectionPointer.SectionName)
+			doc = ast.PruneDocumentToSection(doc, sectionPointer.SectionName)
 			sectionPointer.SetIfScript("") // Ensure the requested section runs.
 
 			if val, err := cmd.Flags().GetBool("dump"); err == nil && val {

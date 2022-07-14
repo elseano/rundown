@@ -64,35 +64,39 @@ func (s *StdoutSpinner) StampShadow() {
 	}
 }
 
-func (s *StdoutSpinner) closeSpinner(indicator string) {
+func (s *StdoutSpinner) closeSpinner(indicator string, message string) {
+	if message != "" {
+		message = " " + message
+	}
+
+	ts := time.Since(s.startedAt).String()
+
 	if s.substep != "" {
-		s.s.FinalMSG = "  " + indicator + " " + s.substep + " (" + s.colorMode.Faint(time.Since(s.startedAt)).String() + ")\r\n"
+		s.s.FinalMSG = "  " + indicator + " " + s.substep + message + s.colorMode.Faint(" ("+ts+")").String() + "\r\n"
 		s.Stop()
 
 		sp := NewActualSpinner(CharSets[21], 100*time.Millisecond, WithWriter(s.out), WithColor("fgHiCyan"))
 		sp.Suffix = " " + s.message
 		sp.Start()
-		sp.FinalMSG = indicator + " " + s.message + "\r\n"
+		sp.FinalMSG = indicator + " " + s.message + message + "\r\n"
 		sp.Stop()
 	} else {
-		util.Logger.Debug().Msgf("Now is %v", time.Now())
-		util.Logger.Debug().Msgf("Started At is %v", s.startedAt)
-		s.s.FinalMSG = indicator + " " + s.message + " (" + s.colorMode.Faint(time.Since(s.startedAt)).String() + ")\r\n"
+		s.s.FinalMSG = indicator + " " + s.message + message + s.colorMode.Faint(" ("+ts+")").String() + "\r\n"
 		s.Stop()
 	}
 
 }
 
 func (s *StdoutSpinner) Success(message string) {
-	s.closeSpinner(s.colorMode.Green(TICK).String())
+	s.closeSpinner(s.colorMode.Green(TICK).String(), message)
 }
 
 func (s *StdoutSpinner) Error(message string) {
-	s.closeSpinner(s.colorMode.Red(CROSS).String())
+	s.closeSpinner(s.colorMode.Red(CROSS).String(), message)
 }
 
 func (s *StdoutSpinner) Skip(message string) {
-	s.closeSpinner(s.colorMode.Faint(SKIP).String())
+	s.closeSpinner(s.colorMode.Faint(SKIP).String(), message)
 }
 
 func (s *StdoutSpinner) Stop() {
@@ -108,13 +112,15 @@ func (s *StdoutSpinner) NewStep(message string) {
 
 	util.Logger.Debug().Msgf("NewStep spinner was active: %v", wasActive)
 
+	ts := time.Since(s.startedAt).String()
+
 	if s.substep == "" {
 		util.Logger.Debug().Msgf("Dangling heading...")
 		s.s.FinalMSG = s.colorMode.Faint(DASH).String() + " " + s.message + "\r\n"
 		s.Stop()
 	} else {
 		util.Logger.Debug().Msgf("Closing step...")
-		s.s.FinalMSG = "  " + s.colorMode.Green(TICK).String() + " " + s.substep + " (" + s.colorMode.Faint(time.Since(s.startedAt)).String() + ")\r\n"
+		s.s.FinalMSG = "  " + s.colorMode.Green(TICK).String() + " " + s.substep + s.colorMode.Faint(" ("+ts+")").String() + "\r\n"
 		s.Stop()
 	}
 

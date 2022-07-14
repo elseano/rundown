@@ -21,6 +21,8 @@ type SectionPointer struct {
 	DescriptionLong  *DescriptionBlock
 	Silent           bool
 
+	ParentSection *SectionPointer
+
 	Dependencies []*SectionPointer
 }
 
@@ -134,11 +136,9 @@ func (n *SectionPointer) ParseOptionsWithResolution(options map[string]string, e
 }
 
 func FindSectionInDocument(parent goldast.Node, name string) *SectionPointer {
-	for child := parent.FirstChild(); child != nil; child = child.NextSibling() {
-		if section, ok := child.(*SectionPointer); ok {
-			if section.SectionName == name {
-				return section
-			}
+	for _, s := range GetSections(parent) {
+		if s.SectionName == name {
+			return s
 		}
 	}
 
@@ -161,15 +161,11 @@ func GetSections(doc goldast.Node) []*SectionPointer {
 	return result
 }
 
+// Locates the section this node is in.
 func GetSectionForNode(node goldast.Node) *SectionPointer {
-	// First, get the containing block element.
-	for node.Parent().Kind() != goldast.KindDocument {
-		node = node.Parent()
-	}
-
-	// The walk backwards until we find the SectionPointer
+	// Search upwards for the containing section element.
 	for node != nil && node.Kind() != KindSectionPointer {
-		node = node.PreviousSibling()
+		node = node.Parent()
 	}
 
 	if p, ok := node.(*SectionPointer); ok {
@@ -224,18 +220,14 @@ func PruneDocumentToRoot(doc goldast.Node) {
 // }
 
 // Reduces the document to just the requested section.
-func PruneDocumentToSection(doc goldast.Node, sectionName string) {
+func PruneDocumentToSection(doc goldast.Node, sectionName string) *goldast.Document {
 	var sectionPointer *SectionPointer = FindSectionInDocument(doc, sectionName)
 
-	for child := doc.FirstChild(); child != nil; {
-		nextChild := child.NextSibling()
+	newDoc := goldast.NewDocument()
+	newDoc.AppendChild(newDoc, sectionPointer)
+	PopulateSkipTargets(newDoc)
 
-		if child != sectionPointer {
-			doc.RemoveChild(doc, child)
-		}
-
-		child = nextChild
-	}
+	return newDoc
 }
 
 func PruneActions(doc goldast.Node) {
@@ -254,4 +246,21 @@ func PruneActions(doc goldast.Node) {
 
 		child = nextChild
 	}
+}
+
+func FindParentSection(heading goldast.Node) *SectionPointer {
+	return nil
+}
+
+// Returns the next section in the AST for this Node.
+func GetNextSection(section *SectionPointer) *SectionPointer {
+	if nextSection, ok := section.NextSibling().(*SectionPointer); ok {
+		return nextSection
+	}
+
+	if nextSection, ok := section.Parent().(*SectionPointer); ok {
+		return nextSection
+	}
+
+	return nil
 }

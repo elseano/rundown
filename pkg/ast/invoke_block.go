@@ -55,6 +55,7 @@ func FillInvokeBlocks(node goldast.Node, maxRecursion int) error {
 			if invoke.HasChildren() {
 				return goldast.WalkContinue, nil
 			}
+
 			section := FindSectionInDocument(node.OwnerDocument(), invoke.Invoke)
 
 			if section == nil {
@@ -80,6 +81,11 @@ func FillInvokeBlocks(node goldast.Node, maxRecursion int) error {
 
 			var child2 goldast.Node
 			for child2 = section.FirstChild(); child2 != nil; child2 = child2.NextSibling() {
+				// Don't copy the section heading
+				if child2 == section.StartNode {
+					continue
+				}
+
 				copied := CopyNode(child2)
 
 				if heading, ok := copied.(*goldast.Heading); ok {

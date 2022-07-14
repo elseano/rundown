@@ -26,3 +26,19 @@ func (n *DescriptionBlock) Kind() goldast.NodeKind {
 func (n *DescriptionBlock) Dump(source []byte, level int) {
 	goldast.DumpHelper(n, source, level, map[string]string{}, nil)
 }
+
+// Walks through the top-level nodes in the AST under document.
+// Will return the first help node before the sections begin.
+func GetRootHelp(doc goldast.Node) *DescriptionBlock {
+	for child := doc.FirstChild(); child != nil; child = child.NextSibling() {
+		if _, ok := child.(*SectionPointer); ok {
+			return nil
+		}
+
+		if db, ok := child.(*DescriptionBlock); ok {
+			return db
+		}
+	}
+
+	return nil
+}

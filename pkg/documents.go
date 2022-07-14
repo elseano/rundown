@@ -50,26 +50,32 @@ type LoadedDocument struct {
 	Context  *renderer.Context
 }
 
+// Walks through the document and returns all the found SectionPointers
 func (doc *LoadedDocument) GetSections() []*ast.SectionPointer {
 	result := []*ast.SectionPointer{}
 
-	for child := doc.Document.FirstChild(); child != nil; child = child.NextSibling() {
-		if section, ok := child.(*ast.SectionPointer); ok {
+	goldast.Walk(doc.Document, func(n goldast.Node, entering bool) (goldast.WalkStatus, error) {
+		if section, ok := n.(*ast.SectionPointer); entering && ok {
 			result = append(result, section)
 		}
-	}
+
+		return goldast.WalkContinue, nil
+	})
 
 	return result
 }
 
+// Walks through the document and returns all the found InvokeBlocks
 func (doc *LoadedDocument) GetInvokes() []*ast.InvokeBlock {
 	result := []*ast.InvokeBlock{}
 
-	for child := doc.Document.FirstChild(); child != nil; child = child.NextSibling() {
-		if section, ok := child.(*ast.InvokeBlock); ok {
+	goldast.Walk(doc.Document, func(n goldast.Node, entering bool) (goldast.WalkStatus, error) {
+		if section, ok := n.(*ast.InvokeBlock); entering && ok {
 			result = append(result, section)
 		}
-	}
+
+		return goldast.WalkContinue, nil
+	})
 
 	return result
 }

@@ -513,7 +513,7 @@ Some secondary dep.
 
 	doc := gm.Parser().Parse(text.NewReader(source))
 
-	ast.PruneDocumentToSection(doc, "test")
+	doc = ast.PruneDocumentToSection(doc, "test")
 	target := ast.FindSectionInDocument(doc, "test")
 
 	doc.Dump(source, 0)
