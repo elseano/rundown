@@ -109,6 +109,12 @@ func TestDocumentation(t *testing.T) {
 						}
 
 						require.NoError(t, ast.FillInvokeBlocks(rd.MasterDocument.Document, 10))
+						out := util.CaptureStdout(func() {
+							rd.MasterDocument.Document.Dump(sourceText, 0)
+						})
+
+						t.Log("Filled invoke blocks:\n")
+						t.Log(out)
 
 						if invocation != nil {
 							invocationStr := string(invocation.Text(section.Document.Source))
@@ -116,15 +122,20 @@ func TestDocumentation(t *testing.T) {
 
 							t.Logf("Executing section %s", sectionName)
 
-							ast.PruneDocumentToSection(rd.MasterDocument.Document, sectionName)
+							rd.MasterDocument.Document = ast.PruneDocumentToSection(rd.MasterDocument.Document, sectionName)
 						}
 
-						out := util.CaptureStdout(func() {
+						out = util.CaptureStdout(func() {
 							rd.MasterDocument.Document.Dump(sourceText, 0)
 						})
 
 						t.Log("Document executed:\n")
 						t.Log(out)
+
+						executionContext := rd.MasterDocument.Context
+						executionContext.ImportRawEnv(os.Environ())
+
+						t.Logf("Env is %+v", executionContext.Env)
 
 						err := rd.MasterDocument.Goldmark.Renderer().Render(&output, sourceText, rd.MasterDocument.Document)
 

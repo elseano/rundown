@@ -511,7 +511,7 @@ func (r *Renderer) renderInvokeBlock(w util.BufWriter, source []byte, node ast.N
 
 		rdutil.Logger.Debug().Msgf("Invoking %s with: %+v", invoke.Invoke, invoke.Args)
 
-		env, err := section.ParseOptionsWithResolution(invoke.Args, r.Context.Env)
+		env, err := section.ParseOptionsWithResolutionByName(invoke.Args, invoke.PreviousEnv)
 		if err != nil {
 			return ast.WalkStop, err
 		}

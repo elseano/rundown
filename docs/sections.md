@@ -236,5 +236,7 @@ When run with `rundown run` results in:
 
 ✔ Calculating things...
 
+The arg is: Some arg.
+
 The result is: Some arg.
 ~~~

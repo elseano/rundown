@@ -92,13 +92,26 @@ func (n *SectionPointer) ParseOptions(options map[string]string) (map[string]str
 }
 
 func (n *SectionPointer) ParseOptionsWithResolution(options map[string]string, env map[string]string) (map[string]string, error) {
+	return n.parseOptionsWithResolutionFunc(options, env, func(optionName string) *SectionOption {
+		return n.GetOptionByEnvName(optionName)
+	})
+}
+
+func (n *SectionPointer) ParseOptionsWithResolutionByName(options map[string]string, env map[string]string) (map[string]string, error) {
+	return n.parseOptionsWithResolutionFunc(options, env, func(optionName string) *SectionOption {
+		return n.GetOption(optionName)
+	})
+}
+
+func (n *SectionPointer) parseOptionsWithResolutionFunc(options map[string]string, env map[string]string, resolver func(optionName string) *SectionOption) (map[string]string, error) {
 	result := map[string]string{}
 
 	util.Logger.Debug().Msgf("Env is %+v", env)
 	util.Logger.Debug().Msgf("Options is %+v", options)
 
 	for k, v := range options {
-		option := n.GetOptionByEnvName(k)
+		option := resolver(k)
+		v := util.SubEnv(env, v)
 
 		if option != nil {
 			optionValue := option.OptionType.Normalise(v)
@@ -136,8 +149,11 @@ func (n *SectionPointer) ParseOptionsWithResolution(options map[string]string, e
 }
 
 func FindSectionInDocument(parent goldast.Node, name string) *SectionPointer {
+	util.Logger.Debug().Msgf("Locating section %s", name)
+
 	for _, s := range GetSections(parent) {
 		if s.SectionName == name {
+			util.Logger.Debug().Msgf("Found section %s: %#v", name, s)
 			return s
 		}
 	}

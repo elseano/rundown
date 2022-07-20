@@ -535,10 +535,8 @@ Some secondary dep.
 			"SectionPointer",
 			" Heading",
 			" InvokeBlock",
-			"  Heading",
 			"  ExecutionBlock",
 			"  InvokeBlock",
-			"   Heading",
 			"   Paragraph",
 			" ExecutionBlock",
 		})
