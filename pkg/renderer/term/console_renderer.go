@@ -1674,11 +1674,14 @@ func (r *Renderer) renderEmphasis(w util.BufWriter, source []byte, node ast.Node
 func (r *Renderer) renderLink(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	n := node.(*ast.Link)
 	if entering {
-		r.inlineStyles.Push(Color(aurora.UnderlineFm))
-		w.WriteString("\033]8;;" + string(n.Destination) + "\033\\")
+		r.inlineStyles.Push(Color(aurora.Index(30, "").Color()))
+		// w.WriteString("\033]8;;" + string(n.Destination) + "\033\\")
 	} else {
 		r.inlineStyles.Pop()
-		w.WriteString("\033]8;;\033\\")
+
+		w.WriteString(aurora.Faint(" -> ").String())
+		w.WriteString(aurora.Sprintf(aurora.Underline(aurora.Faint("%s")), n.Destination))
+		// w.WriteString("\033]8;;\033\\")
 
 		// if n.Title != nil {
 		// 	_, _ = w.WriteString(Aurora.Faint(" (" + string(n.Title) + ")").String())
