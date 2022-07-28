@@ -10,6 +10,7 @@ import (
 	rundown "github.com/elseano/rundown/pkg"
 	"github.com/elseano/rundown/pkg/ast"
 	"github.com/elseano/rundown/pkg/errs"
+	"github.com/elseano/rundown/pkg/renderer/term"
 	"github.com/muesli/reflow/indent"
 	"gopkg.in/guregu/null.v4"
 
@@ -119,6 +120,8 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 		},
 	}
 
+	var flagsRequired []string
+
 	for _, o := range sectionPointer.Options {
 		opt := o
 
@@ -130,24 +133,66 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 		switch topt := opt.OptionType.(type) {
 		case *ast.TypeString:
 			optionEnv[opt.OptionAs] = optVal{Str: command.Flags().String(opt.OptionName, opt.OptionDefault.String, opt.OptionDescription), Option: opt}
+			command.RegisterFlagCompletionFunc(opt.OptionName, stringCompletionFunction(opt, topt))
+			command.Flags()
 		case *ast.TypeBoolean:
 			optionEnv[opt.OptionAs] = optVal{Bool: command.Flags().Bool(opt.OptionName, topt.Normalise(opt.OptionDefault.String) == "true", opt.OptionDescription), Option: opt}
+			command.RegisterFlagCompletionFunc(opt.OptionName, boolCompletionFunction(opt, topt))
 		case *ast.TypeEnum:
 			optionEnv[opt.OptionAs] = optVal{Str: command.Flags().String(opt.OptionName, opt.OptionDefault.String, opt.OptionDescription), Option: opt}
+			command.RegisterFlagCompletionFunc(opt.OptionName, enumCompletionFunction(topt))
 		case *ast.TypeFilename:
 			optionEnv[opt.OptionAs] = optVal{Str: command.Flags().String(opt.OptionName, opt.OptionDefault.String, opt.OptionDescription), Option: opt}
+			command.RegisterFlagCompletionFunc(opt.OptionName, filenameCompletionFunction(topt))
 		}
 
 		if opt.OptionRequired && !opt.OptionDefault.Valid {
 			command.MarkFlagRequired(opt.OptionName)
+
+			flagsRequired = append(flagsRequired, term.Aurora.BrightYellow("--"+opt.OptionName).String())
+			command.Use = command.Use + " --" + opt.OptionName + " " + strings.Replace(opt.OptionTypeString, "enum:", "", 1)
 		}
 
 	}
 
 	command.SetFlagErrorFunc(func(errCmd *cobra.Command, err error) error {
-		fmt.Printf("Error: %s\n", err.Error())
-		return fmt.Errorf("error: %w", err)
+		display := term.Aurora.Sprintf("Running %s requires flags %s", term.Aurora.BrightCyan(sectionPointer.SectionName), strings.Join(flagsRequired, ", "))
+		return fmt.Errorf(display)
 	})
 
 	return &command
+}
+
+func enumCompletionFunction(opt *ast.TypeEnum) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return opt.ValidValues, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+func stringCompletionFunction(opt *ast.SectionOption, topt *ast.TypeString) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		// return cobra.AppendActiveHelp([]string{"xx"}, opt.OptionDescription), cobra.ShellCompDirectiveNoFileComp
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+func boolCompletionFunction(opt *ast.SectionOption, topt *ast.TypeBoolean) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		// return cobra.AppendActiveHelp([]string{"true", "false"}, opt.OptionDescription), cobra.ShellCompDirectiveNoFileComp
+		return []string{"true", "false"}, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+func filenameCompletionFunction(opt *ast.TypeFilename) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if opt.MustExist {
+		return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			// return cobra.AppendActiveHelp([]string{""}, "Requires a file which exists"), cobra.ShellCompDirectiveDefault
+			return nil, cobra.ShellCompDirectiveDefault
+		}
+	} else {
+		return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			// return cobra.AppendActiveHelp([]string{""}, "Requires a file which does not exist"), cobra.ShellCompDirectiveNoFileComp
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+	}
 }

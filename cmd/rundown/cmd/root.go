@@ -19,14 +19,36 @@ func Execute(version string, gitCommit string) error {
 	cmd := NewDocRootCmd(os.Args)
 	cmd.Version = version + " (" + gitCommit + ")"
 
+	if flagCompletions != "" {
+		switch flagCompletions {
+		case "bash":
+			return cmd.Root().GenBashCompletion(os.Stdout)
+		case "zsh":
+			return cmd.Root().GenZshCompletion(os.Stdout)
+		case "fish":
+			return cmd.Root().GenFishCompletion(os.Stdout, true)
+		case "powershell":
+			return cmd.Root().GenPowerShellCompletionWithDesc(os.Stdout)
+		}
+	}
+
 	return cmd.Execute()
 }
 
 func NewDocRootCmd(args []string) *cobra.Command {
 	docRoot := NewRootCmd()
 	docRoot.ParseFlags(args)
+	docRoot.Root().CompletionOptions.DisableDefaultCmd = true
 
 	rundownFile = shared.RundownFile(flagFilename)
+	if rundownFile == "" {
+		if flagCompletions == "" {
+			fmt.Fprintf(os.Stderr, "Error: No RUNDOWN.md file found in current path or parents.\n\n")
+			os.Exit(1)
+		} else {
+			os.Exit(0)
+		}
+	}
 
 	loaded, err := rundown.Load(rundownFile)
 	if err != nil {
