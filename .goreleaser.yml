@@ -23,18 +23,17 @@ archives:
       386: i386
       amd64: x86_64
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
 snapshot:
   name_template: "{{ .Tag }}-next"
 changelog:
   sort: asc
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
+      - "^docs:"
+      - "^test:"
 brews:
-  -
-    name: rundown
+  - name: rundown
     tap:
       owner: elseano
       name: homebrew-taps
@@ -49,7 +48,7 @@ brews:
       assert_match "rundown version #{version}", shell_output("#{bin}/rundown --version")
     install: |
       bin.install "rundown"
-      
+
       output = Utils.safe_popen_read("#{bin}/rundown", "--completions", "bash")
       (bash_completion/"rundown").write output
 
@@ -60,8 +59,7 @@ brews:
       (fish_completion/"rundown").write output
 
 nfpms:
-  -
-    package_name: rundown
+  - package_name: rundown
     homepage: https://github.com/elseano/rundown
     formats:
       - apk
