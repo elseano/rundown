@@ -1675,19 +1675,11 @@ func (r *Renderer) renderLink(w util.BufWriter, source []byte, node ast.Node, en
 	n := node.(*ast.Link)
 	if entering {
 		r.inlineStyles.Push(Color(aurora.Index(30, "").Color()))
-		// w.WriteString("\033]8;;" + string(n.Destination) + "\033\\")
 	} else {
 		r.inlineStyles.Pop()
-
-		w.WriteString(aurora.Faint(" -> ").String())
+		w.WriteString(aurora.Faint(" (").String())
 		w.WriteString(aurora.Sprintf(aurora.Underline(aurora.Faint("%s")), n.Destination))
-		// w.WriteString("\033]8;;\033\\")
-
-		// if n.Title != nil {
-		// 	_, _ = w.WriteString(Aurora.Faint(" (" + string(n.Title) + ")").String())
-		// } else {
-		// 	_, _ = w.WriteString(Aurora.Faint(" (").String() + Aurora.Faint(string(n.Destination)).String() + Aurora.Faint(")").String())
-		// }
+		w.WriteString(aurora.Faint(")").String())
 	}
 
 	return ast.WalkContinue, nil
