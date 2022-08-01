@@ -2,7 +2,7 @@
 
 Rundown documents can be merged together via importing.
 
-For example, it's you might have a `RUNDOWN.md` file in the root of a project, and then have specialised documents in another location, such as `docs/administration.md`.
+For example, you might have a `RUNDOWN.md` file in the root of a project, and then have specialised documents in another location, such as `docs/administration.md`.
 
 To merge these together, the `RUNDOWN.md` file can import the other files into it, optionally prefixing that document's commands.
 
@@ -42,3 +42,7 @@ Use "rundown [command] --help" for more information about a command.
 It's important to note that each command will run with it's working directory being the directory containing the command's file.
 
 So in the above example, `main` will have the root as it's working directory, while `admin:bake` will have the `docs/` working directory.
+
+## Importing and Invoke/Dependencies
+
+Documents can only invoke or depend on commands present in the current document. Invoke/Depending on commands in other documents will result in an error.

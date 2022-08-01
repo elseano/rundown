@@ -1,6 +1,6 @@
 # Executing Code in Rundown
 
-Markdown has great support for code blocks using the fenced code block notation. Rundown extends upon this, by actually running these code blocks.
+The most common thing you'll be doing in Rundown is running code blocks. Markdown has great support for code blocks using the fenced code block notation. Rundown extends upon this, by actually running these code blocks. 
 
 ~~~ markdown
 Now, build your docker container:
@@ -14,6 +14,17 @@ By default, rundown won't run fenced code blocks, because they may be unsafe to 
 
 To enable running of these code blocks, you can add the `<r/>` attribute before the code block to mark it as runnable. The attribute must contain at least one of the execution attributes outlined further below.
 
+In the simplest form, a spinner name can be provided. In this example, rundown also won't render the contents of the `<r>` tag.
+
+~~~ markdown
+<r spinner="Building docker image...">Now, build your docker container:</r>
+
+``` bash
+docker build . -t some_tag
+```
+~~~
+
+
 ## Execution Attributes
 
 How Rundown runs your code can be modified using these attributes:
@@ -22,14 +33,16 @@ How Rundown runs your code can be modified using these attributes:
 * `stdout` - Renders stdout and stderr as the command runs.
 * `with` - Change the interpreter used by rundown to run the code block.
 * `stdout-into` - Copy STDOUT into an environment variable for use later.
-* `capture-env` - Capture the environment variable for use later.
+* `capture-env` - Capture the specified environment variables for use later.
+* `if` - Only run the code block if the if script has an exit code of zero.
+* `replace` - Perform a simple find/replace in the script, providing rudimentary templating.
 
 ### Example 1 - Spinner Customisation <r section="spinner" />
 
 The spinner attribute allows you to customise the spinner text...
 
 ~~~ markdown
-<r spinner="Tweaking widgets..." />
+<r spinner="Tweaking widgets...">To tweak your widgets, do this:</r>
 
 ``` bash
 sleep 1
@@ -99,7 +112,7 @@ We just wrote Hi there!. Did you see it?
 
 ### Example 4 - More than just shell scripts <r section="int"/>
 
-Rundown will attempt to use the syntax name as the executable. This works in many situations, for example with Ruby:
+Rundown will attempt to use the provided syntax name as the executable. This works in many situations, for example with Ruby:
 
 ~~~ markdown
 We're going to run Ruby:
@@ -123,7 +136,9 @@ We're going to run Ruby:
 
 ### Example 5 - Custom interpreter <r section="int-custom"/>
 
-In situations where the syntax differs from the executable name, we can specify how to run the code block using the `with` attribute:
+In situations where the syntax differs from the executable name, we can specify how to run the code block using the `with` attribute. This attribute accepts anything you can do in bash, such as chaining commands via pipes.
+
+When doing this, `$SCRIPT_FILE` is a special environment variable provided by rundown which contains the absolute path to a temporary file containing the script provided.
 
 ~~~ markdown
 SQL can't be run directly. Lets just write it out to the console:
@@ -227,6 +242,8 @@ Creates nested spinners:
 ✔ Building...
 ```
 
+When using something other than bash, you can still support nested spinners. Rundown looks for an [ANSI OSC](https://en.wikipedia.org/wiki/ANSI_escape_code#OSC_(Operating_System_Command)_sequences) command in `stdout` of the format `ESC ] R;SETSPINNER (Base64 Encoded Value) BEL`.
+
 ### Dynamic spinners <r-disabled section="spinner:dynamic"/>
 
 Sometimes you'd like to have your spinners be a bit more descriptive. Rundown expands environment variables in spinner names:
@@ -307,6 +324,8 @@ Will result in:
 
 The greeting is: Hi there.
 ~~~
+
+You can also set environment variables programmatically using an ANSI OSC command `ESC ] R;SETENV KEY=VALUE BEL` written to `stdout`.
 
 ### Saving the current working directory <r section="env:pwd" />
 

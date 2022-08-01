@@ -1,18 +1,18 @@
-# Rundown <r label="rundown:help"/>
+# Rundown
 
-Rundown provides automation to Markdown. In the simplest case, this allows you to render Markdown documentation in the console, executing code blocks as Rundown progresses. It also provides more advanced useage documented below. 
+Rundown is both a CLI tool and a set of invisible markup extensions for Markdown, allowing you to create command-line interfaces to execute your documentation's code blocks. Rundown's philosophy is that readable and executable documentation is equally important.
 
-<r norun reveal/>
+To install rundown:
 
 ``` bash
 brew install elseano/taps/rundown
 ```
 
-
-Rundown's philosophy is that executable documentation is always better, but it shouldn't get in the way of just reading the document itself. 
+There are also `deb`, `rpm` and `apk` files included in the releases to install on Linux systems.
 
 Some of the usecases rundown suits are:
 
+* Task runners
 * Automated setup guides
 * Tutorials
 * Code building scripts
@@ -21,26 +21,77 @@ Some of the usecases rundown suits are:
 
 ![Rundown Demo](./_images/demo.gif)
 
-<r stop-ok/>
+## Getting Started
 
-## Feature Highlights
-
-Rundown will run unmodified markdown perfectly fine. As your rundown files get more complex, you'll want to start using the [rundown automation tags](./docs/automation_tags.md). These tags are transparent additions to the markdown format which aren't rendered by standards compliant markdown renderers (i.e. Github, etc). See [Renderer Support](./docs/renderer_support.md) for more information.
+Rundown expects to find a `RUNDOWN.md` file in the current or parent directory.
 
 [Read the Full documentation](./docs/automation_tags.md), or checkout the examples linked below.
 
-Some of the additions Rundown brings are:
+A simple Rundown file:
 
-* [Shortcodes](./examples/shortcodes.md), which allow you to only run portions of a markdown file.
-* Fenced code block execution and progress indicator [manipulation](./examples/mods.md).
-* Optional failure handling, script skipping, and STDOUT presentation.
-* First-class [emoji](./examples/emoji.md) support either via UTF characters, or :rocket: (`:rocket:`) syntax.
-* [Invisible blocks](./examples/hidden.md), which are only rendered inside markdown and ignored by web based renderers.
-* Visually appealing console markdown rendering, with support for images.
-* [Shebang support](./examples/shebang-repeat.md), allowing you to make your markdown files executable.
-* Rundown files can be designed to execute top to bottom, or present a menu to execute only a single part.
-* Fast - rundown is written in Go, and works on Linux and Mac. Windows support via WSL probably works.
+~~~ markdown
+# Handy Scripts
 
+<r help>
+
+These are a collection of handy scripts we use when developing our application.
+
+To get started, you'll probably want the `compile` command.
+
+</r>
+
+## Compile the application <r section="compile" />
+
+<r help>
+
+Builds the final application binary as `coolbro`.
+
+</r>
+
+<r spinner="Compiling application...">To compile the application, run this command:</r>
+
+``` bash
+go build
+```
+~~~
+
+Using rundown, you can see all the commands supported:
+
+```
+$ rundown --help
+Rundown turns Markdown files into console scripts.
+
+  These are a collection of handy scripts we use when developing our application.
+  
+  To get started, you'll probably want the compile command.
+
+Usage:
+  rundown [command] [flags]...
+  rundown [command]
+
+Available Commands:
+  compile     Compile the application
+  help        Help about any command
+```
+
+Or get help for a specific command:
+
+```
+$ rundown compile --help
+Compile the application
+
+  Builds the final application binary as coolbro.
+
+Usage:
+  rundown compile [flags]
+
+Flags:
+  -h, --help   help for compile
+```
+
+Rundown supports adding help and flags to your commands, as well as a number of more advanced features.
+
+<!--
 ## Rundown Examples
 
 At it's core, Rundown turns markdown's fenced code blocks into executable code. Indented code blocks are left as-is, as illustrated by this example.
@@ -178,3 +229,4 @@ A function can then be invoked using the `invoke` attribute on the rundown tag. 
 
 More examples can be found in the [Functions Example](./examples/functions.md) markdown file.
 
+-->

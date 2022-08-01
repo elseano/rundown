@@ -1,6 +1,6 @@
 # Sections
 
-Sections in Rundown are denoted via `<r section="something"/>` placed inside headings.
+Sections in Rundown are denoted via `<r section="something"/>` placed inside headings. These are the core of how you build out a suite of commands for the CLI.
 
 For example:
 
@@ -39,12 +39,73 @@ $ rundown do-a-thing
 This is a thing you're doing.
 ```
 
+## Section Options/Flags
+
+Sections can have flags which allows you to build out more advanced scripts:
+
+~~~ markdown
+# Some command <r section="something"/>
+
+<r opt="edition" as="MY_EDITION" type="string" required desc="The edition to use" default="blank" />
+
+<r spinner="Loading edition $MY_EDITION..." />
+
+``` bash
+curl https://someurl/download/$MY_EDITION
+```
+~~~
+
+When invoking rundown's help, the option will be documented:
+
+```
+$ rundown something --help
+Some command
+
+Usage:
+  rundown something [flags]
+
+Available Commands:
+  help             Help about any command
+
+Flags:
+  --edition string   The edition to use (default "blank")
+```
+
+Flags are also provided by rundown's shell autocompletion.
+
+### Option types
+
+Rundown supports the following `type` values for the `<r opt>` tag:
+
+* `string` - Any string value
+* `bool` - True/false. Presence of the flag indicates true.
+* `enum` - Any of the provided values in the format of `type="enum:one|two|three"`
+* `file` - A filename is expected.
+  * `file:exist` - The filename must exist.
+  * `file:not-exist` - The filename must not exist.
+
+A note on the `file` type:
+
+Because rundown executes all scripts relative to the rundown file containing the script, providing a filename using a `string` input type will result in a file path you didn't likely expect. 
+
+For example, given this file tree:
+
+```
+|- foo/
+    |- RUNDOWN.md
+|- examples/
+```
+
+Running `rundown` from the `examples` directory and providing a filename to a `string` option will result that filename being interpreted relative to the `foo` directory by any scripts in that file. By using a `file` option type, rundown will know to repath the given filename to the invocation location.
+
 ## Ending a Section
 
 A section ends when:
 
 * Rundown reaches a new heading at the same level as the section.
 * End of the document is reached.
+
+This means that sub-headings can be both their own sections, and part of their parent section. When Rundown encounters this, it follows the rules of "Section Fall-through" and "Conditionals" as described below.
 
 ## Section Fall-through
 
@@ -64,7 +125,7 @@ This is another thing.
 
 Sometimes you need to branch the code rundown needs to run. While you can easily use `bash` scripting for this, sometimes you want a little more.
 
-Headings support the `if` attribute, which allows everything under that heading to be skipped. For example:
+Sections support the `if` attribute, which allows everything under that heading to be skipped if the script evaluates to a non-zero result. For example:
 
 ``` markdown
 # Do a thing

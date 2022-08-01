@@ -1,12 +1,8 @@
 # Rundown Automation
 
-Time to get fancy.
 
-While Rundown will execute any Markdown file top-to-bottom, soon you'll want to tailor how executions are displayed, tweak how a code block is actually run, or jump around the file a little bit.
+**This documentation is outdated.**
 
-Some people have even replaced simple Makefiles with a Rundown file. I probably wouldn't recommend this for complex Makefiles because there's no support for dependency graphs in Rundown.
-
-Any-hoo.
 
 ## The Rundown Automation Element
 
