@@ -144,18 +144,18 @@ func NewRootCmd() *cobra.Command {
 
 	rootCmd.Flags().BoolVar(&flagDump, "dump", false, "Dump the AST only")
 
-	rootCmd.PersistentFlags().IntVar(&flagCols, "cols", util.IntMin(util.GetConsoleWidth(), 120), "Number of columns in display")
 	rootCmd.PersistentFlags().StringVarP(&flagFilename, "file", "f", "", "File to run (defaults to RUNDOWN.md then README.md)")
-	rootCmd.PersistentFlags().BoolVarP(&flagViewOnly, "display", "d", false, "Render without executing scripts")
 	rootCmd.PersistentFlags().StringVar(&flagCompletions, "completions", "", "Render shell completions for given shell (bash, zsh, fish, powershell)")
 	rootCmd.PersistentFlags().BoolVar(&flagDebug, "debug", false, "Write debugging info to rundown.log")
 	rootCmd.PersistentFlags().StringVar(&flagServePort, "serve", "", "Set the port to serve a HTML interface for Rundown")
 	rootCmd.PersistentFlags().Bool("dump", false, "Dump the AST to be executed")
 
-	rootCmd.Flag("cols").Hidden = true
-	rootCmd.Flag("display").Hidden = true
 	rootCmd.Flag("completions").Hidden = true
 	rootCmd.Flag("dump").Hidden = true
+	rootCmd.Flag("debug").Hidden = true
+
+	// Serve command not working yet.
+	rootCmd.Flag("serve").Hidden = true
 
 	return rootCmd
 }
