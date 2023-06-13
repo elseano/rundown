@@ -18,6 +18,7 @@ func SubEnv(environment map[string]string, source string) string {
 
 	for _, k := range keys {
 		source = strings.ReplaceAll(source, fmt.Sprintf("$%s", k), environment[k])
+		source = strings.ReplaceAll(source, fmt.Sprintf("${%s}", k), environment[k])
 	}
 
 	return source

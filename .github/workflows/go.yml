@@ -33,3 +33,4 @@ jobs:
         ./rundown test:curl
         ./rundown test:borg
         ./rundown test:greets --name Forky --greet hi
+        ./rundown test:spinners

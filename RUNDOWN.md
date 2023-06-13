@@ -232,3 +232,28 @@ The result is: <r sub-env>$RESULT</r>.
 ``` bash
 echo "Hello from borg process"
 ```
+
+## Spinners <r section="test:spinners" />
+
+<r capture-env="NAME,COMPLEX_NAME45" spinner="Setting env..." />
+
+``` bash
+export NAME=Thingo
+export COMPLEX_NAME45=More Thingos
+```
+
+<r spinner="Running thing for $NAME..." stdout />
+
+``` bash
+echo "NAME is: $NAME"
+```
+
+<r spinner="Running thing for ${COMPLEX_NAME45}..." sub-spinners stdout />
+
+``` bash
+#> Simple test...
+echo $COMPLEX_NAME45
+
+#> Complex test $NAME...
+echo $NAME
+```
