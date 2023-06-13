@@ -29,4 +29,7 @@ jobs:
       run: go test ./...
 
     - name: Workout
-      run: ./rundown test:curl
+      run: |
+        ./rundown test:curl
+        ./rundown test:borg
+        ./rundown test:greets --name Forky --greet hi

@@ -223,3 +223,12 @@ export RESULT=one
 ```
 
 The result is: <r sub-env>$RESULT</r>.
+
+
+## Borg <r section="test:borg" />
+
+<r borg/>
+
+``` bash
+echo "Hello from borg process"
+```

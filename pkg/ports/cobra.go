@@ -120,8 +120,6 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 		},
 	}
 
-	command.Flag("dump").Hidden = true
-
 	var flagsRequired []string
 
 	for _, o := range sectionPointer.Options {
