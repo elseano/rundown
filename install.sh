@@ -1,6 +1,6 @@
 set -e
 
-VERSION=0.4.0-beta.24
+VERSION=0.4.0-beta.26
 
 if command -v apk; then
   EXT=apk
