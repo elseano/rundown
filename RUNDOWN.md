@@ -160,7 +160,7 @@ End naturally.
 
 ## Some heading <r label="test:greets"/>
 
-<r desc="Greets you by your name"/>
+<r desc>Greets you by your name</r>
 
 <r opt="name" type="string" desc="The name to greet" required/>
 
