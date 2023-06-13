@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"sync"
 	"syscall"
@@ -101,11 +102,17 @@ func (i *ExecutionIntent) Execute() (*ExecutionResult, error) {
 			return nil, err
 		}
 
-		simpleEnv := make([]string, len(baseEnv))
-		i := 0
+		simpleEnv := os.Environ()
+
 		for k, v := range baseEnv {
-			simpleEnv[i] = fmt.Sprintf("%s=%s", k, v)
+			simpleEnv = append(simpleEnv, fmt.Sprintf("%s=%s", k, v))
 		}
+
+		for name, val := range content.GenerateReferences() {
+			simpleEnv = append(simpleEnv, name+"="+val)
+		}
+
+		util.Logger.Trace().Msgf("Replacing process with %s...", lastScript.AbsolutePath)
 
 		if err = syscall.Exec(lastScript.AbsolutePath, []string{lastScript.AbsolutePath}, simpleEnv); err != nil {
 			return nil, err
