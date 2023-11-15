@@ -12,8 +12,7 @@ require (
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 	github.com/eliukblau/pixterm v1.3.1
 	github.com/fatih/color v1.10.0
-	github.com/go-playground/validator/v10 v10.9.0 // indirect
-	github.com/goccy/go-yaml v1.8.9
+	github.com/kr/pretty v0.3.0 // indirect
 	github.com/kr/pty v1.1.1
 	github.com/kyokomi/emoji v2.2.4+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible
@@ -23,6 +22,7 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.14 // indirect
 	github.com/muesli/reflow v0.3.0
 	github.com/muesli/termenv v0.9.0
+	github.com/rogpeppe/go-internal v1.8.0 // indirect
 	github.com/rs/zerolog v1.22.0
 	github.com/spf13/cobra v1.5.0
 	github.com/stretchr/testify v1.7.0
@@ -32,6 +32,7 @@ require (
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
 	golang.org/x/sys v0.0.0-20211003122950-b1ebd4e1001c // indirect
-	golang.org/x/text v0.3.7 // indirect
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/guregu/null.v4 v4.0.0
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
