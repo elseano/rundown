@@ -1,7 +1,6 @@
 package exec
 
 import (
-	"encoding/base64"
 	"fmt"
 	"regexp"
 
@@ -25,8 +24,7 @@ func ChangeCommentsToSpinnerCommands(sourceLang string, source []byte) []byte {
 	return commentDetector.ReplaceAllFunc(source, func(match []byte) []byte {
 		submatches := commentDetector.FindAllSubmatch(match, 1)
 
-		// Base64 encode
-		result := base64.StdEncoding.EncodeToString(submatches[0][2])
+		result := submatches[0][2]
 		indent := submatches[0][1]
 
 		return []byte(fmt.Sprintf("%secho -n -e \"\x1b]R;SETSPINNER %s\x9c\"", indent, result))

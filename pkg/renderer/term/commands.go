@@ -1,7 +1,6 @@
 package term
 
 import (
-	"encoding/base64"
 	"strings"
 
 	"github.com/elseano/rundown/pkg/renderer"
@@ -18,18 +17,11 @@ func HandleCommands(spinner Spinner, context *renderer.Context) func(s string) {
 		switch {
 
 		case strings.HasPrefix(command, changeSpinnerTitleCommand):
-			args := command[len(changeSpinnerTitleCommand):]
-			util.Logger.Debug().Msgf("Decoding: %s", args)
+			message := command[len(changeSpinnerTitleCommand):]
 
-			result, err := base64.StdEncoding.DecodeString(args)
+			util.Logger.Debug().Msgf("Set spinner title %s", message)
 
-			if err == nil {
-				util.Logger.Debug().Msgf("Set spinner title %s", result)
-
-				spinner.NewStep(string(result))
-			} else {
-				util.Logger.Debug().Msgf("Decode err %s", err.Error())
-			}
+			spinner.NewStep(message)
 
 		case strings.HasPrefix(command, setEnvironmentCommand):
 			_args := command[len(setEnvironmentCommand)-1:]
@@ -37,7 +29,6 @@ func HandleCommands(spinner Spinner, context *renderer.Context) func(s string) {
 
 			util.Logger.Debug().Msgf("Got environment %s = %s", strings.TrimSpace(args[0]), args[1])
 			context.Env[strings.TrimSpace(args[0])] = args[1]
-
 		}
 	}
 }
