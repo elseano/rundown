@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	goldast "github.com/yuin/goldmark/ast"
@@ -27,6 +28,8 @@ type TypeEnum struct {
 }
 
 type TypeString struct{}
+
+type TypeInt struct{}
 
 type TypeFilename struct {
 	MustExist    bool
@@ -91,6 +94,10 @@ func BuildOptionType(optionType string) OptionType {
 		return &TypeString{}
 	}
 
+	if strings.HasPrefix(optType, "int") || strings.HasPrefix(optType, "number") {
+		return &TypeInt{}
+	}
+
 	if strings.HasPrefix(optType, "bool") {
 		return &TypeBoolean{}
 	}
@@ -106,6 +113,26 @@ func BuildOptionType(optionType string) OptionType {
 	return nil
 }
 
+func (t *TypeEnum) Normalise(input string) string {
+	return input
+}
+
+func (t *TypeString) Normalise(input string) string {
+	return input
+}
+
+func (t *TypeBoolean) Normalise(input string) string {
+	if strings.ToLower(input) == "true" {
+		return "true"
+	} else {
+		return "false"
+	}
+}
+
+func (t *TypeInt) Normalise(input string) string {
+	return input
+}
+
 func (t *TypeEnum) Validate(input string) error {
 	for _, x := range t.ValidValues {
 		if input == x {
@@ -116,20 +143,17 @@ func (t *TypeEnum) Validate(input string) error {
 	return fmt.Errorf("\"%s\" must be one of: %s", input, strings.Join(t.ValidValues, ", "))
 }
 
-func (t *TypeEnum) Normalise(input string) string {
-	return input
-}
-
 func (t *TypeString) Validate(string) error {
 	return nil
 }
 
-func (t *TypeString) Normalise(input string) string {
-	return input
-}
-
 func (t *TypeBoolean) Validate(string) error {
 	return nil
+}
+
+func (t *TypeInt) Validate(input string) error {
+	_, err := strconv.Atoi(input)
+	return err
 }
 
 func (t *TypeEnum) Describe() string {
@@ -148,12 +172,8 @@ func (t *TypeBoolean) Describe() string {
 	return "true or false"
 }
 
-func (t *TypeBoolean) Normalise(input string) string {
-	if strings.ToLower(input) == "true" {
-		return "true"
-	} else {
-		return "false"
-	}
+func (t *TypeInt) Describe() string {
+	return "a number"
 }
 
 func (t *TypeFilename) Validate(string) error {
