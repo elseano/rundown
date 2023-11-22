@@ -33,7 +33,7 @@ func main() {
 	term.ColorsEnabled = useColors
 
 	var executionError *errs.ExecutionError
-	err := cmd.Execute("", "")
+	err := cmd.Execute(Version, GitCommit)
 
 	if errors.As(err, &executionError) {
 		os.Exit(executionError.ExitCode)
