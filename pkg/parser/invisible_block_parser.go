@@ -151,17 +151,20 @@ func NewInvisibleBlockASTTransformer() parser.ASTTransformer {
 }
 
 func (a *invisibleBlockASTTransformer) Transform(doc *ast.Document, reader text.Reader, pc parser.Context) {
+	a.doTransform(doc, reader, pc)
+}
+
+func (a *invisibleBlockASTTransformer) doTransform(node ast.Node, reader text.Reader, pc parser.Context) {
 	// Finds InvisibleBlocks and removes them.
-
-	for child := doc.FirstChild(); child != nil; {
-
-		ib, ok := child.(*invisibleBlockMarker)
-
-		child = child.NextSibling()
-
-		if ok {
-			doc.RemoveChild(doc, ib)
-		}
+	ib, ok := node.(*invisibleBlockMarker)
+	if ok {
+		node.Parent().RemoveChild(node.Parent(), ib)
+		return
 	}
 
+	for child := node.FirstChild(); child != nil; {
+		nextChild := child.NextSibling()
+		a.doTransform(child, reader, pc)
+		child = nextChild
+	}
 }
