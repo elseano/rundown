@@ -17,7 +17,10 @@ import (
 
 func Execute(version string, gitCommit string) error {
 	cmd := NewDocRootCmd(os.Args)
-	cmd.Version = version + " (" + gitCommit + ")"
+	cmd.Version = version
+	if gitCommit != "" {
+		cmd.Version += " (" + gitCommit + ")"
+	}
 
 	if flagCompletions != "" {
 		switch flagCompletions {
