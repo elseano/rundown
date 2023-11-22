@@ -415,15 +415,19 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader) (golda
 			opt.OptionAs = strings.ToUpper(as.String)
 		}
 
+		var err error
+
 		if node.HasAttr("type") {
-			opt.OptionType = ast.BuildOptionType(node.GetAttr("type").String)
+			opt.OptionType, err = ast.BuildOptionType(node.GetAttr("type").String)
 		} else {
-			opt.OptionType = ast.BuildOptionType("string")
+			opt.OptionType, err = ast.BuildOptionType("string")
 		}
 
-		if opt.OptionType == nil {
-			return node, fmt.Errorf("unknown option type %s for option %s", opt.OptionTypeString, opt.OptionName)
+		if err != nil {
+			return node, fmt.Errorf("error for option `%s`: %w", opt.OptionName, err)
 		}
+
+		opt.OptionDescription += " (" + opt.OptionType.Describe() + ")"
 
 		if node.HasAttr("default") {
 			defaultVal := node.GetAttr("default")

@@ -137,7 +137,7 @@ func (n *SectionPointer) parseOptionsWithResolutionFunc(options map[string]strin
 				return nil, fmt.Errorf("%s: %w", option.OptionName, err)
 			}
 
-			result[option.OptionAs] = fmt.Sprintf("%v", optionValue)
+			result[option.OptionAs] = fmt.Sprintf("%v", option.OptionType.ResolvedValue(optionValue))
 
 			for k, v := range env {
 				result[option.OptionAs] = strings.Replace(result[option.OptionAs], "$"+k, v, -1)

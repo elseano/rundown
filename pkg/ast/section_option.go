@@ -8,13 +8,16 @@ import (
 	"strings"
 
 	goldast "github.com/yuin/goldmark/ast"
+	"golang.org/x/exp/maps"
 	"gopkg.in/guregu/null.v4"
 )
 
 type OptionType interface {
-	Validate(input string) error
-	Normalise(input string) string
-	Describe() string
+	Validate(input string) error       // Validates the normalised input
+	Normalise(input string) string     // Treats the input into a standard format
+	ResolvedValue(input string) string // Converts input into it's final value to be set into the context
+	Describe() string                  // Describes the input and what it accepts
+	InputType() string                 // Human relatable input type (string, int, boolean, etc)
 }
 
 type OptionTypeRuntime interface {
@@ -25,6 +28,10 @@ type TypeBoolean struct{}
 
 type TypeEnum struct {
 	ValidValues []string
+}
+
+type TypeKV struct {
+	Pairs map[string]string
 }
 
 type TypeString struct{}
@@ -80,46 +87,73 @@ func (n *SectionOption) Dump(source []byte, level int) {
 	}, nil)
 }
 
-func BuildOptionType(optionType string) OptionType {
+func BuildOptionType(optionType string) (OptionType, error) {
 	optType := strings.ToLower(optionType)
 
 	if strings.HasPrefix(optType, "enum:") {
 		options := strings.Split(optionType[5:], "|")
 		return &TypeEnum{
 			ValidValues: options,
+		}, nil
+	}
+
+	if strings.HasPrefix(optType, "kv:") {
+		pairs := map[string]string{}
+
+		for _, option := range strings.Split(optionType[3:], "|") {
+			kv := strings.SplitN(option, "=", 2)
+			if len(kv) != 2 {
+				return nil, fmt.Errorf("key-value option `%s` must be in format key=value", option)
+			}
+			pairs[kv[0]] = kv[1]
 		}
+
+		return &TypeKV{
+			Pairs: pairs,
+		}, nil
 	}
 
 	if strings.HasPrefix(optType, "string") {
-		return &TypeString{}
+		return &TypeString{}, nil
 	}
 
 	if strings.HasPrefix(optType, "int") || strings.HasPrefix(optType, "number") {
-		return &TypeInt{}
+		return &TypeInt{}, nil
 	}
 
 	if strings.HasPrefix(optType, "bool") {
-		return &TypeBoolean{}
+		return &TypeBoolean{}, nil
 	}
 
 	if strings.HasPrefix(optType, "file:") {
 		fileOp := strings.Replace(optType, "file:", "", 1)
 
-		return &TypeFilename{MustExist: fileOp == "exist", MustNotExist: fileOp == "not-exist"}
+		return &TypeFilename{MustExist: fileOp == "exist", MustNotExist: fileOp == "not-exist"}, nil
 	} else if optType == "file" {
-		return &TypeFilename{}
+		return &TypeFilename{}, nil
 	}
 
-	return nil
+	return nil, fmt.Errorf("unknown option type `%s`", optType)
 }
 
-func (t *TypeEnum) Normalise(input string) string {
-	return input
-}
+func (t *TypeKV) InputType() string       { return "string" }
+func (t *TypeEnum) InputType() string     { return "string" }
+func (t *TypeString) InputType() string   { return "string" }
+func (t *TypeBoolean) InputType() string  { return "bool" }
+func (t *TypeInt) InputType() string      { return "int" }
+func (t *TypeFilename) InputType() string { return "string" }
 
-func (t *TypeString) Normalise(input string) string {
-	return input
-}
+func (t *TypeKV) ResolvedValue(input string) string       { return t.Pairs[input] }
+func (t *TypeEnum) ResolvedValue(input string) string     { return input }
+func (t *TypeString) ResolvedValue(input string) string   { return input }
+func (t *TypeBoolean) ResolvedValue(input string) string  { return input }
+func (t *TypeInt) ResolvedValue(input string) string      { return input }
+func (t *TypeFilename) ResolvedValue(input string) string { return input }
+
+func (t *TypeKV) Normalise(input string) string     { return input }
+func (t *TypeEnum) Normalise(input string) string   { return input }
+func (t *TypeString) Normalise(input string) string { return input }
+func (t *TypeInt) Normalise(input string) string    { return input }
 
 func (t *TypeBoolean) Normalise(input string) string {
 	if strings.ToLower(input) == "true" {
@@ -127,10 +161,6 @@ func (t *TypeBoolean) Normalise(input string) string {
 	} else {
 		return "false"
 	}
-}
-
-func (t *TypeInt) Normalise(input string) string {
-	return input
 }
 
 func (t *TypeEnum) Validate(input string) error {
@@ -141,6 +171,16 @@ func (t *TypeEnum) Validate(input string) error {
 	}
 
 	return fmt.Errorf("\"%s\" must be one of: %s", input, strings.Join(t.ValidValues, ", "))
+}
+
+func (t *TypeKV) Validate(input string) error {
+	for k := range t.Pairs {
+		if input == k {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("\"%s\" must be one of: %s", input, strings.Join(maps.Keys(t.Pairs), ", "))
 }
 
 func (t *TypeString) Validate(string) error {
@@ -158,6 +198,10 @@ func (t *TypeInt) Validate(input string) error {
 
 func (t *TypeEnum) Describe() string {
 	return strings.Join(t.ValidValues, ", ")
+}
+
+func (t *TypeKV) Describe() string {
+	return "one of: " + strings.Join(maps.Keys(t.Pairs), ", ")
 }
 
 func (t *TypeString) Describe() string {

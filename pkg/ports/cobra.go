@@ -12,6 +12,7 @@ import (
 	"github.com/elseano/rundown/pkg/errs"
 	"github.com/elseano/rundown/pkg/renderer/term"
 	"github.com/muesli/reflow/indent"
+	"golang.org/x/exp/maps"
 	"gopkg.in/guregu/null.v4"
 
 	// glamrend "github.com/elseano/rundown/pkg/rundown/renderer/glamour"
@@ -28,7 +29,7 @@ type optVal struct {
 
 func (o optVal) String() string {
 	if o.Str != nil {
-		return o.Option.OptionType.Normalise(*o.Str)
+		return *o.Str
 	}
 
 	if o.Bool != nil {
@@ -39,7 +40,7 @@ func (o optVal) String() string {
 		}
 	}
 
-	return ""
+	return "<err>"
 }
 
 func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool) *cobra.Command {
@@ -77,6 +78,7 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 
 			optionEnvStr := map[string]string{}
 			for k, v := range optionEnv {
+				fmt.Printf("Setting %s to %s\n", k, v.String())
 				optionEnvStr[k] = v.String()
 			}
 
@@ -144,20 +146,26 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 		case *ast.TypeFilename:
 			optionEnv[opt.OptionAs] = optVal{Str: command.Flags().String(opt.OptionName, opt.OptionDefault.String, opt.OptionDescription), Option: opt}
 			command.RegisterFlagCompletionFunc(opt.OptionName, filenameCompletionFunction(topt))
+		case *ast.TypeKV:
+			optionEnv[opt.OptionAs] = optVal{Str: command.Flags().String(opt.OptionName, opt.OptionDefault.String, opt.OptionDescription), Option: opt}
+			command.RegisterFlagCompletionFunc(opt.OptionName, kvCompletionFunction(topt))
+
 		}
 
 		if opt.OptionRequired && !opt.OptionDefault.Valid {
 			command.MarkFlagRequired(opt.OptionName)
 
 			flagsRequired = append(flagsRequired, term.Aurora.BrightYellow("--"+opt.OptionName).String())
-			command.Use = command.Use + " --" + opt.OptionName + " " + strings.Replace(opt.OptionTypeString, "enum:", "", 1)
+			command.Use = command.Use + " --" + opt.OptionName + " (" + opt.OptionType.InputType() + ")"
 		}
 
 	}
 
 	command.SetFlagErrorFunc(func(errCmd *cobra.Command, err error) error {
-		display := term.Aurora.Sprintf("Running %s requires flags %s", term.Aurora.BrightCyan(sectionPointer.SectionName), strings.Join(flagsRequired, ", "))
-		return fmt.Errorf(display)
+		fmt.Println(command.Help())
+		fmt.Println()
+		// display := term.Aurora.Sprintf("Running %s requires flags %s", term.Aurora.BrightCyan(sectionPointer.SectionName), strings.Join(flagsRequired, ", "))
+		return err
 	})
 
 	return &command
@@ -166,6 +174,12 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 func enumCompletionFunction(opt *ast.TypeEnum) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return opt.ValidValues, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+func kvCompletionFunction(opt *ast.TypeKV) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return maps.Keys(opt.Pairs), cobra.ShellCompDirectiveNoFileComp
 	}
 }
 
