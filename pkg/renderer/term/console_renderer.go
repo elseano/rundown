@@ -1625,19 +1625,14 @@ func (r *Renderer) renderStrikethrough(w util.BufWriter, source []byte, n ast.No
 func (r *Renderer) renderEnvironmentSubstitution(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if !entering {
 		envSub := n.(*rundown_ast.EnvironmentSubstitution)
-		name := strings.TrimLeft(string(envSub.Value), "$")
 
 		style := r.inlineStyles.Peek()
 		if style != nil {
 			r.writeString(w, style.Begin())
 		}
 
-		if val, ok := r.Context.Env[name]; ok {
-
-			w.WriteString(val)
-		} else {
-			w.WriteString(fmt.Sprintf("\nUnknown: %s from %#v\n", name, r.Context.Env))
-		}
+		result := rdutil.SubEnv(r.Context.Env, string(envSub.Value))
+		w.WriteString(result)
 
 		if style != nil {
 			r.writeString(w, style.End())

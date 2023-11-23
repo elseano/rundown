@@ -1,24 +1,45 @@
 package util
 
 import (
-	"fmt"
-	"sort"
+	"regexp"
 	"strings"
 )
 
-// Replaces appearances of environment variables in source with variables present in the given environment.
-// Replaces from longest environment variable name first.
+var VariableDetection = regexp.MustCompile(`(?i)\$([a-z0-9_]+)|\${([a-z0-9_]+)(([^a-z0-9_]+)(.*?))?}`)
+
+// Performs environment substitution on the source string.
+// Supports $VAR, or ${VAR} optionally with the -, :-, +, :+ modifiers.
+// Ignores other (or invalid) modifiers, substituting as if they weren't there.
 func SubEnv(environment map[string]string, source string) string {
-	keys := make([]string, 0, len(environment))
-	for k := range environment {
-		keys = append(keys, k)
-	}
+	for {
+		matches := VariableDetection.FindStringSubmatch(source)
 
-	sort.Slice(keys, func(i, j int) bool { return len(keys[i]) < len(keys[j]) })
+		if matches == nil {
+			break
+		}
 
-	for _, k := range keys {
-		source = strings.ReplaceAll(source, fmt.Sprintf("$%s", k), environment[k])
-		source = strings.ReplaceAll(source, fmt.Sprintf("${%s}", k), environment[k])
+		switch {
+		case matches[2] == "":
+			source = strings.ReplaceAll(source, matches[0], environment[matches[1]])
+		case matches[2] != "":
+			switch {
+			case matches[4] == "-", matches[4] == ":-":
+				if env := environment[matches[2]]; env == "" {
+					source = strings.ReplaceAll(source, matches[0], matches[5])
+				} else {
+					source = strings.ReplaceAll(source, matches[0], env)
+				}
+			case matches[4] == "+", matches[4] == ":+":
+				if env := environment[matches[2]]; env != "" {
+					source = strings.ReplaceAll(source, matches[0], matches[5])
+				} else {
+					source = strings.ReplaceAll(source, matches[0], "")
+				}
+
+			default:
+				source = strings.ReplaceAll(source, matches[0], environment[matches[2]])
+			}
+		}
 	}
 
 	return source

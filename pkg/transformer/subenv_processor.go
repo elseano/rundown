@@ -1,9 +1,8 @@
 package transformer
 
 import (
-	"regexp"
-
 	"github.com/elseano/rundown/pkg/ast"
+	"github.com/elseano/rundown/pkg/util"
 	goldast "github.com/yuin/goldmark/ast"
 	goldtext "github.com/yuin/goldmark/text"
 )
@@ -12,8 +11,6 @@ import (
 type SubEnvProcessor struct {
 	rundownBlock *ast.RundownBlock
 }
-
-var EnvMatcher = regexp.MustCompile(`(\$[A-Z0-9_]+)`)
 
 func (p *SubEnvProcessor) Begin(node *ast.RundownBlock) {
 	p.rundownBlock = node
@@ -32,7 +29,7 @@ func ConvertTextForSubenv(node goldast.Node, reader goldtext.Reader, treatments 
 	case *goldast.Text:
 		contents := node.Text(reader.Source())
 
-		found := EnvMatcher.FindIndex(contents)
+		found := util.VariableDetection.FindIndex(contents)
 
 		if found != nil {
 			parent := node.Parent()
