@@ -78,7 +78,6 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 
 			optionEnvStr := map[string]string{}
 			for k, v := range optionEnv {
-				fmt.Printf("Setting %s to %s\n", k, v.String())
 				optionEnvStr[k] = v.String()
 			}
 
