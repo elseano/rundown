@@ -35,7 +35,7 @@ changelog:
       - "^test:"
 brews:
   - name: rundown
-    tap:
+    repository:
       owner: elseano
       name: homebrew-taps
     commit_author:
@@ -62,6 +62,7 @@ brews:
 nfpms:
   - package_name: rundown
     homepage: https://github.com/elseano/rundown
+    maintainer: 'https://github.com/elseano/rundown'
     formats:
       - apk
       - deb
