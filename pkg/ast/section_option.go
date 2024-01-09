@@ -43,6 +43,8 @@ type TypeFilename struct {
 	MustNotExist bool
 }
 
+type TypePath struct{}
+
 type SectionOption struct {
 	goldast.BaseInline
 	OptionName        string
@@ -125,6 +127,10 @@ func BuildOptionType(optionType string) (OptionType, error) {
 		return &TypeBoolean{}, nil
 	}
 
+	if strings.HasPrefix(optType, "path") {
+		return &TypePath{}, nil
+	}
+
 	if strings.HasPrefix(optType, "file:") {
 		fileOp := strings.Replace(optType, "file:", "", 1)
 
@@ -142,6 +148,7 @@ func (t *TypeString) InputType() string   { return "string" }
 func (t *TypeBoolean) InputType() string  { return "bool" }
 func (t *TypeInt) InputType() string      { return "int" }
 func (t *TypeFilename) InputType() string { return "string" }
+func (t *TypePath) InputType() string     { return "string" }
 
 func (t *TypeKV) ResolvedValue(input string) string       { return t.Pairs[input] }
 func (t *TypeEnum) ResolvedValue(input string) string     { return input }
@@ -149,11 +156,13 @@ func (t *TypeString) ResolvedValue(input string) string   { return input }
 func (t *TypeBoolean) ResolvedValue(input string) string  { return input }
 func (t *TypeInt) ResolvedValue(input string) string      { return input }
 func (t *TypeFilename) ResolvedValue(input string) string { return input }
+func (t *TypePath) ResolvedValue(input string) string     { return input }
 
 func (t *TypeKV) Normalise(input string) string     { return input }
 func (t *TypeEnum) Normalise(input string) string   { return input }
 func (t *TypeString) Normalise(input string) string { return input }
 func (t *TypeInt) Normalise(input string) string    { return input }
+func (t *TypePath) Normalise(input string) string   { return input }
 
 func (t *TypeBoolean) Normalise(input string) string {
 	if strings.ToLower(input) == "true" {
@@ -212,6 +221,10 @@ func (t *TypeFilename) Describe() string {
 	return "any file name"
 }
 
+func (t *TypePath) Describe() string {
+	return "any path"
+}
+
 func (t *TypeBoolean) Describe() string {
 	return "true or false"
 }
@@ -224,12 +237,21 @@ func (t *TypeFilename) Validate(string) error {
 	return nil
 }
 
+func (t *TypePath) Validate(string) error {
+	return nil
+}
+
 func (t *TypeFilename) Normalise(input string) string {
 	return input
 }
 
 // Takes the path provided in the option, and treats it as relative to the pwd, returning the absolute path.
 func (t *TypeFilename) NormaliseToPath(input string, pwd string) (string, error) {
+	rel := path.Join(pwd, input)
+	return filepath.Abs(rel)
+}
+
+func (t *TypePath) NormaliseToPath(input string, pwd string) (string, error) {
 	rel := path.Join(pwd, input)
 	return filepath.Abs(rel)
 }

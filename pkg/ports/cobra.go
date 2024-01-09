@@ -145,6 +145,9 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 		case *ast.TypeFilename:
 			optionEnv[opt.OptionAs] = optVal{Str: command.Flags().String(opt.OptionName, opt.OptionDefault.String, opt.OptionDescription), Option: opt}
 			command.RegisterFlagCompletionFunc(opt.OptionName, filenameCompletionFunction(topt))
+		case *ast.TypePath:
+			optionEnv[opt.OptionAs] = optVal{Str: command.Flags().String(opt.OptionName, opt.OptionDefault.String, opt.OptionDescription), Option: opt}
+			command.RegisterFlagCompletionFunc(opt.OptionName, pathCompletionFunction(topt))
 		case *ast.TypeKV:
 			optionEnv[opt.OptionAs] = optVal{Str: command.Flags().String(opt.OptionName, opt.OptionDefault.String, opt.OptionDescription), Option: opt}
 			command.RegisterFlagCompletionFunc(opt.OptionName, kvCompletionFunction(topt))
@@ -207,5 +210,12 @@ func filenameCompletionFunction(opt *ast.TypeFilename) func(cmd *cobra.Command, 
 			// return cobra.AppendActiveHelp([]string{""}, "Requires a file which does not exist"), cobra.ShellCompDirectiveNoFileComp
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
+	}
+}
+
+func pathCompletionFunction(opt *ast.TypePath) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		// return cobra.AppendActiveHelp([]string{""}, "Requires a file which exists"), cobra.ShellCompDirectiveDefault
+		return nil, cobra.ShellCompDirectiveFilterDirs
 	}
 }
