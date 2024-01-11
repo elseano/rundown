@@ -136,6 +136,9 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 			optionEnv[opt.OptionAs] = optVal{Str: command.Flags().String(opt.OptionName, opt.OptionDefault.String, opt.OptionDescription), Option: opt}
 			command.RegisterFlagCompletionFunc(opt.OptionName, stringCompletionFunction(opt, topt))
 			command.Flags()
+		case *ast.TypeInt:
+			optionEnv[opt.OptionAs] = optVal{Str: command.Flags().String(opt.OptionName, opt.OptionDefault.String, opt.OptionDescription), Option: opt}
+			command.Flags()
 		case *ast.TypeBoolean:
 			optionEnv[opt.OptionAs] = optVal{Bool: command.Flags().Bool(opt.OptionName, topt.Normalise(opt.OptionDefault.String) == "true", opt.OptionDescription), Option: opt}
 			command.RegisterFlagCompletionFunc(opt.OptionName, boolCompletionFunction(opt, topt))
