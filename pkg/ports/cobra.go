@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	rundown "github.com/elseano/rundown/pkg"
@@ -23,6 +24,7 @@ import (
 
 type optVal struct {
 	Str    *string
+	Int    *int
 	Bool   *bool
 	Option *ast.SectionOption
 }
@@ -30,6 +32,10 @@ type optVal struct {
 func (o optVal) String() string {
 	if o.Str != nil {
 		return *o.Str
+	}
+
+	if o.Int != nil {
+		return fmt.Sprintf("%d", *o.Int)
 	}
 
 	if o.Bool != nil {
@@ -137,7 +143,8 @@ func BuildCobraCommand(filename string, section *rundown.Section, writeLog bool)
 			command.RegisterFlagCompletionFunc(opt.OptionName, stringCompletionFunction(opt, topt))
 			command.Flags()
 		case *ast.TypeInt:
-			optionEnv[opt.OptionAs] = optVal{Str: command.Flags().String(opt.OptionName, opt.OptionDefault.String, opt.OptionDescription), Option: opt}
+			defaultVal, _ := strconv.Atoi(opt.OptionDefault.String)
+			optionEnv[opt.OptionAs] = optVal{Int: command.Flags().Int(opt.OptionName, defaultVal, opt.OptionDescription), Option: opt}
 			command.Flags()
 		case *ast.TypeBoolean:
 			optionEnv[opt.OptionAs] = optVal{Bool: command.Flags().Bool(opt.OptionName, topt.Normalise(opt.OptionDefault.String) == "true", opt.OptionDescription), Option: opt}
