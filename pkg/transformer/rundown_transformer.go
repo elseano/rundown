@@ -379,7 +379,7 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader) (golda
 
 	// }
 
-	if node.HasAttr("replace") {
+	if len(node.Attributes()) == 1 && node.HasAttr("replace") {
 		replace := ast.NewContentReplace(node.GetAttr("replace").String)
 
 		Replace(nodeToReplace, replace)
