@@ -379,6 +379,14 @@ func ConvertToRundownNode(node *ast.RundownBlock, reader goldtext.Reader) (golda
 
 	// }
 
+	if node.HasAttr("replace") {
+		replace := ast.NewContentReplace(node.GetAttr("replace").String)
+
+		Replace(nodeToReplace, replace)
+
+		return replace, nil
+	}
+
 	if node.HasAttr("save") || node.HasAttr("save-as") {
 		if fcb, ok := nextNode.(*goldast.FencedCodeBlock); ok {
 

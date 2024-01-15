@@ -405,6 +405,7 @@ func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	// other
 	reg.Register(rundown_ast.KindDescriptionBlock, r.supportSkipping(r.renderHollow))
 	reg.Register(rundown_ast.KindEnvironmentSubstitution, r.wrapInline(r.supportSkipping(r.renderEnvironmentSubstitution)))
+	reg.Register(rundown_ast.KindContentReplace, r.wrapInline(r.supportSkipping(r.renderContentReplace)))
 	// reg.Register(rundown_ast.KindExecutionBlock, r.renderTodo))
 	reg.Register(rundown_ast.KindIgnoreBlock, r.supportSkipping(r.renderTodo("Ignore")))
 	reg.Register(rundown_ast.KindOnFailure, r.supportSkipping(r.renderNothing))
@@ -1625,6 +1626,27 @@ func (r *Renderer) renderStrikethrough(w util.BufWriter, source []byte, n ast.No
 func (r *Renderer) renderEnvironmentSubstitution(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if !entering {
 		envSub := n.(*rundown_ast.EnvironmentSubstitution)
+
+		style := r.inlineStyles.Peek()
+		if style != nil {
+			r.writeString(w, style.Begin())
+		}
+
+		result := rdutil.SubEnv(r.Context.Env, string(envSub.Value))
+		w.WriteString(result)
+
+		if style != nil {
+			r.writeString(w, style.End())
+		}
+
+	}
+
+	return ast.WalkContinue, nil
+}
+
+func (r *Renderer) renderContentReplace(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
+	if !entering {
+		envSub := n.(*rundown_ast.ContentReplace)
 
 		style := r.inlineStyles.Peek()
 		if style != nil {
