@@ -586,10 +586,12 @@ func (r *Renderer) renderStopFail(w util.BufWriter, source []byte, node ast.Node
 	if !entering {
 		r.inlineStyles.Pop()
 		w.WriteString("\n")
+		w.Flush()
+
 		if r.exitCode != 0 {
 			return ast.WalkStop, &errs.ExecutionError{ExitCode: r.exitCode}
 		}
-		w.Flush()
+
 		return ast.WalkStop, errs.ErrStopFail
 	} else {
 		r.inlineStyles.Push(Color(aurora.RedFg))
@@ -702,13 +704,16 @@ func createSpinner(writer io.Writer, env map[string]string) Spinner {
 	// Ensure we always immediately flush when writing the spinner.
 	writer = NewFlushingWriter(writer)
 
-	if NewSpinnerFunc != nil {
+	ci := GetCI()
+
+	switch {
+	case NewSpinnerFunc != nil:
 		s = NewSpinnerFunc(writer)
-	} else if _, gitlab := os.LookupEnv("GITLAB_CI"); gitlab {
+	case ci == GitLabCI:
 		s = spinner.NewGitlabSpinner(writer, Aurora)
-	} else if _, ci := os.LookupEnv("CI"); ci {
+	case ci.IsCI():
 		s = spinner.NewCISpinner(writer, Aurora)
-	} else {
+	case ci == NoCI:
 		s = spinner.NewStdoutSpinner(Aurora, ColorsEnabled, writer)
 	}
 
@@ -787,7 +792,7 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 	}
 
 	if ifResult == ast.WalkSkipChildren {
-		theSpinner.Skip("Not required")
+		theSpinner.Skip()
 		return ast.WalkContinue, err
 	}
 
@@ -875,7 +880,7 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 			return ast.WalkContinue, nil
 		} else {
-			theSpinner.Skip("Skip on Success")
+			theSpinner.Skip()
 
 			// FIXME - How to skip to the next heading?
 			return ast.WalkContinue, nil
@@ -884,7 +889,7 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 	if executionBlock.SkipOnFailure {
 		if err != nil || exitCode != 0 {
-			theSpinner.Skip(fmt.Sprintf("Skip on Failure (%d)", exitCode))
+			theSpinner.Skip()
 
 			skipTo := rundown_ast.GetNextSection(rundown_ast.GetSectionForNode(executionBlock))
 			r.skipUntil = skipTo
@@ -949,7 +954,14 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 			}
 		}
 
+		// Add GitHub annotation
+		if GetCI() == GitHubCI {
+			w.WriteString(fmt.Sprintf("::error Script failed running '%s'", executionBlock.SpinnerName))
+			w.Flush()
+		}
+
 		stopFail := rundown_ast.NewStopFail()
+
 		node.Parent().InsertAfter(node.Parent(), insertAfterNode, stopFail)
 
 		// Allow the FailureNode to handle this.

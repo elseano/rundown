@@ -36,6 +36,7 @@ jobs:
           ./rundown test:borg
           ./rundown test:greets --name Forky --greet hi
           ./rundown test:spinners
+          ./runtime test:fail || true
           rm rundown
       
       - name: Release

@@ -16,6 +16,16 @@ func NewStopFail() *StopFail {
 	}
 }
 
+func NewStopFailWithContents(content string) *StopFail {
+	fail := &StopFail{
+		BaseBlock: goldast.NewParagraph().BaseBlock,
+	}
+
+	fail.AppendChild(fail, goldast.NewString([]byte(content)))
+
+	return fail
+}
+
 // KindRundownBlock is a NodeKind of the RundownBlock node.
 var KindStopFail = goldast.NewNodeKind("StopFail")
 

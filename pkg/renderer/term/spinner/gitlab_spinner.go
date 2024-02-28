@@ -64,7 +64,7 @@ func (s *GitlabSpinner) Error(message string) {
 	s.closeSpinner(CROSS)
 }
 
-func (s *GitlabSpinner) Skip(message string) {
+func (s *GitlabSpinner) Skip() {
 	s.closeSpinner(SKIP)
 }
 

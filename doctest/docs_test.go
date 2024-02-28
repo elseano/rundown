@@ -197,7 +197,7 @@ func (s *DocTestSpinner) Error(message string) {
 	s.w.Write([]byte(fmt.Sprintf("%s %s\n", spinner.CROSS, s.m)))
 }
 
-func (s *DocTestSpinner) Skip(message string) {
+func (s *DocTestSpinner) Skip() {
 	s.w.Write([]byte(fmt.Sprintf("%s %s\n", spinner.SKIP, s.m)))
 }
 

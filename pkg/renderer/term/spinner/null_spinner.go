@@ -24,7 +24,7 @@ func (s *NullSpinner) Success(message string) {
 func (s *NullSpinner) Error(message string) {
 }
 
-func (s *NullSpinner) Skip(message string) {
+func (s *NullSpinner) Skip() {
 }
 
 func (s *NullSpinner) SetMessage(message string) {

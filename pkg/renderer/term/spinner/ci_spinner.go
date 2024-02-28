@@ -46,10 +46,10 @@ func (s *CISpinner) StampShadow() {
 
 func (s *CISpinner) closeSpinner(indicator string) {
 	if s.substep != "" {
-		s.out.Write([]byte(fmt.Sprintf("  %s %s %s\n", indicator, s.substep, s.buildTimeString(s.substepStartedAt))))
+		s.out.Write([]byte(fmt.Sprintf("  %s %s %s\n", indicator, s.substep, buildTimeString(s.substepStartedAt))))
 	}
 
-	s.out.Write([]byte(fmt.Sprintf("%s %s %s\n", indicator, s.CurrentHeading(), s.buildTimeString(s.startedAt))))
+	s.out.Write([]byte(fmt.Sprintf("%s %s %s\n", indicator, s.CurrentHeading(), buildTimeString(s.startedAt))))
 	s.startedAt = time.Time{}
 }
 
@@ -61,7 +61,7 @@ func (s *CISpinner) Error(message string) {
 	s.closeSpinner(s.colors.Red(CROSS).String())
 }
 
-func (s *CISpinner) Skip(message string) {
+func (s *CISpinner) Skip() {
 	s.closeSpinner(s.colors.Yellow(SKIP).String())
 }
 
@@ -69,14 +69,13 @@ func (s *CISpinner) SetMessage(message string) {
 	s.currentHeading = message
 }
 
-func (s *CISpinner) buildTimeString(t time.Time) string {
-	d := time.Since(t)
-	return s.colors.Faint(fmt.Sprintf("(%s)", d)).String()
+func buildTimeString(t time.Time) string {
+	return "(" + time.Since(t).Round(time.Millisecond).String() + ")"
 }
 
 func (s *CISpinner) NewStep(message string) {
 	if s.substep != "" {
-		s.out.Write([]byte(fmt.Sprintf("  %s %s %s\n", s.colors.Green(TICK), s.substep, s.buildTimeString(s.substepStartedAt))))
+		s.out.Write([]byte(fmt.Sprintf("  %s %s %s\n", s.colors.Green(TICK), s.substep, s.colors.Faint(buildTimeString(s.substepStartedAt)))))
 	} else {
 		s.out.Write([]byte(fmt.Sprintf("%s %s\n", s.colors.Faint(DASH), s.CurrentHeading())))
 	}

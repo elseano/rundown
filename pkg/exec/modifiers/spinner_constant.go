@@ -13,7 +13,7 @@ type SpinnerControl interface {
 	Stop()
 	Success(message string)
 	Error(message string)
-	Skip(message string)
+	Skip()
 	SetMessage(message string)
 	NewStep(message string)
 	HideAndExecute(f func())

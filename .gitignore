@@ -5,9 +5,10 @@ dist/
 
 dist/
 
-
 TODO.md
 debug.md
 
 pkg/exec/langspec.go
 pkg/exec/languages.go
+.env
+rundown

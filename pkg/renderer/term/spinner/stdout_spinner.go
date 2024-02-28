@@ -22,7 +22,7 @@ type StdoutSpinner struct {
 const (
 	TICK  = "✔"
 	CROSS = "✖"
-	SKIP  = "≡"
+	SKIP  = "⋯"
 	DASH  = "-"
 )
 
@@ -64,15 +64,22 @@ func (s *StdoutSpinner) StampShadow() {
 	}
 }
 
-func (s *StdoutSpinner) closeSpinner(indicator string, message string) {
+func (s *StdoutSpinner) closeSpinner(indicator string, message string, faint bool) {
 	if message != "" {
 		message = " " + message
 	}
 
-	ts := time.Since(s.startedAt).String()
+	colour := s.colorMode.Black
+
+	if faint {
+		colour = func(arg any) aurora.Value { return s.colorMode.Faint(s.colorMode.StrikeThrough(arg)) }
+	}
+
+	ts := buildTimeString(s.startedAt)
 
 	if s.substep != "" {
-		s.s.FinalMSG = "  " + indicator + " " + s.substep + message + s.colorMode.Faint(" ("+ts+")").String() + "\r\n"
+
+		s.s.FinalMSG = "  " + indicator + " " + colour(s.substep+message).String() + " " + s.colorMode.Faint(ts).String() + "\r\n"
 		s.Stop()
 
 		sp := NewActualSpinner(CharSets[21], 100*time.Millisecond, WithWriter(s.out), WithColor("fgHiCyan"))
@@ -81,22 +88,22 @@ func (s *StdoutSpinner) closeSpinner(indicator string, message string) {
 		sp.FinalMSG = indicator + " " + s.message + message + "\r\n"
 		sp.Stop()
 	} else {
-		s.s.FinalMSG = indicator + " " + s.message + message + s.colorMode.Faint(" ("+ts+")").String() + "\r\n"
+		s.s.FinalMSG = indicator + " " + colour(s.message+message).String() + " " + s.colorMode.Faint(ts).String() + "\r\n"
 		s.Stop()
 	}
 
 }
 
 func (s *StdoutSpinner) Success(message string) {
-	s.closeSpinner(s.colorMode.Green(TICK).String(), message)
+	s.closeSpinner(s.colorMode.Green(TICK).String(), message, false)
 }
 
 func (s *StdoutSpinner) Error(message string) {
-	s.closeSpinner(s.colorMode.Red(CROSS).String(), message)
+	s.closeSpinner(s.colorMode.Red(CROSS).String(), message, false)
 }
 
-func (s *StdoutSpinner) Skip(message string) {
-	s.closeSpinner(s.colorMode.Faint(SKIP).String(), message)
+func (s *StdoutSpinner) Skip() {
+	s.closeSpinner(s.colorMode.Faint(SKIP).String(), "", true)
 }
 
 func (s *StdoutSpinner) Stop() {

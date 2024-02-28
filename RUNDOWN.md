@@ -257,3 +257,11 @@ echo $COMPLEX_NAME45
 #> Complex test $NAME...
 echo $NAME
 ```
+
+## Failure <r section="test:fail" />
+
+<r spinner="SomeScript" />
+
+``` bash
+idontexit
+```

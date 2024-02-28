@@ -10,7 +10,7 @@ type wrappableSpinner interface {
 	Stop()
 	Success(message string)
 	Error(message string)
-	Skip(message string)
+	Skip()
 	SetMessage(message string)
 	NewStep(message string)
 	HideAndExecute(f func())
@@ -53,9 +53,8 @@ func (s *SubenvSpinner) Error(message string) {
 	s.spinner.Error(message)
 }
 
-func (s *SubenvSpinner) Skip(message string) {
-	message = s.SubEnv(message)
-	s.spinner.Skip(message)
+func (s *SubenvSpinner) Skip() {
+	s.spinner.Skip()
 }
 
 func (s *SubenvSpinner) SetMessage(message string) {
