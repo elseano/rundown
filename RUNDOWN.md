@@ -260,7 +260,7 @@ echo $NAME
 
 ## Failure <r section="test:fail" />
 
-<r spinner="SomeScript" />
+<r spinner="Running for failure..." />
 
 ``` bash
 idontexit
