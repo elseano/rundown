@@ -956,7 +956,7 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 
 		// Add GitHub annotation
 		if GetCI() == GitHubCI {
-			w.WriteString(fmt.Sprintf("::error Script failed running '%s'", executionBlock.SpinnerName))
+			w.WriteString(fmt.Sprintf("::error::Script failed running '%s'", executionBlock.SpinnerName))
 			w.Flush()
 		}
 
