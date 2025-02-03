@@ -149,3 +149,28 @@ I will be rendered.
 
 I will be rendered too.
 ```
+
+### Stopping with Success on script failure <r section="ex6" />
+
+There are times when you want a script to ignore a specific failure. In this case, you can combine `on-failure` with `stop-ok`.
+
+``` markdown
+<r spinner="Running a thing" />
+
+~~~ bash
+echo "Some failure" 1>&2
+exit 1
+~~~
+
+<r on-failure="Some failure"><r stop-ok="Expected this failure"></r></r>
+
+You should not see this.
+```
+
+Will result in this output:
+
+``` expected
+✖ Running a thing
+
+Expected this failure
+```
