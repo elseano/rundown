@@ -408,7 +408,7 @@ func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(rundown_ast.KindContentReplace, r.wrapInline(r.supportSkipping(r.renderContentReplace)))
 	// reg.Register(rundown_ast.KindExecutionBlock, r.renderTodo))
 	reg.Register(rundown_ast.KindIgnoreBlock, r.supportSkipping(r.renderTodo("Ignore")))
-	reg.Register(rundown_ast.KindOnFailure, r.supportSkipping(r.renderNothing))
+	reg.Register(rundown_ast.KindOnFailure, r.supportSkipping(r.renderOnFailure))
 	reg.Register(rundown_ast.KindRundownBlock, r.supportSkipping(r.renderTodo("Rundown")))
 	reg.Register(rundown_ast.KindSaveCodeBlock, r.supportSkipping(r.renderSaveCodeBlock))
 	reg.Register(rundown_ast.KindSectionOption, r.supportSkipping(r.renderHollow))
@@ -602,6 +602,20 @@ func (r *Renderer) renderStopFail(w util.BufWriter, source []byte, node ast.Node
 
 		return ast.WalkContinue, nil
 	}
+}
+
+func (r *Renderer) renderOnFailure(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if !entering {
+		return ast.WalkContinue, nil
+	}
+
+	onFailure := node.(*rundown_ast.OnFailure)
+
+	if onFailure.Triggered {
+		return ast.WalkContinue, nil
+	}
+
+	return ast.WalkSkipChildren, nil
 }
 
 func (r *Renderer) renderStopOk(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -895,6 +909,19 @@ func (r *Renderer) renderExecutionBlock(w util.BufWriter, source []byte, node as
 			r.skipUntil = skipTo
 
 			return ast.WalkContinue, nil
+		}
+	}
+
+	// Now check for on-failure checks.
+
+	if err != nil || exitCode != 0 {
+		for onFailure, ok := executionBlock.NextSibling().(*rundown_ast.OnFailure); ok; onFailure, ok = onFailure.NextSibling().(*rundown_ast.OnFailure) {
+			if onFailure.MatchesError(stderrBuffer.Bytes()) {
+				theSpinner.Error("Handled")
+				onFailure.Triggered = true
+
+				return ast.WalkContinue, nil
+			}
 		}
 	}
 
@@ -1494,13 +1521,18 @@ func (r *Renderer) renderListItem(w util.BufWriter, source []byte, n ast.Node, e
 // ParagraphAttributeFilter defines attribute names which paragraph elements can have.
 var ParagraphAttributeFilter = GlobalAttributeFilter
 
+// Ensures cursor is on a clean paragraph.
+func (r *Renderer) ensureCleanParagraph(w util.BufWriter, n ast.Node) {
+	switch r.lastRendered.(type) {
+	case *rundown_ast.ExecutionBlock:
+		_, _ = w.WriteString("\n")
+	}
+}
+
 func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
 		// If we're following an execution block, add a extra line.
-		switch r.lastRendered.(type) {
-		case *rundown_ast.ExecutionBlock:
-			w.WriteString("\n")
-		}
+		r.ensureCleanParagraph(w, n)
 
 		link, ok := n.FirstChild().(*ast.Link)
 

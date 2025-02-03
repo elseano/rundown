@@ -9,6 +9,7 @@ import (
 type OnFailure struct {
 	goldast.BaseBlock
 	FailureMessageRegexp string
+	Triggered            bool
 }
 
 // NewRundownBlock returns a new RundownBlock node.

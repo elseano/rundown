@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -23,10 +24,15 @@ import (
 )
 
 func TestDocumentation(t *testing.T) {
+	testSectionName := "" // Leave as a blank string to test everything
+
 	devNull, _ := os.Create(os.DevNull)
 	util.RedirectLogger(devNull)
 
-	r, err := rundown.Load("../docs/index.md")
+	pwd, err := os.Getwd()
+	assert.NoError(t, err)
+
+	r, err := rundown.Load(filepath.Join(pwd, "../docs/index.md"))
 
 	assert.NoError(t, err)
 
@@ -36,123 +42,125 @@ func TestDocumentation(t *testing.T) {
 	t.Logf("Sections: %#v", sections)
 
 	for _, s := range sections {
-		t.Run(s.Pointer.SectionName, func(t *testing.T) {
-			util.RedirectLogger(devNull)
+		if testSectionName == "" || s.Pointer.SectionName == testSectionName {
+			t.Run(s.Pointer.SectionName, func(t *testing.T) {
+				util.RedirectLogger(devNull)
 
-			// Reload document as we mutate it.
-			r, err := rundown.Load("../docs/index.md")
-			assert.NoError(t, err)
+				// Reload document as we mutate it.
+				r, err := rundown.Load("../docs/index.md")
+				assert.NoError(t, err)
 
-			var section *rundown.Section
+				var section *rundown.Section
 
-			// Find the section.
-			for _, ss := range r.GetSections() {
-				if ss.Pointer.SectionName == s.Pointer.SectionName {
-					section = ss
-					break
-				}
-			}
-
-			doc := ast.PruneDocumentToSection(section.Document.Document, section.Pointer.SectionName)
-
-			// Get markdown section
-			source := ast.FindNode(doc, func(n gold_ast.Node) bool {
-				if fcb, ok := n.(*gold_ast.FencedCodeBlock); ok && fcb.Info != nil {
-					return string(fcb.Info.Text(section.Document.Source)) == "markdown"
-				}
-
-				return false
-			})
-
-			// Get expected section
-			expected := ast.FindNode(doc, func(n gold_ast.Node) bool {
-				if fcb, ok := n.(*gold_ast.FencedCodeBlock); ok && fcb.Info != nil {
-					info := string(fcb.Info.Text(section.Document.Source))
-
-					return info == "expected" || info == "expected-err"
-				}
-
-				return false
-			})
-
-			// See if there's a specific invocation mentioned.
-			invocation := ast.FindNodeBackwardsDeeply(expected, func(n gold_ast.Node) bool {
-				if code, ok := n.(*gold_ast.CodeSpan); ok {
-					return strings.Contains(string(code.Text(section.Document.Source)), "rundown ")
-				}
-
-				return false
-			})
-
-			if assert.NotNil(t, source, "Source is nil") && assert.NotNil(t, expected, "Expected is nil") {
-				util.RedirectLogger(testutil.NewTestWriter(t))
-
-				fcbSource := source.(*gold_ast.FencedCodeBlock)
-				fcbExpected := expected.(*gold_ast.FencedCodeBlock)
-
-				r := text.NewNodeReaderFromSource(fcbSource, section.Document.Source)
-				sourceText, _ := ioutil.ReadAll(r)
-
-				r = text.NewNodeReaderFromSource(fcbExpected, section.Document.Source)
-				expectedText, _ := ioutil.ReadAll(r)
-
-				if assert.NotEmpty(t, sourceText) && assert.NotEmpty(t, expectedText) {
-					rd, err := rundown.LoadString(string(sourceText), section.Document.Filename)
-
-					output := bytes.Buffer{}
-
-					if assert.NoError(t, err) {
-						term.Aurora = aurora.NewAurora(false)
-						term.ColorsEnabled = false
-						term.NewSpinnerFunc = func(w io.Writer) term.Spinner {
-							return NewDocTestSpinner(w)
-						}
-
-						require.NoError(t, ast.FillInvokeBlocks(rd.MasterDocument.Document, 10))
-						out := util.CaptureStdout(func() {
-							rd.MasterDocument.Document.Dump(sourceText, 0)
-						})
-
-						t.Log("Filled invoke blocks:\n")
-						t.Log(out)
-
-						if invocation != nil {
-							invocationStr := string(invocation.Text(section.Document.Source))
-							sectionName := strings.Replace(invocationStr, "rundown ", "", 1)
-
-							t.Logf("Executing section %s", sectionName)
-
-							rd.MasterDocument.Document = ast.PruneDocumentToSection(rd.MasterDocument.Document, sectionName)
-						}
-
-						out = util.CaptureStdout(func() {
-							rd.MasterDocument.Document.Dump(sourceText, 0)
-						})
-
-						t.Log("Document executed:\n")
-						t.Log(out)
-
-						executionContext := rd.MasterDocument.Context
-						executionContext.ImportRawEnv(os.Environ())
-
-						t.Logf("Env is %+v", executionContext.Env)
-
-						err := rd.MasterDocument.Goldmark.Renderer().Render(&output, sourceText, rd.MasterDocument.Document)
-
-						info := string(fcbExpected.Info.Text(section.Document.Source))
-
-						t.Log("Result:\n")
-						t.Log(output.String())
-
-						if (info == "expected" && assert.NoError(t, err)) || (info == "expected-err" && assert.Error(t, err)) {
-							assert.Equal(t, cleanString(string(expectedText)), cleanString(output.String()))
-						}
+				// Find the section.
+				for _, ss := range r.GetSections() {
+					if ss.Pointer.SectionName == s.Pointer.SectionName {
+						section = ss
+						break
 					}
 				}
 
-			}
+				doc := ast.PruneDocumentToSection(section.Document.Document, section.Pointer.SectionName)
 
-		})
+				// Get markdown section
+				source := ast.FindNode(doc, func(n gold_ast.Node) bool {
+					if fcb, ok := n.(*gold_ast.FencedCodeBlock); ok && fcb.Info != nil {
+						return string(fcb.Info.Text(section.Document.Source)) == "markdown"
+					}
+
+					return false
+				})
+
+				// Get expected section
+				expected := ast.FindNode(doc, func(n gold_ast.Node) bool {
+					if fcb, ok := n.(*gold_ast.FencedCodeBlock); ok && fcb.Info != nil {
+						info := string(fcb.Info.Text(section.Document.Source))
+
+						return info == "expected" || info == "expected-err"
+					}
+
+					return false
+				})
+
+				// See if there's a specific invocation mentioned.
+				invocation := ast.FindNodeBackwardsDeeply(expected, func(n gold_ast.Node) bool {
+					if code, ok := n.(*gold_ast.CodeSpan); ok {
+						return strings.Contains(string(code.Text(section.Document.Source)), "rundown ")
+					}
+
+					return false
+				})
+
+				if assert.NotNil(t, source, "Source is nil") && assert.NotNil(t, expected, "Expected is nil") {
+					util.RedirectLogger(testutil.NewTestWriter(t))
+
+					fcbSource := source.(*gold_ast.FencedCodeBlock)
+					fcbExpected := expected.(*gold_ast.FencedCodeBlock)
+
+					r := text.NewNodeReaderFromSource(fcbSource, section.Document.Source)
+					sourceText, _ := ioutil.ReadAll(r)
+
+					r = text.NewNodeReaderFromSource(fcbExpected, section.Document.Source)
+					expectedText, _ := ioutil.ReadAll(r)
+
+					if assert.NotEmpty(t, sourceText) && assert.NotEmpty(t, expectedText) {
+						rd, err := rundown.LoadString(string(sourceText), section.Document.Filename)
+
+						output := bytes.Buffer{}
+
+						if assert.NoError(t, err) {
+							term.Aurora = aurora.NewAurora(false)
+							term.ColorsEnabled = false
+							term.NewSpinnerFunc = func(w io.Writer) term.Spinner {
+								return NewDocTestSpinner(w)
+							}
+
+							require.NoError(t, ast.FillInvokeBlocks(rd.MasterDocument.Document, 10))
+							out := util.CaptureStdout(func() {
+								rd.MasterDocument.Document.Dump(sourceText, 0)
+							})
+
+							t.Log("Filled invoke blocks:\n")
+							t.Log(out)
+
+							if invocation != nil {
+								invocationStr := string(invocation.Text(section.Document.Source))
+								sectionName := strings.Replace(invocationStr, "rundown ", "", 1)
+
+								t.Logf("Executing section %s", sectionName)
+
+								rd.MasterDocument.Document = ast.PruneDocumentToSection(rd.MasterDocument.Document, sectionName)
+							}
+
+							out = util.CaptureStdout(func() {
+								rd.MasterDocument.Document.Dump(sourceText, 0)
+							})
+
+							t.Log("Document executed:\n")
+							t.Log(out)
+
+							executionContext := rd.MasterDocument.Context
+							executionContext.ImportRawEnv(os.Environ())
+
+							t.Logf("Env is %+v", executionContext.Env)
+
+							err := rd.MasterDocument.Goldmark.Renderer().Render(&output, sourceText, rd.MasterDocument.Document)
+
+							info := string(fcbExpected.Info.Text(section.Document.Source))
+
+							t.Log("Result:\n")
+							t.Log(output.String())
+
+							if (info == "expected" && assert.NoError(t, err)) || (info == "expected-err" && assert.Error(t, err)) {
+								assert.Equal(t, cleanString(string(expectedText)), cleanString(output.String()))
+							}
+						}
+					}
+
+				}
+
+			})
+		}
 	}
 }
 
